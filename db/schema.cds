@@ -1,411 +1,526 @@
+/**
+ * CV Sorting Domain Model
+ * Following SAP CAP Best Practices
+ *
+ * @see https://cap.cloud.sap/docs/guides/domain-modeling
+ */
 namespace cv.sorting;
 
-using { cuid, managed, sap.common.CodeList } from '@sap/cds/common';
+using {
+    cuid,
+    managed,
+    sap.common.CodeList,
+    Currency,
+    Country
+} from '@sap/cds/common';
 
-// ==========================================
+using {
+    cv.sorting.common.Email,
+    cv.sorting.common.Phone,
+    cv.sorting.common.URL,
+    cv.sorting.common.Score,
+    cv.sorting.common.Percentage,
+    cv.sorting.common.YearsExperience,
+    cv.sorting.common.CandidateStatusCode,
+    cv.sorting.common.ProcessingStatus,
+    cv.sorting.common.JobStatus,
+    cv.sorting.common.ReviewStatus,
+    cv.sorting.common.ProficiencyLevel,
+    cv.sorting.common.LanguageProficiency,
+    cv.sorting.common.EmploymentType,
+    cv.sorting.common.LocationType,
+    cv.sorting.common.AuditTrail,
+    cv.sorting.common.SoftDelete,
+    cv.sorting.common.Taggable
+} from './common';
+
+// ============================================
 // CORE ENTITIES
-// ==========================================
+// ============================================
 
 /**
  * Candidates - Main entity for job applicants
  */
-entity Candidates : cuid, managed {
-    firstName           : String(100) @mandatory;
-    lastName            : String(100) @mandatory;
-    email               : String(255) @mandatory;
-    phone               : String(50);
-    linkedInUrl         : String(500);
-    portfolioUrl        : String(500);
-    location            : String(200);
-    country             : String(100);
-    city                : String(100);
+entity Candidates : cuid, managed, AuditTrail, SoftDelete, Taggable {
+    // Personal Information
+    firstName             : String(100) not null;
+    lastName              : String(100) not null;
+    email                 : Email not null;
+    phone                 : Phone;
+    linkedInUrl           : URL;
+    portfolioUrl          : URL;
+
+    // Location
+    country               : Country;
+    city                  : String(100);
+    address               : String(500);
 
     // Professional Summary
-    headline            : String(500);
-    summary             : LargeString;
-    totalExperienceYears: Decimal(4,1);
+    headline              : String(500);
+    summary               : LargeString;
+    totalExperienceYears  : YearsExperience;
+    currentSalary         : Decimal(12,2);
+    expectedSalary        : Decimal(12,2);
+    salaryCurrency        : Currency;
+    noticePeriodDays      : Integer;
+    availableFrom         : Date;
+    willingToRelocate     : Boolean default false;
 
     // Status & Scoring
-    status              : Association to CandidateStatuses;
-    overallScore        : Decimal(5,2);  // Calculated match score (0-100)
-    aiConfidenceScore   : Decimal(5,2);  // AI extraction confidence
+    status                : Association to CandidateStatuses @assert.target;
+    overallScore          : Score;
+    aiConfidenceScore     : Percentage;
 
-    // Relationships
-    documents           : Composition of many CVDocuments on documents.candidate = $self;
-    experiences         : Composition of many WorkExperiences on experiences.candidate = $self;
-    educations          : Composition of many Educations on educations.candidate = $self;
-    skills              : Composition of many CandidateSkills on skills.candidate = $self;
-    languages           : Composition of many CandidateLanguages on languages.candidate = $self;
-    certifications      : Composition of many Certifications on certifications.candidate = $self;
-    matchResults        : Association to many MatchResults on matchResults.candidate = $self;
-    notes               : Composition of many CandidateNotes on notes.candidate = $self;
+    // Compositions (owned by candidate)
+    documents             : Composition of many CVDocuments on documents.candidate = $self;
+    experiences           : Composition of many WorkExperiences on experiences.candidate = $self;
+    educations            : Composition of many Educations on educations.candidate = $self;
+    skills                : Composition of many CandidateSkills on skills.candidate = $self;
+    languages             : Composition of many CandidateLanguages on languages.candidate = $self;
+    certifications        : Composition of many Certifications on certifications.candidate = $self;
+    notes                 : Composition of many CandidateNotes on notes.candidate = $self;
+
+    // Associations
+    matchResults          : Association to many MatchResults on matchResults.candidate = $self;
 
     // Source tracking
-    source              : String(100);   // Where the CV came from
-    tags                : array of String;
+    source                : String(100);
+    referredBy            : String(200);
+
+    // Virtual/Calculated fields
+    virtual fullName      : String(201) = firstName || ' ' || lastName;
 }
 
 /**
  * CV Documents - Uploaded resume/CV files
  */
 entity CVDocuments : cuid, managed {
-    candidate           : Association to Candidates;
-    fileName            : String(255) @mandatory;
-    fileType            : String(50);    // pdf, docx, doc, png, jpg
-    fileSize            : Integer;       // in bytes
-    fileContent         : LargeBinary @Core.MediaType: mediaType;
-    mediaType           : String(100);
+    candidate             : Association to Candidates not null;
+
+    // File Information
+    fileName              : String(255) not null;
+    fileType              : String(50);
+    fileSize              : Integer;
+    @Core.MediaType: mediaType
+    @Core.ContentDisposition.Filename: fileName
+    fileContent           : LargeBinary;
+    mediaType             : String(100);
 
     // Processing Status
-    processingStatus    : String(20) default 'pending';  // pending, processing, completed, failed
-    processedAt         : Timestamp;
-    extractedText       : LargeString;   // Raw extracted text
-    extractedData       : LargeString;   // JSON structured data
+    processingStatus      : ProcessingStatus default 'pending';
+    processedAt           : Timestamp;
 
-    // AI Processing
-    ocrConfidence       : Decimal(5,2);
-    extractionMethod    : String(50);    // document-ai, manual, hybrid
-    errorMessage        : String(1000);
+    // Extracted Data
+    @Core.MediaType: 'text/plain'
+    extractedText         : LargeString;
+    @Core.MediaType: 'application/json'
+    extractedData         : LargeString;
 
-    isLatest            : Boolean default true;
-    version             : Integer default 1;
+    // AI Processing Metrics
+    ocrConfidence         : Percentage;
+    extractionMethod      : String(50);
+    processingDuration    : Integer; // milliseconds
+    errorMessage          : String(1000);
+
+    // Version Control
+    isLatest              : Boolean default true;
+    version               : Integer default 1;
+    previousVersion       : Association to CVDocuments;
 }
 
 /**
  * Work Experience entries
  */
 entity WorkExperiences : cuid, managed {
-    candidate           : Association to Candidates;
-    companyName         : String(200) @mandatory;
-    jobTitle            : String(200) @mandatory;
-    location            : String(200);
-    startDate           : Date;
-    endDate             : Date;
-    isCurrent           : Boolean default false;
-    description         : LargeString;
+    candidate             : Association to Candidates not null;
 
-    // Calculated fields
-    durationMonths      : Integer;
+    companyName           : String(200) not null;
+    jobTitle              : String(200) not null;
+    department            : String(100);
+    location              : String(200);
+    country               : Country;
 
-    // Skills used in this role
-    skills              : array of String;
+    startDate             : Date not null;
+    endDate               : Date;
+    isCurrent             : Boolean default false;
 
-    // Industry classification
-    industry            : String(100);
+    @Core.MediaType: 'text/plain'
+    description           : LargeString;
+    achievements          : LargeString;
+
+    // Calculated
+    durationMonths        : Integer;
+
+    // Classification
+    industry              : String(100);
+    companySize           : String(50);
+
+    // Skills used (denormalized for performance)
+    skillsUsed            : many String(100);
 }
 
 /**
  * Education entries
  */
 entity Educations : cuid, managed {
-    candidate           : Association to Candidates;
-    institution         : String(300) @mandatory;
-    degree              : String(200);
-    fieldOfStudy        : String(200);
-    startDate           : Date;
-    endDate             : Date;
-    grade               : String(50);
-    description         : LargeString;
+    candidate             : Association to Candidates not null;
+
+    institution           : String(300) not null;
+    degree                : String(200);
+    fieldOfStudy          : String(200);
+
+    startDate             : Date;
+    endDate               : Date;
+    isOngoing             : Boolean default false;
+
+    grade                 : String(50);
+    gpa                   : Decimal(3,2);
+    maxGpa                : Decimal(3,2);
+
+    description           : LargeString;
+    honors                : String(200);
 
     // Classification
-    degreeLevel         : Association to DegreeLevels;
+    degreeLevel           : Association to DegreeLevels;
+    country               : Country;
 }
 
 /**
  * Candidate Skills with proficiency
  */
-entity CandidateSkills : cuid {
-    candidate           : Association to Candidates;
-    skill               : Association to Skills;
-    proficiencyLevel    : String(20);    // beginner, intermediate, advanced, expert
-    yearsOfExperience   : Decimal(4,1);
-    isVerified          : Boolean default false;
-    source              : String(50);    // extracted, manual, inferred
-}
+entity CandidateSkills : cuid, managed {
+    candidate             : Association to Candidates not null;
+    skill                 : Association to Skills not null @assert.target;
 
-/**
- * Master Skills catalog
- */
-entity Skills : cuid, managed {
-    name                : String(100) @mandatory;
-    category            : Association to SkillCategories;
-    aliases             : array of String;  // Alternative names for the skill
-    isActive            : Boolean default true;
+    proficiencyLevel      : ProficiencyLevel default 'intermediate';
+    yearsOfExperience     : YearsExperience;
+    lastUsedDate          : Date;
 
-    // For matching
-    parentSkill         : Association to Skills;  // Skill hierarchy
-    relatedSkills       : Association to many SkillRelations on relatedSkills.skill1 = $self;
-}
+    isVerified            : Boolean default false;
+    verifiedBy            : String(100);
+    verifiedAt            : Timestamp;
 
-entity SkillRelations : cuid {
-    skill1              : Association to Skills;
-    skill2              : Association to Skills;
-    relationStrength    : Decimal(3,2);  // 0-1 how related the skills are
-}
-
-/**
- * Skill Categories
- */
-entity SkillCategories : CodeList {
-    key code            : String(50);
-    skills              : Association to many Skills on skills.category = $self;
+    source                : String(50) default 'extracted'; // extracted, manual, inferred
+    confidenceScore       : Percentage;
 }
 
 /**
  * Candidate Languages
  */
 entity CandidateLanguages : cuid {
-    candidate           : Association to Candidates;
-    language            : String(50) @mandatory;
-    proficiency         : String(20);    // native, fluent, professional, basic
+    candidate             : Association to Candidates not null;
+    languageCode          : String(5) not null;
+    languageName          : String(50);
+    proficiency           : LanguageProficiency default 'professional';
+    isNative              : Boolean default false;
 }
 
 /**
  * Certifications
  */
 entity Certifications : cuid, managed {
-    candidate           : Association to Candidates;
-    name                : String(300) @mandatory;
-    issuingOrganization : String(200);
-    issueDate           : Date;
-    expirationDate      : Date;
-    credentialId        : String(100);
-    credentialUrl       : String(500);
+    candidate             : Association to Candidates not null;
+
+    name                  : String(300) not null;
+    issuingOrganization   : String(200);
+    issueDate             : Date;
+    expirationDate        : Date;
+
+    credentialId          : String(100);
+    credentialUrl         : URL;
+
+    isValid               : Boolean default true;
 }
 
 /**
- * Candidate Notes - Comments from recruiters
+ * Candidate Notes - Comments from recruiters/hiring managers
  */
-entity CandidateNotes : cuid, managed {
-    candidate           : Association to Candidates;
-    noteText            : LargeString @mandatory;
-    noteType            : String(50);    // general, interview, feedback, internal
-    isPrivate           : Boolean default false;
+entity CandidateNotes : cuid, managed, AuditTrail {
+    candidate             : Association to Candidates not null;
+
+    noteText              : LargeString not null;
+    noteType              : String(50) default 'general';
+
+    isPrivate             : Boolean default false;
+    isPinned              : Boolean default false;
 }
 
-// ==========================================
-// JOB POSTING & MATCHING
-// ==========================================
+// ============================================
+// SKILLS CATALOG
+// ============================================
+
+/**
+ * Master Skills catalog
+ */
+entity Skills : cuid, managed {
+    name                  : String(100) not null;
+    normalizedName        : String(100); // lowercase, trimmed for matching
+
+    category              : Association to SkillCategories;
+    parentSkill           : Association to Skills;
+
+    description           : String(500);
+    aliases               : many String(100);
+
+    isActive              : Boolean default true;
+    usageCount            : Integer default 0;
+
+    // Relations
+    childSkills           : Association to many Skills on childSkills.parentSkill = $self;
+    relatedSkills         : Association to many SkillRelations on relatedSkills.skill1 = $self;
+}
+
+/**
+ * Skill Relations for similarity matching
+ */
+entity SkillRelations : cuid {
+    skill1                : Association to Skills not null;
+    skill2                : Association to Skills not null;
+    relationStrength      : Decimal(3,2) default 0.5; // 0-1
+    relationType          : String(20); // similar, parent-child, complementary
+}
+
+/**
+ * Skill Categories
+ */
+entity SkillCategories : CodeList {
+    key code              : String(50);
+    icon                  : String(50);
+    sortOrder             : Integer;
+    skills                : Association to many Skills on skills.category = $self;
+}
+
+// ============================================
+// JOB POSTINGS
+// ============================================
 
 /**
  * Job Postings
  */
-entity JobPostings : cuid, managed {
-    title               : String(200) @mandatory;
-    department          : String(100);
-    location            : String(200);
-    locationType        : String(50);    // onsite, remote, hybrid
-    employmentType      : String(50);    // full-time, part-time, contract, internship
+entity JobPostings : cuid, managed, AuditTrail, Taggable {
+    // Basic Info
+    title                 : String(200) not null;
+    jobCode               : String(50);
+    department            : String(100);
 
-    description         : LargeString;
-    responsibilities    : LargeString;
+    // Location
+    location              : String(200);
+    country               : Country;
+    locationType          : LocationType default 'onsite';
+
+    // Employment Details
+    employmentType        : EmploymentType default 'full-time';
+
+    // Description
+    @Core.MediaType: 'text/html'
+    description           : LargeString;
+    @Core.MediaType: 'text/html'
+    responsibilities      : LargeString;
+    @Core.MediaType: 'text/html'
+    qualifications        : LargeString;
+    @Core.MediaType: 'text/html'
+    benefits              : LargeString;
 
     // Requirements
-    requiredSkills      : Composition of many JobRequiredSkills on requiredSkills.jobPosting = $self;
-    minimumExperience   : Decimal(4,1);  // years
-    preferredExperience : Decimal(4,1);
-    requiredEducation   : Association to DegreeLevels;
+    requiredSkills        : Composition of many JobRequiredSkills on requiredSkills.jobPosting = $self;
+    minimumExperience     : YearsExperience;
+    preferredExperience   : YearsExperience;
+    requiredEducation     : Association to DegreeLevels;
 
-    // Salary
-    salaryMin           : Decimal(12,2);
-    salaryMax           : Decimal(12,2);
-    salaryCurrency      : String(3) default 'USD';
+    // Compensation
+    salaryMin             : Decimal(12,2);
+    salaryMax             : Decimal(12,2);
+    salaryCurrency        : Currency;
+    showSalary            : Boolean default false;
 
-    // Status
-    status              : String(20) default 'draft';  // draft, open, closed, on-hold
-    publishedAt         : Timestamp;
-    closingDate         : Date;
+    // Status & Timeline
+    status                : JobStatus default 'draft';
+    publishedAt           : Timestamp;
+    closingDate           : Date;
+    targetHireDate        : Date;
 
-    // Matching
-    matchResults        : Association to many MatchResults on matchResults.jobPosting = $self;
+    // Hiring Details
+    numberOfPositions     : Integer default 1;
+    hiringManager         : String(100);
+    recruiter             : String(100);
 
-    // Weights for scoring algorithm
-    skillWeight         : Decimal(3,2) default 0.40;
-    experienceWeight    : Decimal(3,2) default 0.30;
-    educationWeight     : Decimal(3,2) default 0.20;
-    locationWeight      : Decimal(3,2) default 0.10;
+    // Matching Configuration
+    skillWeight           : Decimal(3,2) default 0.40;
+    experienceWeight      : Decimal(3,2) default 0.30;
+    educationWeight       : Decimal(3,2) default 0.20;
+    locationWeight        : Decimal(3,2) default 0.10;
+
+    // Relations
+    matchResults          : Association to many MatchResults on matchResults.jobPosting = $self;
+
+    // Analytics
+    viewCount             : Integer default 0;
+    applicationCount      : Integer default 0;
 }
 
 /**
- * Job Required Skills with importance
+ * Job Required Skills with importance weight
  */
 entity JobRequiredSkills : cuid {
-    jobPosting          : Association to JobPostings;
-    skill               : Association to Skills;
-    isRequired          : Boolean default true;  // required vs nice-to-have
-    minimumProficiency  : String(20);
-    weight              : Decimal(3,2) default 1.0;  // Importance weight
+    jobPosting            : Association to JobPostings not null;
+    skill                 : Association to Skills not null @assert.target;
+
+    isRequired            : Boolean default true;
+    minimumProficiency    : ProficiencyLevel default 'intermediate';
+    weight                : Decimal(3,2) default 1.0;
 }
+
+// ============================================
+// MATCHING
+// ============================================
 
 /**
  * Match Results - Candidate to Job matching scores
  */
 entity MatchResults : cuid, managed {
-    candidate           : Association to Candidates;
-    jobPosting          : Association to JobPostings;
+    candidate             : Association to Candidates not null;
+    jobPosting            : Association to JobPostings not null;
 
-    // Overall score
-    overallScore        : Decimal(5,2) @mandatory;  // 0-100
-
-    // Component scores
-    skillScore          : Decimal(5,2);
-    experienceScore     : Decimal(5,2);
-    educationScore      : Decimal(5,2);
-    locationScore       : Decimal(5,2);
-
-    // Detailed breakdown (JSON)
-    scoreBreakdown      : LargeString;
-
-    // AI insights
-    aiRecommendation    : LargeString;
-    strengthsAnalysis   : LargeString;
-    gapsAnalysis        : LargeString;
+    // Scores
+    overallScore          : Score not null;
+    skillScore            : Score;
+    experienceScore       : Score;
+    educationScore        : Score;
+    locationScore         : Score;
 
     // Ranking
-    rank                : Integer;
+    rank                  : Integer;
 
-    // Status
-    reviewStatus        : String(20) default 'pending';  // pending, reviewed, shortlisted, rejected
-    reviewedBy          : String(100);
-    reviewedAt          : Timestamp;
-    reviewNotes         : LargeString;
+    // Detailed Analysis (JSON)
+    @Core.MediaType: 'application/json'
+    scoreBreakdown        : LargeString;
+    @Core.MediaType: 'application/json'
+    matchedSkills         : LargeString;
+    @Core.MediaType: 'application/json'
+    missingSkills         : LargeString;
+
+    // AI Insights
+    aiRecommendation      : LargeString;
+    strengthsAnalysis     : LargeString;
+    gapsAnalysis          : LargeString;
+
+    // Review
+    reviewStatus          : ReviewStatus default 'pending';
+    reviewedBy            : String(100);
+    reviewedAt            : Timestamp;
+    reviewNotes           : LargeString;
 }
 
-// ==========================================
-// SUPPORTING ENTITIES
-// ==========================================
+// ============================================
+// CODE LISTS / VALUE HELPS
+// ============================================
 
 /**
- * Candidate Statuses
+ * Candidate Statuses with workflow order
  */
 entity CandidateStatuses : CodeList {
-    key code            : String(20);
-    // new, screening, interviewing, shortlisted, offered, hired, rejected, withdrawn
+    key code              : String(20);
+    sortOrder             : Integer;
+    isActive              : Boolean default true;
+    criticality           : Integer; // For UI status colors
+
+    // Allowed transitions
+    allowedTransitions    : many String(20);
 }
 
 /**
- * Degree Levels
+ * Degree Levels with ranking
  */
 entity DegreeLevels : CodeList {
-    key code            : String(50);
-    rank                : Integer;  // For comparison: 1=high school, 2=associate, 3=bachelor, 4=master, 5=doctorate
+    key code              : String(50);
+    rank                  : Integer; // For comparison
+    sortOrder             : Integer;
 }
 
-// ==========================================
-// FILTERING & SORTING CONFIGURATION
-// ==========================================
+// ============================================
+// CONFIGURATION
+// ============================================
 
 /**
  * Saved Filter Configurations
  */
 entity SavedFilters : cuid, managed {
-    name                : String(100) @mandatory;
-    description         : String(500);
-    filterCriteria      : LargeString @mandatory;  // JSON filter configuration
-    isPublic            : Boolean default false;
-    isDefault           : Boolean default false;
-    createdByUser       : String(100);
+    name                  : String(100) not null;
+    description           : String(500);
+
+    @Core.MediaType: 'application/json'
+    filterCriteria        : LargeString not null;
+
+    isPublic              : Boolean default false;
+    isDefault             : Boolean default false;
+
+    entityType            : String(50); // Candidates, JobPostings, etc.
+    owner                 : String(100);
 }
 
 /**
  * Sorting Configurations
  */
 entity SortingConfigurations : cuid, managed {
-    name                : String(100) @mandatory;
-    description         : String(500);
-    sortingRules        : LargeString @mandatory;  // JSON sorting rules
+    name                  : String(100) not null;
+    description           : String(500);
 
-    // Weights for custom scoring
-    skillWeight         : Decimal(3,2) default 0.35;
-    experienceWeight    : Decimal(3,2) default 0.25;
-    educationWeight     : Decimal(3,2) default 0.20;
-    recencyWeight       : Decimal(3,2) default 0.10;
-    locationWeight      : Decimal(3,2) default 0.10;
+    @Core.MediaType: 'application/json'
+    sortingRules          : LargeString not null;
 
-    isDefault           : Boolean default false;
+    // Weights for scoring
+    skillWeight           : Decimal(3,2) default 0.35;
+    experienceWeight      : Decimal(3,2) default 0.25;
+    educationWeight       : Decimal(3,2) default 0.20;
+    recencyWeight         : Decimal(3,2) default 0.10;
+    locationWeight        : Decimal(3,2) default 0.10;
+
+    isDefault             : Boolean default false;
+    owner                 : String(100);
 }
 
-// ==========================================
-// JOULE AI INTEGRATION
-// ==========================================
+// ============================================
+// AUDIT & WORKFLOW
+// ============================================
 
 /**
- * Joule Conversation History
+ * Audit Log for tracking changes
  */
-entity JouleConversations : cuid, managed {
-    sessionId           : String(100) @mandatory;
-    userId              : String(100);
-    context             : String(50);    // candidate-search, job-matching, analytics
+entity AuditLogs : cuid, managed {
+    entityName            : String(100) not null;
+    entityId              : UUID not null;
+    action                : String(20) not null; // CREATE, UPDATE, DELETE
 
-    messages            : Composition of many JouleMessages on messages.conversation = $self;
-}
+    @Core.MediaType: 'application/json'
+    oldValues             : LargeString;
+    @Core.MediaType: 'application/json'
+    newValues             : LargeString;
 
-entity JouleMessages : cuid, managed {
-    conversation        : Association to JouleConversations;
-    role                : String(20) @mandatory;  // user, assistant
-    content             : LargeString @mandatory;
-
-    // If the message resulted in an action
-    actionType          : String(50);    // search, filter, sort, analyze
-    actionPayload       : LargeString;   // JSON action details
-    actionResult        : LargeString;   // JSON result summary
+    changedFields         : many String(100);
+    userId                : String(100);
+    userIp                : String(50);
 }
 
 /**
- * Joule Insights - AI-generated insights
- */
-entity JouleInsights : cuid, managed {
-    entityType          : String(50) @mandatory;  // candidate, job, match
-    entityId            : UUID @mandatory;
-    insightType         : String(50);    // summary, recommendation, gap-analysis, improvement
-    content             : LargeString @mandatory;
-    confidence          : Decimal(5,2);
-    isActive            : Boolean default true;
-}
-
-// ==========================================
-// ANALYTICS & REPORTING
-// ==========================================
-
-/**
- * Pipeline Analytics snapshots
- */
-entity PipelineSnapshots : cuid, managed {
-    snapshotDate        : Date @mandatory;
-
-    totalCandidates     : Integer;
-    newCandidates       : Integer;
-    inScreening         : Integer;
-    inInterview         : Integer;
-    shortlisted         : Integer;
-    hired               : Integer;
-    rejected            : Integer;
-
-    avgTimeToHire       : Decimal(6,2);  // days
-    avgMatchScore       : Decimal(5,2);
-
-    bySource            : LargeString;   // JSON breakdown by source
-    byLocation          : LargeString;   // JSON breakdown by location
-    topSkills           : LargeString;   // JSON top skills in pipeline
-}
-
-// ==========================================
-// WORKFLOW TRACKING
-// ==========================================
-
-/**
- * Workflow Instances
+ * Workflow Instances for tracking automation
  */
 entity WorkflowInstances : cuid, managed {
-    workflowType        : String(50) @mandatory;  // cv-processing, approval, notification
-    entityType          : String(50);
-    entityId            : UUID;
+    workflowType          : String(50) not null;
+    workflowDefinitionId  : String(100);
 
-    status              : String(20) default 'running';  // running, completed, failed, cancelled
-    startedAt           : Timestamp;
-    completedAt         : Timestamp;
+    entityType            : String(50);
+    entityId              : UUID;
 
-    currentStep         : String(100);
-    stepHistory         : LargeString;   // JSON array of completed steps
-    errorDetails        : LargeString;
+    status                : String(20) default 'running';
+    startedAt             : Timestamp;
+    completedAt           : Timestamp;
+
+    currentStep           : String(100);
+    @Core.MediaType: 'application/json'
+    stepHistory           : LargeString;
+
+    errorCode             : String(50);
+    errorMessage          : LargeString;
+
+    triggeredBy           : String(100);
 }

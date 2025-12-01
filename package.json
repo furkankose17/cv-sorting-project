@@ -1,7 +1,7 @@
 {
   "name": "cv-sorting-project",
   "version": "1.0.0",
-  "description": "SAP BTP CV Sorting and Candidate Management System with AI-powered document extraction, Joule integration, and process automation",
+  "description": "SAP BTP CV Sorting and Candidate Management System",
   "repository": "https://github.com/furkankose17/cv-sorting-project",
   "license": "UNLICENSED",
   "private": true,
@@ -13,64 +13,103 @@
     "@sap-cloud-sdk/connectivity": "^3",
     "@sap-cloud-sdk/resilience": "^3",
     "express": "^4",
-    "passport": "^0.7",
-    "uuid": "^9",
-    "pdf-parse": "^1.1.1",
-    "mammoth": "^1.6.0",
-    "natural": "^6.10.0",
-    "compromise": "^14.10.0"
+    "passport": "^0.7"
   },
   "devDependencies": {
     "@cap-js/sqlite": "^1",
     "@sap/cds-dk": "^7",
     "@sap/ux-specification": "^1",
-    "chai": "^4",
-    "chai-http": "^4",
-    "mocha": "^10",
+    "@sap/cds-lsp": "^7",
+    "axios": "^1",
+    "jest": "^29",
+    "@types/jest": "^29",
     "rimraf": "^5"
   },
   "scripts": {
     "start": "cds-serve",
-    "watch": "cds watch",
-    "test": "mocha test/**/*.test.js --timeout 10000",
+    "watch": "cds watch --profile development",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
     "build": "cds build --production",
-    "deploy": "cds deploy --to hana",
-    "clean": "rimraf gen mta_archives *.mtar"
+    "build:cf": "mbt build",
+    "deploy": "cf deploy mta_archives/*.mtar",
+    "deploy:hana": "cds deploy --to hana",
+    "lint": "cds lint",
+    "clean": "rimraf gen mta_archives *.mtar node_modules"
   },
   "cds": {
     "requires": {
-      "db": {
-        "kind": "hana"
+      "[production]": {
+        "db": {
+          "kind": "hana"
+        },
+        "auth": {
+          "kind": "xsuaa"
+        }
       },
-      "auth": {
-        "kind": "xsuaa"
+      "[development]": {
+        "db": {
+          "kind": "sqlite",
+          "credentials": {
+            "database": ":memory:"
+          }
+        },
+        "auth": {
+          "kind": "mocked",
+          "users": {
+            "admin": {
+              "password": "admin",
+              "roles": ["CVAdmin", "Recruiter", "HRManager"]
+            },
+            "recruiter": {
+              "password": "recruiter",
+              "roles": ["Recruiter"]
+            },
+            "viewer": {
+              "password": "viewer",
+              "roles": ["Viewer"]
+            }
+          }
+        }
       },
       "document-ai": {
         "kind": "rest",
         "credentials": {
           "destination": "document-ai-destination"
         }
-      },
-      "joule-ai": {
-        "kind": "rest",
-        "credentials": {
-          "destination": "joule-ai-destination"
-        }
       }
     },
     "features": {
-      "fetch_csrf": true
+      "fetch_csrf": true,
+      "odata_new_parser": true
+    },
+    "odata": {
+      "version": "v4"
     },
     "hana": {
       "deploy-format": "hdbtable"
+    },
+    "log": {
+      "levels": {
+        "cds": "info",
+        "db": "error",
+        "[development]": {
+          "cds": "debug",
+          "db": "info"
+        }
+      }
+    },
+    "i18n": {
+      "default_language": "en",
+      "languages": ["en", "de", "tr"]
     }
   },
   "sapux": [
-    "app/cv-upload",
-    "app/candidate-management",
-    "app/analytics-dashboard"
+    "app/candidates",
+    "app/jobs",
+    "app/cv-upload"
   ],
   "engines": {
-    "node": ">=18"
+    "node": "^18 || ^20"
   }
 }
