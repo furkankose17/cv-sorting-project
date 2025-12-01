@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mvc:View
+    controllerName="cv.sorting.cvupload.controller.Upload"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:u="sap.ui.unified"
+    xmlns:layout="sap.ui.layout"
+    xmlns:f="sap.f"
+    xmlns:core="sap.ui.core">
+
+    <Page
+        id="uploadPage"
+        title="{i18n>uploadPageTitle}"
+        showNavButton="false">
+
+        <headerContent>
+            <Button
+                icon="sap-icon://documents"
+                text="{i18n>viewDocuments}"
+                press="onNavigateToDocuments"
+                type="Transparent"/>
+        </headerContent>
+
+        <content>
+            <f:Card class="sapUiMediumMargin">
+                <f:header>
+                    <f:cards:Header
+                        xmlns:f.cards="sap.f.cards"
+                        title="{i18n>uploadCVTitle}"
+                        subtitle="{i18n>uploadCVSubtitle}"
+                        iconSrc="sap-icon://upload"/>
+                </f:header>
+                <f:content>
+                    <VBox class="sapUiSmallMargin">
+                        <!-- Upload Area -->
+                        <u:FileUploader
+                            id="fileUploader"
+                            name="cvFile"
+                            uploadUrl="/cv/uploadDocument"
+                            uploadComplete="onUploadComplete"
+                            change="onFileChange"
+                            fileType="pdf,doc,docx,png,jpg,jpeg"
+                            multiple="true"
+                            buttonOnly="false"
+                            buttonText="{i18n>selectFiles}"
+                            placeholder="{i18n>dragDropPlaceholder}"
+                            style="Emphasized"
+                            width="100%"
+                            class="sapUiSmallMarginBottom"/>
+
+                        <!-- Drag and Drop Area -->
+                        <VBox
+                            id="dropZone"
+                            class="sapUiSmallMargin dropZone"
+                            alignItems="Center"
+                            justifyContent="Center">
+                            <core:Icon
+                                src="sap-icon://upload-to-cloud"
+                                size="3rem"
+                                color="#0854a0"
+                                class="sapUiSmallMarginBottom"/>
+                            <Text text="{i18n>dragDropHint}" class="sapUiTinyMarginBottom"/>
+                            <Text text="{i18n>supportedFormats}" class="sapUiTinyMarginBottom supportedFormatsText"/>
+                        </VBox>
+
+                        <!-- Selected Files List -->
+                        <Panel
+                            id="selectedFilesPanel"
+                            headerText="{i18n>selectedFiles}"
+                            visible="{= ${upload>/files}.length > 0}"
+                            class="sapUiSmallMarginTop">
+                            <List
+                                id="selectedFilesList"
+                                items="{upload>/files}"
+                                mode="Delete"
+                                delete="onRemoveFile">
+                                <StandardListItem
+                                    title="{upload>name}"
+                                    description="{upload>formattedSize}"
+                                    icon="{upload>icon}"
+                                    info="{upload>status}"
+                                    infoState="{upload>infoState}"/>
+                            </List>
+                        </Panel>
+
+                        <!-- Upload Progress -->
+                        <VBox
+                            visible="{upload>/isProcessing}"
+                            class="sapUiSmallMarginTop"
+                            alignItems="Center">
+                            <ProgressIndicator
+                                id="uploadProgress"
+                                percentValue="{upload>/uploadProgress}"
+                                displayValue="{upload>/uploadProgress}%"
+                                showValue="true"
+                                state="Information"
+                                width="100%"/>
+                            <Text text="{i18n>processingDocuments}" class="sapUiTinyMarginTop"/>
+                        </VBox>
+
+                        <!-- Upload Button -->
+                        <Button
+                            id="uploadButton"
+                            text="{i18n>uploadAndProcess}"
+                            type="Emphasized"
+                            press="onUploadPress"
+                            enabled="{= ${upload>/files}.length > 0 &amp;&amp; !${upload>/isProcessing}}"
+                            class="sapUiMediumMarginTop"
+                            width="100%"/>
+                    </VBox>
+                </f:content>
+            </f:Card>
+
+            <!-- Recent Uploads Section -->
+            <f:Card class="sapUiMediumMargin">
+                <f:header>
+                    <f:cards:Header
+                        xmlns:f.cards="sap.f.cards"
+                        title="{i18n>recentUploads}"
+                        subtitle="{i18n>lastUploaded}"/>
+                </f:header>
+                <f:content>
+                    <Table
+                        id="recentUploadsTable"
+                        items="{
+                            path: '/Documents',
+                            sorter: { path: 'createdAt', descending: true },
+                            parameters: { $top: 10 }
+                        }"
+                        growing="true"
+                        growingThreshold="5"
+                        mode="None">
+                        <columns>
+                            <Column>
+                                <Text text="{i18n>fileName}"/>
+                            </Column>
+                            <Column>
+                                <Text text="{i18n>status}"/>
+                            </Column>
+                            <Column>
+                                <Text text="{i18n>uploadDate}"/>
+                            </Column>
+                            <Column>
+                                <Text text="{i18n>candidate}"/>
+                            </Column>
+                            <Column width="8rem">
+                                <Text text="{i18n>actions}"/>
+                            </Column>
+                        </columns>
+                        <items>
+                            <ColumnListItem type="Navigation" press="onDocumentPress">
+                                <cells>
+                                    <ObjectIdentifier
+                                        title="{fileName}"
+                                        text="{fileType}"/>
+                                    <ObjectStatus
+                                        text="{processingStatus}"
+                                        state="{= ${processingStatus} === 'completed' ? 'Success' : ${processingStatus} === 'failed' ? 'Error' : ${processingStatus} === 'processing' ? 'Information' : 'None'}"/>
+                                    <Text text="{
+                                        path: 'createdAt',
+                                        type: 'sap.ui.model.type.DateTime',
+                                        formatOptions: { style: 'medium' }
+                                    }"/>
+                                    <Text text="{candidate_firstName} {candidate_lastName}"/>
+                                    <HBox>
+                                        <Button
+                                            icon="sap-icon://synchronize"
+                                            tooltip="{i18n>reprocess}"
+                                            press="onReprocessDocument"
+                                            type="Transparent"
+                                            visible="{= ${processingStatus} === 'failed'}"/>
+                                        <Button
+                                            icon="sap-icon://detail-view"
+                                            tooltip="{i18n>viewDetails}"
+                                            press="onViewDocument"
+                                            type="Transparent"/>
+                                    </HBox>
+                                </cells>
+                            </ColumnListItem>
+                        </items>
+                    </Table>
+                </f:content>
+            </f:Card>
+        </content>
+
+        <footer>
+            <Toolbar>
+                <ToolbarSpacer/>
+                <Text text="{i18n>uploadFooterText}"/>
+            </Toolbar>
+        </footer>
+    </Page>
+</mvc:View>

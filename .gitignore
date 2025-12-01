@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+gen/
+*.mtar
+mta_archives/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+
+# Environment and credentials
+.env
+.env.local
+default-env.json
+*.pem
+*.key
+credentials*.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# SAP specific
+.che/
+.theia/
+mta_archives/
+resources/
+
+# Local databases
+*.db
+*.sqlite
+
+# Backup files
+*.bak
+*.backup
+*~

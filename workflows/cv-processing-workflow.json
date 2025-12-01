@@ -1,0 +1,555 @@
+{
+  "$schema": "https://api.sap.com/workflow/1.0/schema.json",
+  "id": "cv-processing-workflow",
+  "name": "CV Processing Workflow",
+  "description": "Automated workflow for processing uploaded CV documents through OCR, data extraction, and candidate profile creation",
+  "version": "1.0.0",
+
+  "triggers": [
+    {
+      "type": "api",
+      "id": "api-trigger",
+      "name": "API Trigger",
+      "description": "Triggered via API when a new CV is uploaded"
+    },
+    {
+      "type": "event",
+      "id": "document-uploaded-trigger",
+      "name": "Document Uploaded Event",
+      "description": "Triggered by DocumentUploaded event from CV Service",
+      "eventSource": "CVService",
+      "eventType": "DocumentUploaded"
+    }
+  ],
+
+  "inputParameters": {
+    "documentId": {
+      "type": "string",
+      "description": "ID of the uploaded document",
+      "required": true
+    },
+    "fileName": {
+      "type": "string",
+      "description": "Name of the uploaded file"
+    },
+    "uploadedBy": {
+      "type": "string",
+      "description": "User who uploaded the document"
+    },
+    "autoCreateCandidate": {
+      "type": "boolean",
+      "description": "Automatically create candidate from extracted data",
+      "default": true
+    }
+  },
+
+  "steps": [
+    {
+      "id": "validate-document",
+      "name": "Validate Document",
+      "type": "script",
+      "description": "Validate the uploaded document before processing",
+      "script": {
+        "language": "javascript",
+        "code": "const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/png', 'image/jpeg'];\ncontext.isValid = allowedTypes.includes(context.fileType);\nif (!context.isValid) {\n  context.validationError = 'Unsupported file type: ' + context.fileType;\n}"
+      }
+    },
+    {
+      "id": "check-validation",
+      "name": "Check Validation Result",
+      "type": "exclusiveGateway",
+      "description": "Route based on validation result",
+      "condition": {
+        "expression": "${context.isValid == true}"
+      },
+      "branches": [
+        {
+          "condition": "${context.isValid == true}",
+          "nextStep": "process-with-document-ai"
+        },
+        {
+          "condition": "${context.isValid == false}",
+          "nextStep": "handle-validation-error"
+        }
+      ]
+    },
+    {
+      "id": "handle-validation-error",
+      "name": "Handle Validation Error",
+      "type": "servicetask",
+      "description": "Update document status and notify about validation failure",
+      "service": {
+        "destination": "cv-service",
+        "path": "/cv/Documents(${context.documentId})",
+        "method": "PATCH",
+        "body": {
+          "processingStatus": "failed",
+          "errorMessage": "${context.validationError}"
+        }
+      },
+      "nextStep": "send-failure-notification"
+    },
+    {
+      "id": "process-with-document-ai",
+      "name": "Process with Document AI",
+      "type": "servicetask",
+      "description": "Send document to Document AI for OCR and data extraction",
+      "service": {
+        "destination": "cv-service",
+        "path": "/cv/processDocument",
+        "method": "POST",
+        "body": {
+          "documentId": "${context.documentId}",
+          "extractionOptions": "{\"language\": \"en\", \"enhancedMode\": true}"
+        }
+      },
+      "output": {
+        "extractionResult": "${response}"
+      },
+      "errorHandling": {
+        "retryCount": 3,
+        "retryInterval": "PT30S",
+        "onError": "handle-extraction-error"
+      }
+    },
+    {
+      "id": "handle-extraction-error",
+      "name": "Handle Extraction Error",
+      "type": "servicetask",
+      "description": "Handle document extraction failure",
+      "service": {
+        "destination": "cv-service",
+        "path": "/cv/Documents(${context.documentId})",
+        "method": "PATCH",
+        "body": {
+          "processingStatus": "failed",
+          "errorMessage": "Document AI extraction failed after retries"
+        }
+      },
+      "nextStep": "send-failure-notification"
+    },
+    {
+      "id": "check-extraction-result",
+      "name": "Check Extraction Quality",
+      "type": "exclusiveGateway",
+      "description": "Check if extraction confidence is sufficient",
+      "condition": {
+        "expression": "${context.extractionResult.confidence >= 0.7}"
+      },
+      "branches": [
+        {
+          "condition": "${context.extractionResult.confidence >= 0.7}",
+          "nextStep": "auto-create-candidate"
+        },
+        {
+          "condition": "${context.extractionResult.confidence < 0.7 && context.extractionResult.confidence >= 0.4}",
+          "nextStep": "request-manual-review"
+        },
+        {
+          "condition": "${context.extractionResult.confidence < 0.4}",
+          "nextStep": "flag-for-manual-processing"
+        }
+      ]
+    },
+    {
+      "id": "auto-create-candidate",
+      "name": "Auto Create Candidate",
+      "type": "exclusiveGateway",
+      "description": "Check if auto-create is enabled",
+      "condition": {
+        "expression": "${context.autoCreateCandidate == true}"
+      },
+      "branches": [
+        {
+          "condition": "${context.autoCreateCandidate == true}",
+          "nextStep": "create-candidate-profile"
+        },
+        {
+          "condition": "${context.autoCreateCandidate == false}",
+          "nextStep": "send-success-notification"
+        }
+      ]
+    },
+    {
+      "id": "create-candidate-profile",
+      "name": "Create Candidate Profile",
+      "type": "servicetask",
+      "description": "Create candidate from extracted document data",
+      "service": {
+        "destination": "cv-service",
+        "path": "/cv/createCandidateFromDocument",
+        "method": "POST",
+        "body": {
+          "documentId": "${context.documentId}",
+          "additionalData": "{}",
+          "autoLinkSkills": true
+        }
+      },
+      "output": {
+        "candidateResult": "${response}"
+      }
+    },
+    {
+      "id": "check-duplicate",
+      "name": "Check for Duplicates",
+      "type": "servicetask",
+      "description": "Check if similar candidate already exists",
+      "service": {
+        "destination": "candidate-service",
+        "path": "/candidate/searchCandidates",
+        "method": "GET",
+        "parameters": {
+          "query": "${context.candidateResult.email}"
+        }
+      },
+      "output": {
+        "duplicateCheck": "${response}"
+      }
+    },
+    {
+      "id": "handle-duplicate",
+      "name": "Handle Duplicate Check",
+      "type": "exclusiveGateway",
+      "description": "Route based on duplicate detection",
+      "condition": {
+        "expression": "${context.duplicateCheck.totalCount > 1}"
+      },
+      "branches": [
+        {
+          "condition": "${context.duplicateCheck.totalCount > 1}",
+          "nextStep": "request-duplicate-review"
+        },
+        {
+          "condition": "${context.duplicateCheck.totalCount <= 1}",
+          "nextStep": "trigger-matching"
+        }
+      ]
+    },
+    {
+      "id": "request-duplicate-review",
+      "name": "Request Duplicate Review",
+      "type": "usertask",
+      "description": "Request HR to review potential duplicate candidates",
+      "assignee": {
+        "type": "role",
+        "role": "HR_REVIEWER"
+      },
+      "dueDate": "P2D",
+      "form": {
+        "title": "Potential Duplicate Candidate",
+        "description": "A new CV was uploaded that may match an existing candidate. Please review.",
+        "fields": [
+          {
+            "id": "action",
+            "type": "dropdown",
+            "label": "Action",
+            "options": ["merge", "create_new", "reject"],
+            "required": true
+          },
+          {
+            "id": "mergeTargetId",
+            "type": "text",
+            "label": "Merge with Candidate ID",
+            "visible": "${action == 'merge'}"
+          },
+          {
+            "id": "notes",
+            "type": "textarea",
+            "label": "Notes"
+          }
+        ]
+      },
+      "output": {
+        "duplicateDecision": "${taskOutput}"
+      }
+    },
+    {
+      "id": "process-duplicate-decision",
+      "name": "Process Duplicate Decision",
+      "type": "exclusiveGateway",
+      "description": "Process the duplicate review decision",
+      "branches": [
+        {
+          "condition": "${context.duplicateDecision.action == 'merge'}",
+          "nextStep": "merge-candidates"
+        },
+        {
+          "condition": "${context.duplicateDecision.action == 'create_new'}",
+          "nextStep": "trigger-matching"
+        },
+        {
+          "condition": "${context.duplicateDecision.action == 'reject'}",
+          "nextStep": "reject-candidate"
+        }
+      ]
+    },
+    {
+      "id": "merge-candidates",
+      "name": "Merge Candidates",
+      "type": "servicetask",
+      "description": "Merge the new candidate with existing",
+      "service": {
+        "destination": "candidate-service",
+        "path": "/candidate/mergeCandidates",
+        "method": "POST",
+        "body": {
+          "primaryId": "${context.duplicateDecision.mergeTargetId}",
+          "duplicateIds": ["${context.candidateResult.candidateId}"],
+          "mergeStrategy": "merge-all"
+        }
+      },
+      "nextStep": "send-success-notification"
+    },
+    {
+      "id": "reject-candidate",
+      "name": "Reject Candidate",
+      "type": "servicetask",
+      "description": "Archive the rejected candidate",
+      "service": {
+        "destination": "candidate-service",
+        "path": "/candidate/archiveCandidate",
+        "method": "POST",
+        "body": {
+          "candidateId": "${context.candidateResult.candidateId}",
+          "reason": "Duplicate - rejected by HR"
+        }
+      },
+      "nextStep": "send-rejection-notification"
+    },
+    {
+      "id": "request-manual-review",
+      "name": "Request Manual Review",
+      "type": "usertask",
+      "description": "Request HR to review low-confidence extraction",
+      "assignee": {
+        "type": "role",
+        "role": "HR_REVIEWER"
+      },
+      "dueDate": "P3D",
+      "form": {
+        "title": "Review CV Extraction",
+        "description": "The automated extraction had medium confidence. Please verify the extracted data.",
+        "fields": [
+          {
+            "id": "extractedDataCorrect",
+            "type": "boolean",
+            "label": "Is the extracted data correct?",
+            "required": true
+          },
+          {
+            "id": "corrections",
+            "type": "textarea",
+            "label": "Corrections (JSON format)",
+            "visible": "${!extractedDataCorrect}"
+          },
+          {
+            "id": "approved",
+            "type": "boolean",
+            "label": "Approve and create candidate?",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "reviewResult": "${taskOutput}"
+      },
+      "nextStep": "process-review-result"
+    },
+    {
+      "id": "process-review-result",
+      "name": "Process Review Result",
+      "type": "exclusiveGateway",
+      "description": "Process manual review decision",
+      "branches": [
+        {
+          "condition": "${context.reviewResult.approved == true}",
+          "nextStep": "create-candidate-profile"
+        },
+        {
+          "condition": "${context.reviewResult.approved == false}",
+          "nextStep": "archive-document"
+        }
+      ]
+    },
+    {
+      "id": "flag-for-manual-processing",
+      "name": "Flag for Manual Processing",
+      "type": "servicetask",
+      "description": "Mark document as requiring manual data entry",
+      "service": {
+        "destination": "cv-service",
+        "path": "/cv/Documents(${context.documentId})",
+        "method": "PATCH",
+        "body": {
+          "processingStatus": "manual_required",
+          "extractionMethod": "manual"
+        }
+      },
+      "nextStep": "create-manual-entry-task"
+    },
+    {
+      "id": "create-manual-entry-task",
+      "name": "Create Manual Entry Task",
+      "type": "usertask",
+      "description": "Assign manual data entry task to HR",
+      "assignee": {
+        "type": "role",
+        "role": "HR_DATA_ENTRY"
+      },
+      "dueDate": "P5D",
+      "priority": "medium",
+      "form": {
+        "title": "Manual CV Data Entry",
+        "description": "Please manually extract candidate information from the uploaded CV.",
+        "fields": [
+          {
+            "id": "firstName",
+            "type": "text",
+            "label": "First Name",
+            "required": true
+          },
+          {
+            "id": "lastName",
+            "type": "text",
+            "label": "Last Name",
+            "required": true
+          },
+          {
+            "id": "email",
+            "type": "email",
+            "label": "Email",
+            "required": true
+          },
+          {
+            "id": "phone",
+            "type": "text",
+            "label": "Phone"
+          },
+          {
+            "id": "summary",
+            "type": "textarea",
+            "label": "Professional Summary"
+          },
+          {
+            "id": "skills",
+            "type": "textarea",
+            "label": "Skills (comma-separated)"
+          }
+        ]
+      },
+      "output": {
+        "manualData": "${taskOutput}"
+      },
+      "nextStep": "create-candidate-from-manual"
+    },
+    {
+      "id": "create-candidate-from-manual",
+      "name": "Create Candidate from Manual Entry",
+      "type": "servicetask",
+      "description": "Create candidate profile from manually entered data",
+      "service": {
+        "destination": "cv-service",
+        "path": "/cv/createCandidateFromDocument",
+        "method": "POST",
+        "body": {
+          "documentId": "${context.documentId}",
+          "additionalData": "${JSON.stringify(context.manualData)}",
+          "autoLinkSkills": true
+        }
+      },
+      "output": {
+        "candidateResult": "${response}"
+      },
+      "nextStep": "trigger-matching"
+    },
+    {
+      "id": "trigger-matching",
+      "name": "Trigger Job Matching",
+      "type": "servicetask",
+      "description": "Calculate matches for the new candidate against all open jobs",
+      "service": {
+        "destination": "matching-service",
+        "path": "/matching/batchMatch",
+        "method": "POST",
+        "body": {
+          "candidateIds": ["${context.candidateResult.candidateId}"],
+          "jobPostingIds": []
+        }
+      },
+      "output": {
+        "matchingResult": "${response}"
+      }
+    },
+    {
+      "id": "archive-document",
+      "name": "Archive Document",
+      "type": "servicetask",
+      "description": "Archive document that was not approved",
+      "service": {
+        "destination": "cv-service",
+        "path": "/cv/Documents(${context.documentId})",
+        "method": "PATCH",
+        "body": {
+          "processingStatus": "archived"
+        }
+      },
+      "nextStep": "end"
+    },
+    {
+      "id": "send-success-notification",
+      "name": "Send Success Notification",
+      "type": "mail",
+      "description": "Notify about successful CV processing",
+      "to": ["${context.uploadedBy}"],
+      "subject": "CV Processing Complete - ${context.fileName}",
+      "body": "The CV '${context.fileName}' has been successfully processed.\n\nCandidate ID: ${context.candidateResult.candidateId}\nLinked Skills: ${context.candidateResult.linkedSkills}\n\nYou can now view the candidate profile in the system.",
+      "nextStep": "end"
+    },
+    {
+      "id": "send-failure-notification",
+      "name": "Send Failure Notification",
+      "type": "mail",
+      "description": "Notify about CV processing failure",
+      "to": ["${context.uploadedBy}"],
+      "subject": "CV Processing Failed - ${context.fileName}",
+      "body": "The CV '${context.fileName}' could not be processed.\n\nError: ${context.validationError || context.errorMessage}\n\nPlease try uploading a different file or contact support.",
+      "nextStep": "end"
+    },
+    {
+      "id": "send-rejection-notification",
+      "name": "Send Rejection Notification",
+      "type": "mail",
+      "description": "Notify about rejected duplicate",
+      "to": ["${context.uploadedBy}"],
+      "subject": "CV Rejected - Duplicate - ${context.fileName}",
+      "body": "The CV '${context.fileName}' was identified as a duplicate and has been rejected.\n\nNotes: ${context.duplicateDecision.notes}",
+      "nextStep": "end"
+    },
+    {
+      "id": "end",
+      "name": "End",
+      "type": "end"
+    }
+  ],
+
+  "errorHandling": {
+    "defaultErrorHandler": {
+      "type": "servicetask",
+      "service": {
+        "destination": "cv-service",
+        "path": "/cv/Documents(${context.documentId})",
+        "method": "PATCH",
+        "body": {
+          "processingStatus": "failed",
+          "errorMessage": "Workflow error: ${error.message}"
+        }
+      }
+    }
+  },
+
+  "metadata": {
+    "createdAt": "2024-01-01T00:00:00Z",
+    "createdBy": "system",
+    "tags": ["cv-processing", "document-ai", "candidate-creation"]
+  }
+}

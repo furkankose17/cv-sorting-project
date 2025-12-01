@@ -1,0 +1,11 @@
+code;name;descr
+new;New;Newly added candidate
+screening;Screening;Under initial screening review
+interviewing;Interviewing;Currently in interview process
+shortlisted;Shortlisted;Shortlisted for position
+offered;Offered;Job offer extended
+hired;Hired;Successfully hired
+rejected;Rejected;Application rejected
+withdrawn;Withdrawn;Candidate withdrew application
+archived;Archived;Archived/inactive
+merged;Merged;Merged with another record

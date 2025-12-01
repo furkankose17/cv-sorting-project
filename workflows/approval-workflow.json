@@ -1,0 +1,495 @@
+{
+  "$schema": "https://api.sap.com/workflow/1.0/schema.json",
+  "id": "candidate-approval-workflow",
+  "name": "Candidate Approval Workflow",
+  "description": "Multi-level approval workflow for progressing candidates through hiring stages",
+  "version": "1.0.0",
+
+  "triggers": [
+    {
+      "type": "api",
+      "id": "api-trigger",
+      "name": "API Trigger"
+    },
+    {
+      "type": "event",
+      "id": "shortlist-trigger",
+      "name": "Candidate Shortlisted Event",
+      "eventSource": "MatchingService",
+      "eventType": "CandidateShortlisted"
+    }
+  ],
+
+  "inputParameters": {
+    "candidateId": {
+      "type": "string",
+      "required": true
+    },
+    "jobPostingId": {
+      "type": "string",
+      "required": true
+    },
+    "requestedBy": {
+      "type": "string",
+      "required": true
+    },
+    "approvalType": {
+      "type": "string",
+      "enum": ["interview", "offer", "hire"],
+      "required": true
+    },
+    "urgency": {
+      "type": "string",
+      "enum": ["normal", "high", "urgent"],
+      "default": "normal"
+    }
+  },
+
+  "steps": [
+    {
+      "id": "load-candidate-details",
+      "name": "Load Candidate Details",
+      "type": "servicetask",
+      "description": "Fetch candidate and job details for approval context",
+      "service": {
+        "destination": "candidate-service",
+        "path": "/candidate/Candidates(${context.candidateId})?$expand=skills,experiences,educations",
+        "method": "GET"
+      },
+      "output": {
+        "candidate": "${response}"
+      }
+    },
+    {
+      "id": "load-job-details",
+      "name": "Load Job Details",
+      "type": "servicetask",
+      "service": {
+        "destination": "matching-service",
+        "path": "/matching/JobPostings(${context.jobPostingId})?$expand=requiredSkills",
+        "method": "GET"
+      },
+      "output": {
+        "jobPosting": "${response}"
+      }
+    },
+    {
+      "id": "load-match-details",
+      "name": "Load Match Score",
+      "type": "servicetask",
+      "service": {
+        "destination": "matching-service",
+        "path": "/matching/MatchResults?$filter=candidate_ID eq ${context.candidateId} and jobPosting_ID eq ${context.jobPostingId}",
+        "method": "GET"
+      },
+      "output": {
+        "matchResult": "${response.value[0]}"
+      }
+    },
+    {
+      "id": "generate-ai-summary",
+      "name": "Generate AI Summary",
+      "type": "servicetask",
+      "description": "Get Joule AI summary for approver",
+      "service": {
+        "destination": "joule-service",
+        "path": "/joule/generateCandidateSummary",
+        "method": "POST",
+        "body": {
+          "candidateId": "${context.candidateId}",
+          "style": "executive",
+          "forJobId": "${context.jobPostingId}"
+        }
+      },
+      "output": {
+        "aiSummary": "${response}"
+      }
+    },
+    {
+      "id": "determine-approval-chain",
+      "name": "Determine Approval Chain",
+      "type": "script",
+      "description": "Determine required approvers based on approval type",
+      "script": {
+        "language": "javascript",
+        "code": "const approvalChains = {\n  'interview': ['RECRUITER', 'HIRING_MANAGER'],\n  'offer': ['HIRING_MANAGER', 'HR_HEAD', 'FINANCE'],\n  'hire': ['HR_HEAD', 'DEPARTMENT_HEAD']\n};\ncontext.approvalChain = approvalChains[context.approvalType] || ['HR_REVIEWER'];\ncontext.currentApproverIndex = 0;\ncontext.approvalHistory = [];"
+      }
+    },
+    {
+      "id": "check-more-approvers",
+      "name": "Check More Approvers",
+      "type": "exclusiveGateway",
+      "branches": [
+        {
+          "condition": "${context.currentApproverIndex < context.approvalChain.length}",
+          "nextStep": "request-approval"
+        },
+        {
+          "condition": "${context.currentApproverIndex >= context.approvalChain.length}",
+          "nextStep": "all-approved"
+        }
+      ]
+    },
+    {
+      "id": "request-approval",
+      "name": "Request Approval",
+      "type": "usertask",
+      "description": "Request approval from current approver in chain",
+      "assignee": {
+        "type": "role",
+        "role": "${context.approvalChain[context.currentApproverIndex]}"
+      },
+      "dueDate": "${context.urgency == 'urgent' ? 'P1D' : context.urgency == 'high' ? 'P2D' : 'P5D'}",
+      "priority": "${context.urgency}",
+      "form": {
+        "title": "Candidate Approval Request - ${context.approvalType}",
+        "sections": [
+          {
+            "title": "Candidate Information",
+            "fields": [
+              {
+                "id": "candidateName",
+                "type": "readonly",
+                "label": "Candidate",
+                "value": "${context.candidate.firstName} ${context.candidate.lastName}"
+              },
+              {
+                "id": "jobTitle",
+                "type": "readonly",
+                "label": "Position",
+                "value": "${context.jobPosting.title}"
+              },
+              {
+                "id": "matchScore",
+                "type": "readonly",
+                "label": "Match Score",
+                "value": "${context.matchResult.overallScore}/100"
+              },
+              {
+                "id": "experience",
+                "type": "readonly",
+                "label": "Experience",
+                "value": "${context.candidate.totalExperienceYears} years"
+              }
+            ]
+          },
+          {
+            "title": "AI Summary",
+            "fields": [
+              {
+                "id": "summary",
+                "type": "readonly",
+                "label": "Executive Summary",
+                "value": "${context.aiSummary.summary}"
+              },
+              {
+                "id": "strengths",
+                "type": "readonly",
+                "label": "Key Strengths",
+                "value": "${context.aiSummary.keyStrengths.join(', ')}"
+              },
+              {
+                "id": "concerns",
+                "type": "readonly",
+                "label": "Potential Concerns",
+                "value": "${context.aiSummary.potentialConcerns.join(', ')}"
+              }
+            ]
+          },
+          {
+            "title": "Previous Approvals",
+            "fields": [
+              {
+                "id": "history",
+                "type": "table",
+                "label": "Approval History",
+                "value": "${context.approvalHistory}"
+              }
+            ]
+          },
+          {
+            "title": "Decision",
+            "fields": [
+              {
+                "id": "decision",
+                "type": "dropdown",
+                "label": "Your Decision",
+                "options": ["approve", "reject", "request_info"],
+                "required": true
+              },
+              {
+                "id": "comments",
+                "type": "textarea",
+                "label": "Comments",
+                "required": "${decision == 'reject' || decision == 'request_info'}"
+              },
+              {
+                "id": "conditions",
+                "type": "textarea",
+                "label": "Approval Conditions (if any)",
+                "visible": "${decision == 'approve'}"
+              }
+            ]
+          }
+        ]
+      },
+      "output": {
+        "approvalDecision": "${taskOutput}"
+      },
+      "escalation": {
+        "enabled": true,
+        "escalateAfter": "${context.urgency == 'urgent' ? 'PT8H' : 'P2D'}",
+        "escalateTo": "HR_HEAD"
+      }
+    },
+    {
+      "id": "process-approval-decision",
+      "name": "Process Approval Decision",
+      "type": "exclusiveGateway",
+      "branches": [
+        {
+          "condition": "${context.approvalDecision.decision == 'approve'}",
+          "nextStep": "record-approval"
+        },
+        {
+          "condition": "${context.approvalDecision.decision == 'reject'}",
+          "nextStep": "handle-rejection"
+        },
+        {
+          "condition": "${context.approvalDecision.decision == 'request_info'}",
+          "nextStep": "request-additional-info"
+        }
+      ]
+    },
+    {
+      "id": "record-approval",
+      "name": "Record Approval",
+      "type": "script",
+      "script": {
+        "language": "javascript",
+        "code": "context.approvalHistory.push({\n  approver: context.approvalChain[context.currentApproverIndex],\n  decision: 'approved',\n  timestamp: new Date().toISOString(),\n  comments: context.approvalDecision.comments,\n  conditions: context.approvalDecision.conditions\n});\ncontext.currentApproverIndex++;"
+      },
+      "nextStep": "check-more-approvers"
+    },
+    {
+      "id": "handle-rejection",
+      "name": "Handle Rejection",
+      "type": "script",
+      "script": {
+        "language": "javascript",
+        "code": "context.approvalHistory.push({\n  approver: context.approvalChain[context.currentApproverIndex],\n  decision: 'rejected',\n  timestamp: new Date().toISOString(),\n  comments: context.approvalDecision.comments\n});\ncontext.finalDecision = 'rejected';\ncontext.rejectionReason = context.approvalDecision.comments;"
+      },
+      "nextStep": "update-candidate-status-rejected"
+    },
+    {
+      "id": "request-additional-info",
+      "name": "Request Additional Information",
+      "type": "usertask",
+      "description": "Request additional information from recruiter",
+      "assignee": {
+        "type": "user",
+        "user": "${context.requestedBy}"
+      },
+      "dueDate": "P2D",
+      "form": {
+        "title": "Additional Information Required",
+        "fields": [
+          {
+            "id": "infoRequest",
+            "type": "readonly",
+            "label": "Information Requested",
+            "value": "${context.approvalDecision.comments}"
+          },
+          {
+            "id": "additionalInfo",
+            "type": "textarea",
+            "label": "Your Response",
+            "required": true
+          },
+          {
+            "id": "attachments",
+            "type": "file",
+            "label": "Supporting Documents"
+          }
+        ]
+      },
+      "output": {
+        "additionalInfo": "${taskOutput}"
+      },
+      "nextStep": "request-approval"
+    },
+    {
+      "id": "all-approved",
+      "name": "All Approvals Complete",
+      "type": "script",
+      "script": {
+        "language": "javascript",
+        "code": "context.finalDecision = 'approved';\ncontext.allConditions = context.approvalHistory\n  .filter(a => a.conditions)\n  .map(a => a.conditions)\n  .join('; ');"
+      },
+      "nextStep": "determine-next-status"
+    },
+    {
+      "id": "determine-next-status",
+      "name": "Determine Next Status",
+      "type": "script",
+      "script": {
+        "language": "javascript",
+        "code": "const statusMap = {\n  'interview': 'interviewing',\n  'offer': 'offered',\n  'hire': 'hired'\n};\ncontext.newStatus = statusMap[context.approvalType];"
+      },
+      "nextStep": "update-candidate-status-approved"
+    },
+    {
+      "id": "update-candidate-status-approved",
+      "name": "Update Candidate Status (Approved)",
+      "type": "servicetask",
+      "service": {
+        "destination": "candidate-service",
+        "path": "/candidate/updateStatus",
+        "method": "POST",
+        "body": {
+          "candidateId": "${context.candidateId}",
+          "newStatus": "${context.newStatus}",
+          "notes": "Approved via workflow. Conditions: ${context.allConditions || 'None'}",
+          "notifyCandidate": true
+        }
+      },
+      "nextStep": "add-approval-note"
+    },
+    {
+      "id": "update-candidate-status-rejected",
+      "name": "Update Candidate Status (Rejected)",
+      "type": "servicetask",
+      "service": {
+        "destination": "candidate-service",
+        "path": "/candidate/updateStatus",
+        "method": "POST",
+        "body": {
+          "candidateId": "${context.candidateId}",
+          "newStatus": "rejected",
+          "notes": "Rejected via approval workflow: ${context.rejectionReason}",
+          "notifyCandidate": false
+        }
+      },
+      "nextStep": "send-rejection-notification"
+    },
+    {
+      "id": "add-approval-note",
+      "name": "Add Approval Note",
+      "type": "servicetask",
+      "service": {
+        "destination": "candidate-service",
+        "path": "/candidate/CandidateNotes",
+        "method": "POST",
+        "body": {
+          "candidate_ID": "${context.candidateId}",
+          "noteText": "Approval workflow completed for ${context.approvalType}. All approvers: ${context.approvalChain.join(' -> ')}. Final decision: APPROVED",
+          "noteType": "workflow"
+        }
+      },
+      "nextStep": "send-approval-notification"
+    },
+    {
+      "id": "send-approval-notification",
+      "name": "Send Approval Notification",
+      "type": "mail",
+      "to": ["${context.requestedBy}", "${context.candidate.email}"],
+      "subject": "Candidate Approved - ${context.candidate.firstName} ${context.candidate.lastName} for ${context.jobPosting.title}",
+      "body": "Great news! ${context.candidate.firstName} ${context.candidate.lastName} has been approved for ${context.approvalType} stage.\n\nPosition: ${context.jobPosting.title}\nApproval Chain: ${context.approvalChain.join(' -> ')}\n\n${context.allConditions ? 'Conditions: ' + context.allConditions : ''}\n\nPlease proceed with the next steps.",
+      "nextStep": "check-trigger-next-workflow"
+    },
+    {
+      "id": "send-rejection-notification",
+      "name": "Send Rejection Notification",
+      "type": "mail",
+      "to": ["${context.requestedBy}"],
+      "subject": "Candidate Rejected - ${context.candidate.firstName} ${context.candidate.lastName}",
+      "body": "Unfortunately, ${context.candidate.firstName} ${context.candidate.lastName} was not approved for ${context.approvalType}.\n\nReason: ${context.rejectionReason}\n\nPlease review and take appropriate action.",
+      "nextStep": "end"
+    },
+    {
+      "id": "check-trigger-next-workflow",
+      "name": "Check Trigger Next Workflow",
+      "type": "exclusiveGateway",
+      "branches": [
+        {
+          "condition": "${context.approvalType == 'interview'}",
+          "nextStep": "trigger-interview-scheduling"
+        },
+        {
+          "condition": "${context.approvalType == 'offer'}",
+          "nextStep": "trigger-offer-generation"
+        },
+        {
+          "condition": "${context.approvalType == 'hire'}",
+          "nextStep": "trigger-onboarding"
+        }
+      ]
+    },
+    {
+      "id": "trigger-interview-scheduling",
+      "name": "Trigger Interview Scheduling",
+      "type": "servicetask",
+      "service": {
+        "destination": "workflow-service",
+        "path": "/workflow/instances",
+        "method": "POST",
+        "body": {
+          "workflowDefinitionId": "interview-scheduling-workflow",
+          "context": {
+            "candidateId": "${context.candidateId}",
+            "jobPostingId": "${context.jobPostingId}"
+          }
+        }
+      },
+      "nextStep": "end"
+    },
+    {
+      "id": "trigger-offer-generation",
+      "name": "Trigger Offer Generation",
+      "type": "servicetask",
+      "service": {
+        "destination": "workflow-service",
+        "path": "/workflow/instances",
+        "method": "POST",
+        "body": {
+          "workflowDefinitionId": "offer-generation-workflow",
+          "context": {
+            "candidateId": "${context.candidateId}",
+            "jobPostingId": "${context.jobPostingId}",
+            "conditions": "${context.allConditions}"
+          }
+        }
+      },
+      "nextStep": "end"
+    },
+    {
+      "id": "trigger-onboarding",
+      "name": "Trigger Onboarding Workflow",
+      "type": "servicetask",
+      "service": {
+        "destination": "workflow-service",
+        "path": "/workflow/instances",
+        "method": "POST",
+        "body": {
+          "workflowDefinitionId": "employee-onboarding-workflow",
+          "context": {
+            "candidateId": "${context.candidateId}",
+            "jobPostingId": "${context.jobPostingId}"
+          }
+        }
+      },
+      "nextStep": "end"
+    },
+    {
+      "id": "end",
+      "name": "End",
+      "type": "end"
+    }
+  ],
+
+  "metadata": {
+    "createdAt": "2024-01-01T00:00:00Z",
+    "createdBy": "system",
+    "tags": ["approval", "hiring", "multi-level"]
+  }
+}

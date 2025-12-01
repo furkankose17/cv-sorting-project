@@ -1,0 +1,46 @@
+ID;name;category_code;isActive
+550e8400-e29b-41d4-a716-446655440001;JavaScript;programming;true
+550e8400-e29b-41d4-a716-446655440002;TypeScript;programming;true
+550e8400-e29b-41d4-a716-446655440003;Python;programming;true
+550e8400-e29b-41d4-a716-446655440004;Java;programming;true
+550e8400-e29b-41d4-a716-446655440005;C#;programming;true
+550e8400-e29b-41d4-a716-446655440006;Go;programming;true
+550e8400-e29b-41d4-a716-446655440007;Rust;programming;true
+550e8400-e29b-41d4-a716-446655440008;ABAP;programming;true
+550e8400-e29b-41d4-a716-446655440009;SQL;programming;true
+550e8400-e29b-41d4-a716-446655440010;React;frameworks;true
+550e8400-e29b-41d4-a716-446655440011;Angular;frameworks;true
+550e8400-e29b-41d4-a716-446655440012;Vue.js;frameworks;true
+550e8400-e29b-41d4-a716-446655440013;Node.js;frameworks;true
+550e8400-e29b-41d4-a716-446655440014;Express.js;frameworks;true
+550e8400-e29b-41d4-a716-446655440015;Spring Boot;frameworks;true
+550e8400-e29b-41d4-a716-446655440016;Django;frameworks;true
+550e8400-e29b-41d4-a716-446655440017;SAP CAP;frameworks;true
+550e8400-e29b-41d4-a716-446655440018;SAP Fiori;frameworks;true
+550e8400-e29b-41d4-a716-446655440019;SAPUI5;frameworks;true
+550e8400-e29b-41d4-a716-446655440020;PostgreSQL;databases;true
+550e8400-e29b-41d4-a716-446655440021;MySQL;databases;true
+550e8400-e29b-41d4-a716-446655440022;MongoDB;databases;true
+550e8400-e29b-41d4-a716-446655440023;SAP HANA;databases;true
+550e8400-e29b-41d4-a716-446655440024;Redis;databases;true
+550e8400-e29b-41d4-a716-446655440025;AWS;cloud;true
+550e8400-e29b-41d4-a716-446655440026;Azure;cloud;true
+550e8400-e29b-41d4-a716-446655440027;Google Cloud;cloud;true
+550e8400-e29b-41d4-a716-446655440028;SAP BTP;cloud;true
+550e8400-e29b-41d4-a716-446655440029;Docker;cloud;true
+550e8400-e29b-41d4-a716-446655440030;Kubernetes;cloud;true
+550e8400-e29b-41d4-a716-446655440031;CI/CD;cloud;true
+550e8400-e29b-41d4-a716-446655440032;SAP S/4HANA;sap;true
+550e8400-e29b-41d4-a716-446655440033;SAP SuccessFactors;sap;true
+550e8400-e29b-41d4-a716-446655440034;SAP Ariba;sap;true
+550e8400-e29b-41d4-a716-446655440035;SAP Integration Suite;sap;true
+550e8400-e29b-41d4-a716-446655440036;SAP Build;sap;true
+550e8400-e29b-41d4-a716-446655440037;Communication;soft_skills;true
+550e8400-e29b-41d4-a716-446655440038;Leadership;soft_skills;true
+550e8400-e29b-41d4-a716-446655440039;Problem Solving;soft_skills;true
+550e8400-e29b-41d4-a716-446655440040;Teamwork;soft_skills;true
+550e8400-e29b-41d4-a716-446655440041;Project Management;management;true
+550e8400-e29b-41d4-a716-446655440042;Agile/Scrum;management;true
+550e8400-e29b-41d4-a716-446655440043;Data Analysis;analytics;true
+550e8400-e29b-41d4-a716-446655440044;Machine Learning;analytics;true
+550e8400-e29b-41d4-a716-446655440045;Business Intelligence;analytics;true

@@ -1,0 +1,180 @@
+{
+  "xsappname": "cv-sorting",
+  "tenant-mode": "dedicated",
+  "description": "CV Sorting and Candidate Management System - Security Configuration",
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.CVAdmin",
+      "description": "Full administrative access to CV management"
+    },
+    {
+      "name": "$XSAPPNAME.Recruiter",
+      "description": "Upload CVs, manage candidates, view matches"
+    },
+    {
+      "name": "$XSAPPNAME.HRManager",
+      "description": "Approve candidates, view analytics, manage workflows"
+    },
+    {
+      "name": "$XSAPPNAME.HRReviewer",
+      "description": "Review and verify candidate data"
+    },
+    {
+      "name": "$XSAPPNAME.Viewer",
+      "description": "Read-only access to candidate profiles"
+    },
+    {
+      "name": "$XSAPPNAME.JobManager",
+      "description": "Manage job postings and requirements"
+    },
+    {
+      "name": "$XSAPPNAME.WorkflowParticipant",
+      "description": "Participate in approval workflows"
+    },
+    {
+      "name": "uaa.user",
+      "description": "UAA user scope"
+    }
+  ],
+  "attributes": [
+    {
+      "name": "Department",
+      "description": "User's department for data filtering",
+      "valueType": "string"
+    },
+    {
+      "name": "Region",
+      "description": "User's region for data filtering",
+      "valueType": "string"
+    }
+  ],
+  "role-templates": [
+    {
+      "name": "CVAdmin",
+      "description": "Administrator with full access",
+      "scope-references": [
+        "$XSAPPNAME.CVAdmin",
+        "$XSAPPNAME.Recruiter",
+        "$XSAPPNAME.HRManager",
+        "$XSAPPNAME.HRReviewer",
+        "$XSAPPNAME.Viewer",
+        "$XSAPPNAME.JobManager",
+        "$XSAPPNAME.WorkflowParticipant"
+      ],
+      "attribute-references": [
+        "Department",
+        "Region"
+      ]
+    },
+    {
+      "name": "Recruiter",
+      "description": "Recruiter role for CV upload and candidate management",
+      "scope-references": [
+        "$XSAPPNAME.Recruiter",
+        "$XSAPPNAME.Viewer",
+        "$XSAPPNAME.WorkflowParticipant"
+      ],
+      "attribute-references": [
+        "Department"
+      ]
+    },
+    {
+      "name": "HRManager",
+      "description": "HR Manager with approval and analytics access",
+      "scope-references": [
+        "$XSAPPNAME.HRManager",
+        "$XSAPPNAME.HRReviewer",
+        "$XSAPPNAME.Viewer",
+        "$XSAPPNAME.WorkflowParticipant"
+      ],
+      "attribute-references": [
+        "Department",
+        "Region"
+      ]
+    },
+    {
+      "name": "HRReviewer",
+      "description": "HR Reviewer for data verification",
+      "scope-references": [
+        "$XSAPPNAME.HRReviewer",
+        "$XSAPPNAME.Viewer",
+        "$XSAPPNAME.WorkflowParticipant"
+      ],
+      "attribute-references": [
+        "Department"
+      ]
+    },
+    {
+      "name": "JobManager",
+      "description": "Job posting manager",
+      "scope-references": [
+        "$XSAPPNAME.JobManager",
+        "$XSAPPNAME.Viewer"
+      ],
+      "attribute-references": [
+        "Department"
+      ]
+    },
+    {
+      "name": "Viewer",
+      "description": "Read-only viewer",
+      "scope-references": [
+        "$XSAPPNAME.Viewer"
+      ],
+      "attribute-references": []
+    }
+  ],
+  "role-collections": [
+    {
+      "name": "CV Sorting Administrator",
+      "description": "Full administrative access to the CV Sorting system",
+      "role-template-references": [
+        "$XSAPPNAME.CVAdmin"
+      ]
+    },
+    {
+      "name": "CV Sorting Recruiter",
+      "description": "Recruiter access for CV upload and candidate management",
+      "role-template-references": [
+        "$XSAPPNAME.Recruiter"
+      ]
+    },
+    {
+      "name": "CV Sorting HR Manager",
+      "description": "HR Manager with approval and analytics capabilities",
+      "role-template-references": [
+        "$XSAPPNAME.HRManager"
+      ]
+    },
+    {
+      "name": "CV Sorting HR Reviewer",
+      "description": "HR Reviewer for data verification tasks",
+      "role-template-references": [
+        "$XSAPPNAME.HRReviewer"
+      ]
+    },
+    {
+      "name": "CV Sorting Job Manager",
+      "description": "Manager for job postings and requirements",
+      "role-template-references": [
+        "$XSAPPNAME.JobManager"
+      ]
+    },
+    {
+      "name": "CV Sorting Viewer",
+      "description": "Read-only access to candidate profiles",
+      "role-template-references": [
+        "$XSAPPNAME.Viewer"
+      ]
+    }
+  ],
+  "oauth2-configuration": {
+    "token-validity": 43200,
+    "refresh-token-validity": 604800,
+    "redirect-uris": [
+      "https://*.cfapps.*.hana.ondemand.com/**",
+      "https://*.hana.ondemand.com/**",
+      "http://localhost:*/**"
+    ]
+  }
+}

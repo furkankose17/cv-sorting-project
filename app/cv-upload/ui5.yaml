@@ -1,0 +1,42 @@
+specVersion: "3.0"
+metadata:
+  name: cv-upload
+type: application
+framework:
+  name: SAPUI5
+  version: "1.120.0"
+  libraries:
+    - name: sap.m
+    - name: sap.ui.core
+    - name: sap.f
+    - name: sap.ui.layout
+    - name: sap.ui.unified
+    - name: sap.uxap
+builder:
+  customTasks:
+    - name: ui5-tooling-transpile-task
+      afterTask: replaceVersion
+      configuration:
+        debug: true
+        removeConsoleStatements: true
+server:
+  customMiddleware:
+    - name: fiori-tools-proxy
+      afterMiddleware: compression
+      configuration:
+        ignoreCertError: false
+        backend:
+          - path: /cv
+            url: http://localhost:4004
+          - path: /candidate
+            url: http://localhost:4004
+          - path: /matching
+            url: http://localhost:4004
+          - path: /joule
+            url: http://localhost:4004
+    - name: fiori-tools-appreload
+      afterMiddleware: compression
+      configuration:
+        port: 35729
+        path: webapp
+        delay: 300

@@ -1,0 +1,76 @@
+{
+  "name": "cv-sorting-project",
+  "version": "1.0.0",
+  "description": "SAP BTP CV Sorting and Candidate Management System with AI-powered document extraction, Joule integration, and process automation",
+  "repository": "https://github.com/furkankose17/cv-sorting-project",
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@sap/cds": "^7",
+    "@sap/cds-hana": "^2",
+    "@sap/xssec": "^3",
+    "@sap-cloud-sdk/http-client": "^3",
+    "@sap-cloud-sdk/connectivity": "^3",
+    "@sap-cloud-sdk/resilience": "^3",
+    "express": "^4",
+    "passport": "^0.7",
+    "uuid": "^9",
+    "pdf-parse": "^1.1.1",
+    "mammoth": "^1.6.0",
+    "natural": "^6.10.0",
+    "compromise": "^14.10.0"
+  },
+  "devDependencies": {
+    "@cap-js/sqlite": "^1",
+    "@sap/cds-dk": "^7",
+    "@sap/ux-specification": "^1",
+    "chai": "^4",
+    "chai-http": "^4",
+    "mocha": "^10",
+    "rimraf": "^5"
+  },
+  "scripts": {
+    "start": "cds-serve",
+    "watch": "cds watch",
+    "test": "mocha test/**/*.test.js --timeout 10000",
+    "build": "cds build --production",
+    "deploy": "cds deploy --to hana",
+    "clean": "rimraf gen mta_archives *.mtar"
+  },
+  "cds": {
+    "requires": {
+      "db": {
+        "kind": "hana"
+      },
+      "auth": {
+        "kind": "xsuaa"
+      },
+      "document-ai": {
+        "kind": "rest",
+        "credentials": {
+          "destination": "document-ai-destination"
+        }
+      },
+      "joule-ai": {
+        "kind": "rest",
+        "credentials": {
+          "destination": "joule-ai-destination"
+        }
+      }
+    },
+    "features": {
+      "fetch_csrf": true
+    },
+    "hana": {
+      "deploy-format": "hdbtable"
+    }
+  },
+  "sapux": [
+    "app/cv-upload",
+    "app/candidate-management",
+    "app/analytics-dashboard"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}
