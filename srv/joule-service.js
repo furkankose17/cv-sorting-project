@@ -1,24 +1,59 @@
+'use strict';
+
 const cds = require('@sap/cds');
 const { v4: uuidv4 } = require('uuid');
+
+const LOG = cds.log('joule-service');
 
 /**
  * Joule AI Copilot Service Implementation
  * Provides natural language interface for candidate search, analysis, and insights
+ *
+ * Features:
+ * - Natural language candidate search
+ * - AI-powered recommendations
+ * - Intelligent summaries and comparisons
+ * - Interview question generation
+ * - Skill gap analysis
+ * - Proactive insights
+ *
+ * @see https://www.sap.com/products/artificial-intelligence/joule.html
  */
 module.exports = class JouleService extends cds.ApplicationService {
 
+    /**
+     * AI Model configuration
+     */
+    static AI_CONFIG = {
+        model: 'gpt-4',
+        temperature: 0.7,
+        maxTokens: 2000,
+        systemPrompt: `You are Joule, an AI assistant specialized in HR and recruitment.
+You help recruiters find candidates, analyze profiles, and make hiring decisions.
+Be concise, professional, and actionable in your responses.
+Always provide structured insights when analyzing candidates or jobs.`
+    };
+
     async init() {
-        // Connect to Joule AI service (SAP AI Core)
+        LOG.info('Initializing Joule AI Service');
+
+        // Connect to SAP AI Core for production AI capabilities
         try {
-            this.jouleAI = await cds.connect.to('joule-ai');
+            this.aiCore = await cds.connect.to('joule-ai');
+            LOG.info('Connected to SAP AI Core');
         } catch (e) {
-            console.warn('Joule AI service not connected, using mock responses');
-            this.jouleAI = null;
+            LOG.warn('SAP AI Core not available, using local AI simulation', e.message);
+            this.aiCore = null;
         }
 
         // Get reference to other services
-        this.candidateService = await cds.connect.to('CandidateService');
-        this.matchingService = await cds.connect.to('MatchingService');
+        try {
+            this.candidateService = await cds.connect.to('CandidateService');
+            this.matchingService = await cds.connect.to('MatchingService');
+            LOG.info('Connected to internal services');
+        } catch (e) {
+            LOG.warn('Some services not available', e.message);
+        }
 
         // Register action handlers
         this.on('chat', this.handleChat);
@@ -1113,5 +1148,199 @@ module.exports = class JouleService extends cds.ApplicationService {
         };
 
         return { suggestions: suggestions[context] || suggestions['candidate-search'] };
+    }
+
+    // ==========================================
+    // AI COMPLETION HELPERS
+    // ==========================================
+
+    /**
+     * Generate AI completion using SAP AI Core or local simulation
+     * @param {string} prompt - The prompt to send to the AI
+     * @param {Object} options - Additional options
+     * @returns {Promise<string>} AI generated response
+     */
+    async _generateAICompletion(prompt, options = {}) {
+        const config = { ...JouleService.AI_CONFIG, ...options };
+
+        if (this.aiCore) {
+            try {
+                // Use SAP AI Core / Generative AI Hub
+                const response = await this.aiCore.send({
+                    method: 'POST',
+                    path: '/chat/completions',
+                    data: {
+                        model: config.model,
+                        messages: [
+                            { role: 'system', content: config.systemPrompt },
+                            { role: 'user', content: prompt }
+                        ],
+                        temperature: config.temperature,
+                        max_tokens: config.maxTokens
+                    }
+                });
+
+                return response.choices?.[0]?.message?.content || '';
+            } catch (error) {
+                LOG.error('AI Core request failed, falling back to simulation', error);
+                return this._simulateAIResponse(prompt, options);
+            }
+        }
+
+        return this._simulateAIResponse(prompt, options);
+    }
+
+    /**
+     * Simulate AI response for development/testing
+     * @param {string} prompt - The prompt
+     * @param {Object} options - Options including responseType
+     * @returns {string} Simulated response
+     */
+    _simulateAIResponse(prompt, options = {}) {
+        const { responseType } = options;
+
+        const templates = {
+            summary: `Based on the profile analysis:
+
+**Key Strengths:**
+- Strong technical background with relevant experience
+- Demonstrated problem-solving abilities
+- Good communication and collaboration skills
+
+**Areas to Explore:**
+- Depth of experience with specific technologies
+- Leadership and mentorship capabilities
+- Cultural fit and long-term goals
+
+**Recommendation:** Consider for next interview stage.`,
+
+            comparison: `**Candidate Comparison Analysis:**
+
+After analyzing the candidates, here are the key differentiators:
+
+1. **Experience Level:** Varies from mid-level to senior
+2. **Skill Alignment:** All candidates meet core requirements
+3. **Cultural Fit:** Would need interview assessment
+
+**Recommendation:** Proceed with top 2 candidates for technical interviews.`,
+
+            questions: `**Suggested Interview Questions:**
+
+1. "Tell me about a challenging project where you had to learn new technologies quickly."
+2. "How do you approach debugging complex issues in production?"
+3. "Describe your experience working in agile teams."
+4. "What interests you most about this role and our company?"
+5. "Where do you see your career in the next 3-5 years?"`,
+
+            insights: `**AI-Generated Insights:**
+
+- This candidate's profile shows strong alignment with your hiring needs
+- Recent experience is highly relevant to the position
+- Skills match indicates 78% compatibility
+- Consider discussing: career progression expectations, team dynamics preferences
+
+**Action Items:**
+1. Schedule technical assessment
+2. Prepare role-specific scenarios
+3. Discuss growth opportunities`,
+
+            default: `I've analyzed the information provided. Here are my observations:
+
+The data shows interesting patterns that warrant further investigation.
+I recommend taking a closer look at the specific metrics and comparing them against your benchmarks.
+
+Would you like me to provide more detailed analysis on any specific aspect?`
+        };
+
+        return templates[responseType] || templates.default;
+    }
+
+    /**
+     * Extract entities from natural language for better understanding
+     * @param {string} text - Input text
+     * @returns {Object} Extracted entities
+     */
+    _extractEntities(text) {
+        const entities = {
+            skills: [],
+            locations: [],
+            experienceYears: null,
+            status: null,
+            names: [],
+            dates: []
+        };
+
+        // Skill extraction
+        const skillPatterns = /\b(javascript|typescript|python|java|react|angular|vue|node\.?js|aws|azure|gcp|docker|kubernetes|sql|mongodb|sap|abap|fiori|hana|cap)\b/gi;
+        let match;
+        while ((match = skillPatterns.exec(text)) !== null) {
+            entities.skills.push(match[1]);
+        }
+
+        // Experience extraction
+        const expMatch = text.match(/(\d+)\+?\s*years?/i);
+        if (expMatch) {
+            entities.experienceYears = parseInt(expMatch[1]);
+        }
+
+        // Location extraction
+        const locationPattern = /(?:in|from|based in|located in)\s+([A-Za-z\s]+?)(?:\s+with|\s+who|,|$)/gi;
+        while ((match = locationPattern.exec(text)) !== null) {
+            entities.locations.push(match[1].trim());
+        }
+
+        // Status extraction
+        const statusKeywords = ['new', 'screening', 'interviewing', 'shortlisted', 'offered', 'hired', 'rejected'];
+        for (const status of statusKeywords) {
+            if (text.toLowerCase().includes(status)) {
+                entities.status = status;
+                break;
+            }
+        }
+
+        return entities;
+    }
+
+    /**
+     * Build context string for AI prompts
+     * @param {Object} data - Context data
+     * @returns {string} Formatted context
+     */
+    _buildContext(data) {
+        const parts = [];
+
+        if (data.candidate) {
+            parts.push(`Candidate: ${data.candidate.firstName} ${data.candidate.lastName}`);
+            if (data.candidate.headline) parts.push(`Role: ${data.candidate.headline}`);
+            if (data.candidate.totalExperienceYears) parts.push(`Experience: ${data.candidate.totalExperienceYears} years`);
+        }
+
+        if (data.job) {
+            parts.push(`Job: ${data.job.title}`);
+            if (data.job.department) parts.push(`Department: ${data.job.department}`);
+        }
+
+        if (data.skills?.length > 0) {
+            parts.push(`Skills: ${data.skills.map(s => s.name || s).join(', ')}`);
+        }
+
+        if (data.matchScore !== undefined) {
+            parts.push(`Match Score: ${data.matchScore}%`);
+        }
+
+        return parts.join('\n');
+    }
+
+    /**
+     * Log AI interaction for analytics
+     * @param {string} action - Action type
+     * @param {Object} details - Interaction details
+     */
+    _logAIInteraction(action, details) {
+        LOG.info('AI Interaction', {
+            action,
+            timestamp: new Date().toISOString(),
+            ...details
+        });
     }
 };

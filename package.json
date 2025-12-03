@@ -12,8 +12,14 @@
     "@sap-cloud-sdk/http-client": "^3",
     "@sap-cloud-sdk/connectivity": "^3",
     "@sap-cloud-sdk/resilience": "^3",
+    "@sap-ai-sdk/foundation-models": "^1",
+    "@sap-ai-sdk/ai-api": "^1",
     "express": "^4",
-    "passport": "^0.7"
+    "passport": "^0.7",
+    "pdf-parse": "^1.1.1",
+    "tesseract.js": "^5",
+    "mammoth": "^1.6",
+    "uuid": "^9"
   },
   "devDependencies": {
     "@cap-js/sqlite": "^1",
@@ -72,10 +78,24 @@
           }
         }
       },
-      "document-ai": {
+      "ocr": {
         "kind": "rest",
+        "impl": "./srv/handlers/ocr-service.js",
         "credentials": {
-          "destination": "document-ai-destination"
+          "[production]": {
+            "destination": "ocr-service-destination"
+          }
+        }
+      },
+      "joule-ai": {
+        "kind": "rest",
+        "[production]": {
+          "credentials": {
+            "destination": "sap-ai-core-destination"
+          }
+        },
+        "[development]": {
+          "impl": "./srv/joule-service.js"
         }
       }
     },

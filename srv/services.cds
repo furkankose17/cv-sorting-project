@@ -515,7 +515,8 @@ service AdminService {
     function healthCheck() returns {
         status: String;
         database: String;
-        documentAI: String;
+        ocr: String;
+        jouleAI: String;
         timestamp: Timestamp;
     };
 }
