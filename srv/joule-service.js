@@ -2,6 +2,11 @@
 
 const cds = require('@sap/cds');
 const { v4: uuidv4 } = require('uuid');
+const {
+    AIServiceManager,
+    SYSTEM_PROMPTS,
+    RECOMMENDED_MODELS
+} = require('./lib/ai-provider');
 
 const LOG = cds.log('joule-service');
 
@@ -17,7 +22,18 @@ const LOG = cds.log('joule-service');
  * - Skill gap analysis
  * - Proactive insights
  *
- * @see https://www.sap.com/products/artificial-intelligence/joule.html
+ * Supported AI Backends:
+ * - Ollama (local LLM serving) - recommended for privacy/cost
+ * - OpenAI-compatible APIs (OpenAI, Groq, Together.ai, etc.)
+ * - Hugging Face Inference API
+ * - Local transformers.js models
+ *
+ * Configuration via environment variables:
+ * - OLLAMA_BASE_URL: Ollama server URL (default: http://localhost:11434)
+ * - OLLAMA_MODEL: Ollama model to use (default: llama3.2:3b)
+ * - OPENAI_API_KEY: OpenAI API key
+ * - OPENAI_MODEL: OpenAI model (default: gpt-3.5-turbo)
+ * - HF_API_KEY: Hugging Face API key
  */
 module.exports = class JouleService extends cds.ApplicationService {
 
@@ -25,25 +41,36 @@ module.exports = class JouleService extends cds.ApplicationService {
      * AI Model configuration
      */
     static AI_CONFIG = {
-        model: 'gpt-4',
         temperature: 0.7,
-        maxTokens: 2000,
-        systemPrompt: `You are Joule, an AI assistant specialized in HR and recruitment.
-You help recruiters find candidates, analyze profiles, and make hiring decisions.
-Be concise, professional, and actionable in your responses.
-Always provide structured insights when analyzing candidates or jobs.`
+        maxTokens: 1500,
+        timeout: 60000,
+        systemPrompt: SYSTEM_PROMPTS.general
     };
 
     async init() {
-        LOG.info('Initializing Joule AI Service');
+        LOG.info('Initializing Joule AI Service (Alternative AI Models)');
 
-        // Connect to SAP AI Core for production AI capabilities
+        // Initialize AI Service Manager with automatic provider detection
         try {
-            this.aiCore = await cds.connect.to('joule-ai');
-            LOG.info('Connected to SAP AI Core');
+            this.aiManager = await new AIServiceManager({
+                ollama: {
+                    baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
+                    model: process.env.OLLAMA_MODEL || RECOMMENDED_MODELS.ollama.balanced
+                },
+                openai: {
+                    apiKey: process.env.OPENAI_API_KEY,
+                    model: process.env.OPENAI_MODEL || RECOMMENDED_MODELS.openai.fast
+                },
+                huggingface: {
+                    apiKey: process.env.HF_API_KEY
+                }
+            }).initialize();
+
+            const providerInfo = this.aiManager.getProviderInfo();
+            LOG.info('AI Service initialized', providerInfo);
         } catch (e) {
-            LOG.warn('SAP AI Core not available, using local AI simulation', e.message);
-            this.aiCore = null;
+            LOG.error('Failed to initialize AI Service Manager', e.message);
+            this.aiManager = null;
         }
 
         // Get reference to other services
@@ -1155,7 +1182,9 @@ Always provide structured insights when analyzing candidates or jobs.`
     // ==========================================
 
     /**
-     * Generate AI completion using SAP AI Core or local simulation
+     * Generate AI completion using available AI provider
+     * Supports: Ollama, OpenAI, Hugging Face, Local models
+     *
      * @param {string} prompt - The prompt to send to the AI
      * @param {Object} options - Additional options
      * @returns {Promise<string>} AI generated response
@@ -1163,96 +1192,204 @@ Always provide structured insights when analyzing candidates or jobs.`
     async _generateAICompletion(prompt, options = {}) {
         const config = { ...JouleService.AI_CONFIG, ...options };
 
-        if (this.aiCore) {
+        if (this.aiManager) {
             try {
-                // Use SAP AI Core / Generative AI Hub
-                const response = await this.aiCore.send({
-                    method: 'POST',
-                    path: '/chat/completions',
-                    data: {
-                        model: config.model,
-                        messages: [
-                            { role: 'system', content: config.systemPrompt },
-                            { role: 'user', content: prompt }
-                        ],
-                        temperature: config.temperature,
-                        max_tokens: config.maxTokens
-                    }
+                const messages = [
+                    { role: 'system', content: options.systemPrompt || config.systemPrompt },
+                    { role: 'user', content: prompt }
+                ];
+
+                const result = await this.aiManager.chat(messages, {
+                    temperature: config.temperature,
+                    maxTokens: config.maxTokens,
+                    timeout: config.timeout
                 });
 
-                return response.choices?.[0]?.message?.content || '';
+                this._logAIInteraction('completion', {
+                    provider: result.provider,
+                    model: result.model,
+                    promptLength: prompt.length,
+                    responseLength: result.text?.length
+                });
+
+                return result.text || '';
             } catch (error) {
-                LOG.error('AI Core request failed, falling back to simulation', error);
-                return this._simulateAIResponse(prompt, options);
+                LOG.error('AI completion failed, using fallback', error.message);
+                return this._getFallbackResponse(prompt, options);
             }
         }
 
-        return this._simulateAIResponse(prompt, options);
+        return this._getFallbackResponse(prompt, options);
     }
 
     /**
-     * Simulate AI response for development/testing
+     * Generate chat completion with conversation history
+     * @param {Array} messages - Chat messages
+     * @param {Object} options - Options
+     * @returns {Promise<Object>} Chat result with text and metadata
+     */
+    async _generateChatCompletion(messages, options = {}) {
+        const config = { ...JouleService.AI_CONFIG, ...options };
+
+        if (this.aiManager) {
+            try {
+                const result = await this.aiManager.chat(messages, {
+                    temperature: config.temperature,
+                    maxTokens: config.maxTokens,
+                    timeout: config.timeout
+                });
+
+                return result;
+            } catch (error) {
+                LOG.error('Chat completion failed', error.message);
+                const lastUserMessage = messages.filter(m => m.role === 'user').pop();
+                return {
+                    text: this._getFallbackResponse(lastUserMessage?.content || '', options),
+                    provider: 'fallback'
+                };
+            }
+        }
+
+        const lastUserMessage = messages.filter(m => m.role === 'user').pop();
+        return {
+            text: this._getFallbackResponse(lastUserMessage?.content || '', options),
+            provider: 'fallback'
+        };
+    }
+
+    /**
+     * Get AI provider information
+     * @returns {Object} Provider info
+     */
+    getAIProviderInfo() {
+        if (this.aiManager) {
+            return this.aiManager.getProviderInfo();
+        }
+        return { primary: 'fallback', fallbacks: [], available: [] };
+    }
+
+    /**
+     * Fallback response generator when AI is unavailable
      * @param {string} prompt - The prompt
      * @param {Object} options - Options including responseType
-     * @returns {string} Simulated response
+     * @returns {string} Fallback response
      */
-    _simulateAIResponse(prompt, options = {}) {
+    _getFallbackResponse(prompt, options = {}) {
         const { responseType } = options;
+        const lowerPrompt = prompt.toLowerCase();
+
+        // Auto-detect response type from prompt if not specified
+        let detectedType = responseType;
+        if (!detectedType) {
+            if (lowerPrompt.includes('summarize') || lowerPrompt.includes('summary')) {
+                detectedType = 'summary';
+            } else if (lowerPrompt.includes('interview') || lowerPrompt.includes('question')) {
+                detectedType = 'questions';
+            } else if (lowerPrompt.includes('compare') || lowerPrompt.includes('comparison')) {
+                detectedType = 'comparison';
+            } else if (lowerPrompt.includes('skill') || lowerPrompt.includes('gap')) {
+                detectedType = 'skills';
+            } else if (lowerPrompt.includes('insight')) {
+                detectedType = 'insights';
+            }
+        }
 
         const templates = {
-            summary: `Based on the profile analysis:
+            summary: `**Profile Summary:**
 
-**Key Strengths:**
-- Strong technical background with relevant experience
-- Demonstrated problem-solving abilities
-- Good communication and collaboration skills
+Based on the available information:
+
+**Strengths:**
+- Relevant technical background
+- Experience aligns with requirements
+- Strong foundational skills
 
 **Areas to Explore:**
-- Depth of experience with specific technologies
-- Leadership and mentorship capabilities
-- Cultural fit and long-term goals
+- Specific project contributions
+- Leadership experience
+- Long-term career goals
 
-**Recommendation:** Consider for next interview stage.`,
+**Recommendation:** Consider for next interview stage.
 
-            comparison: `**Candidate Comparison Analysis:**
+*Note: Full AI analysis requires an active AI provider (Ollama, OpenAI, or HuggingFace).*`,
 
-After analyzing the candidates, here are the key differentiators:
+            comparison: `**Candidate Comparison:**
 
-1. **Experience Level:** Varies from mid-level to senior
-2. **Skill Alignment:** All candidates meet core requirements
-3. **Cultural Fit:** Would need interview assessment
+| Criteria | Assessment |
+|----------|------------|
+| Skills Match | Comparable across candidates |
+| Experience | Varies by role |
+| Fit | Requires interview assessment |
 
-**Recommendation:** Proceed with top 2 candidates for technical interviews.`,
+**Next Steps:**
+1. Review individual profiles
+2. Conduct technical screening
+3. Compare interview performance
+
+*Note: Detailed AI comparison requires an active AI provider.*`,
 
             questions: `**Suggested Interview Questions:**
 
-1. "Tell me about a challenging project where you had to learn new technologies quickly."
-2. "How do you approach debugging complex issues in production?"
-3. "Describe your experience working in agile teams."
-4. "What interests you most about this role and our company?"
-5. "Where do you see your career in the next 3-5 years?"`,
+**Technical:**
+1. "Describe a challenging technical problem you solved recently."
+2. "How do you approach learning new technologies?"
+3. "Walk me through your debugging process."
 
-            insights: `**AI-Generated Insights:**
+**Behavioral:**
+4. "Tell me about a time you disagreed with a team decision."
+5. "How do you prioritize competing deadlines?"
 
-- This candidate's profile shows strong alignment with your hiring needs
-- Recent experience is highly relevant to the position
-- Skills match indicates 78% compatibility
-- Consider discussing: career progression expectations, team dynamics preferences
+**Role-Specific:**
+6. "What interests you about this position?"
+7. "Where do you see yourself in 3 years?"
 
-**Action Items:**
-1. Schedule technical assessment
-2. Prepare role-specific scenarios
-3. Discuss growth opportunities`,
+*Note: Personalized questions require an active AI provider.*`,
 
-            default: `I've analyzed the information provided. Here are my observations:
+            skills: `**Skill Analysis:**
 
-The data shows interesting patterns that warrant further investigation.
-I recommend taking a closer look at the specific metrics and comparing them against your benchmarks.
+**Identified Skills:**
+- Technical competencies from profile
+- Domain expertise indicators
+- Soft skills from experience
 
-Would you like me to provide more detailed analysis on any specific aspect?`
+**Potential Gaps:**
+- Review against job requirements
+- Consider training opportunities
+- Assess transferable skills
+
+*Note: Detailed gap analysis requires an active AI provider.*`,
+
+            insights: `**Profile Insights:**
+
+**Observations:**
+- Profile shows relevant experience
+- Skills align with typical requirements
+- Background suggests growth potential
+
+**Recommendations:**
+1. Verify key qualifications
+2. Assess cultural fit
+3. Discuss career trajectory
+
+*Note: AI-powered insights require an active AI provider.*`,
+
+            default: `**Analysis Summary:**
+
+I've reviewed the available information. Here are initial observations:
+
+- Data shows patterns worth investigating
+- Several factors merit deeper review
+- Recommend structured evaluation
+
+For enhanced AI analysis, configure one of:
+- **Ollama**: Set OLLAMA_BASE_URL (local, private, free)
+- **OpenAI**: Set OPENAI_API_KEY
+- **HuggingFace**: Set HF_API_KEY
+
+Would you like guidance on setting up an AI provider?`
         };
 
-        return templates[responseType] || templates.default;
+        return templates[detectedType] || templates.default;
     }
 
     /**

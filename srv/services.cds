@@ -516,7 +516,11 @@ service AdminService {
         status: String;
         database: String;
         ocr: String;
-        jouleAI: String;
+        ai: {
+            provider: String;
+            model: String;
+            status: String;
+        };
         timestamp: Timestamp;
     };
 }
