@@ -29,27 +29,51 @@ const AI_PROVIDERS = {
 
 /**
  * Recommended small/efficient models for each provider
+ * Updated based on 2024-2025 benchmarks for HR/recruitment tasks
+ *
+ * Memory estimates (approximate):
+ * - 135M params: ~300MB RAM
+ * - 360M params: ~750MB RAM
+ * - 0.5B params: ~1GB RAM
+ * - 1.5B params: ~3GB RAM
+ * - 3.8B params: ~7.6GB RAM (FP16) or ~1.8GB (INT4)
  */
 const RECOMMENDED_MODELS = {
     ollama: {
-        fast: 'phi3:mini',          // 3.8B params, very fast
-        balanced: 'llama3.2:3b',     // Good balance of speed/quality
-        quality: 'mistral:7b',       // Higher quality, slower
-        coding: 'codellama:7b'       // Optimized for code
-    },
-    openai: {
-        fast: 'gpt-3.5-turbo',
-        balanced: 'gpt-4o-mini',
-        quality: 'gpt-4o'
+        // Ultra-lightweight (< 1GB RAM)
+        tiny: 'smollm2:135m',           // 135M params, ~300MB, fastest
+        // Lightweight (1-2GB RAM)
+        fast: 'smollm2:360m',           // 360M params, ~750MB, good for simple tasks
+        // Balanced (2-4GB RAM)
+        balanced: 'qwen2.5:1.5b',       // 1.5B params, ~3GB, excellent quality/size ratio
+        // Quality (4-8GB RAM)
+        quality: 'phi3.5:3.8b',         // 3.8B params, ~7.6GB FP16, best reasoning
+        // Coding-focused
+        coding: 'qwen2.5-coder:1.5b'    // 1.5B params, optimized for code
     },
     huggingface: {
-        fast: 'microsoft/phi-2',
-        balanced: 'mistralai/Mistral-7B-Instruct-v0.2',
-        quality: 'meta-llama/Llama-2-13b-chat-hf'
+        // Ultra-lightweight - runs on free tier easily
+        tiny: 'HuggingFaceTB/SmolLM2-135M-Instruct',    // 135M, ~300MB
+        // Lightweight - good for classification/extraction
+        fast: 'HuggingFaceTB/SmolLM2-360M-Instruct',    // 360M, ~750MB
+        // Balanced - best for general HR tasks
+        balanced: 'Qwen/Qwen2.5-1.5B-Instruct',         // 1.5B, ~3GB
+        // Quality - when you need best results
+        quality: 'microsoft/Phi-3.5-mini-instruct',     // 3.8B, best reasoning
+        // Alternative lightweight options
+        alt_tiny: 'Qwen/Qwen2.5-0.5B-Instruct',         // 0.5B, ~1GB
+        alt_balanced: 'HuggingFaceTB/SmolLM2-1.7B-Instruct' // 1.7B, ~3.4GB
+    },
+    openai: {
+        fast: 'gpt-3.5-turbo',          // Fastest, cheapest
+        balanced: 'gpt-4o-mini',        // Good balance
+        quality: 'gpt-4o'               // Best quality
     },
     local: {
-        fast: 'Xenova/phi-2',                    // transformers.js compatible
-        balanced: 'Xenova/distilgpt2'
+        // For browser/Node.js via transformers.js
+        tiny: 'Xenova/smollm-135M-instruct-v0.2-Q8_0-ONNX',
+        fast: 'Xenova/Qwen1.5-0.5B-Chat',
+        balanced: 'Xenova/phi-2'
     }
 };
 
@@ -358,6 +382,13 @@ class OpenAIProvider extends BaseAIProvider {
 
 /**
  * Hugging Face Inference API Provider
+ *
+ * Best lightweight models for HR/CV tasks:
+ * - SmolLM2-135M-Instruct: Ultra-fast, ~300MB, good for simple extraction
+ * - SmolLM2-360M-Instruct: Fast, ~750MB, good for classification
+ * - Qwen2.5-0.5B-Instruct: ~1GB, multilingual, good quality
+ * - Qwen2.5-1.5B-Instruct: ~3GB, excellent for summarization (RECOMMENDED)
+ * - Phi-3.5-mini-instruct: ~3.8B, best reasoning but slower
  */
 class HuggingFaceProvider extends BaseAIProvider {
     constructor(config = {}) {
@@ -365,6 +396,7 @@ class HuggingFaceProvider extends BaseAIProvider {
         this.name = 'huggingface';
         this.apiKey = config.apiKey || process.env.HF_API_KEY || process.env.HUGGINGFACE_API_KEY;
         this.baseUrl = config.baseUrl || 'https://api-inference.huggingface.co/models';
+        // Default to SmolLM2-360M for good balance of speed and capability
         this.model = config.model || process.env.HF_MODEL || RECOMMENDED_MODELS.huggingface.fast;
     }
 

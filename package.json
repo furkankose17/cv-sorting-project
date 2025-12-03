@@ -93,13 +93,13 @@
       "provider": "auto",
       "ollama": {
         "baseUrl": "http://localhost:11434",
-        "model": "llama3.2:3b"
+        "model": "qwen2.5:1.5b"
       },
       "openai": {
         "model": "gpt-3.5-turbo"
       },
       "huggingface": {
-        "model": "microsoft/phi-2"
+        "model": "HuggingFaceTB/SmolLM2-360M-Instruct"
       }
     },
     "features": {

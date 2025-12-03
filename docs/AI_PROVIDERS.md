@@ -7,13 +7,47 @@ This branch uses non-SAP AI providers for the Joule AI features. You can use loc
 | Provider | Type | Cost | Privacy | Setup Difficulty |
 |----------|------|------|---------|------------------|
 | **Ollama** | Local | Free | High | Easy |
-| **OpenAI** | Cloud | Pay-per-use | Low | Easy |
 | **Hugging Face** | Cloud | Free tier | Low | Easy |
+| **OpenAI** | Cloud | Pay-per-use | Low | Easy |
 | **Local (transformers.js)** | Browser/Node | Free | High | Medium |
+
+## Best Lightweight Models for CV Sorting
+
+Based on 2024-2025 benchmarks, here are the **recommended models** for HR/recruitment tasks:
+
+### Top Picks by Memory Budget
+
+| Memory | Model | Provider | Best For |
+|--------|-------|----------|----------|
+| **< 500MB** | SmolLM2-135M-Instruct | HuggingFace | Simple extraction, classification |
+| **< 1GB** | SmolLM2-360M-Instruct | HuggingFace/Ollama | Fast analysis, entity extraction |
+| **< 2GB** | Qwen2.5-0.5B-Instruct | HuggingFace/Ollama | Multilingual, good quality |
+| **< 4GB** | Qwen2.5-1.5B-Instruct | HuggingFace/Ollama | **RECOMMENDED** - Best quality/size ratio |
+| **< 8GB** | Phi-3.5-mini-instruct | HuggingFace/Ollama | Best reasoning, summarization |
+
+### Why These Models?
+
+- **SmolLM2** (Hugging Face): State-of-the-art small models, trained on high-quality datasets including code and math
+- **Qwen2.5** (Alibaba): Excellent multilingual support (29+ languages), 128K context length
+- **Phi-3.5** (Microsoft): Best reasoning capability, rivals GPT-3.5 on many benchmarks
 
 ## Quick Start
 
-### Option 1: Ollama (Recommended for Local Development)
+### Option 1: Hugging Face (Easiest - Free Tier)
+
+Get a free API key and start immediately:
+
+```bash
+# 1. Get free API key from https://huggingface.co/settings/tokens
+export HF_API_KEY="hf_..."
+
+# 2. Optional: Choose a specific model (defaults to SmolLM2-360M)
+export HF_MODEL="Qwen/Qwen2.5-1.5B-Instruct"  # Recommended for quality
+# or
+export HF_MODEL="HuggingFaceTB/SmolLM2-135M-Instruct"  # Fastest
+```
+
+### Option 2: Ollama (Best for Privacy)
 
 Ollama runs LLMs locally on your machine. No API keys needed, completely private.
 
@@ -21,17 +55,18 @@ Ollama runs LLMs locally on your machine. No API keys needed, completely private
 # Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
 
-# Pull a recommended model (choose one based on your hardware)
-ollama pull phi3:mini        # Fast, 3.8B params, ~2GB RAM
-ollama pull llama3.2:3b      # Balanced, 3B params, ~2GB RAM
-ollama pull mistral:7b       # Quality, 7B params, ~4GB RAM
+# Pull a recommended model (choose based on your RAM)
+ollama pull smollm2:135m     # Ultra-fast, ~300MB RAM
+ollama pull smollm2:360m     # Fast, ~750MB RAM
+ollama pull qwen2.5:1.5b     # RECOMMENDED, ~3GB RAM
+ollama pull phi3.5:3.8b      # Best quality, ~4GB RAM (quantized)
 
 # Ollama runs automatically on http://localhost:11434
 ```
 
 The service will auto-detect Ollama if running.
 
-### Option 2: OpenAI (or Compatible APIs)
+### Option 3: OpenAI (or Compatible APIs)
 
 Set your API key:
 
@@ -57,23 +92,41 @@ export HF_MODEL="microsoft/phi-2"  # Optional
 
 ## Model Recommendations
 
-### By Use Case
+### By Use Case (CV Sorting Tasks)
 
-| Use Case | Ollama Model | OpenAI Model | Notes |
-|----------|--------------|--------------|-------|
-| Fast responses | `phi3:mini` | `gpt-3.5-turbo` | Best for quick queries |
-| Quality analysis | `mistral:7b` | `gpt-4o-mini` | Better reasoning |
-| Code understanding | `codellama:7b` | `gpt-4o` | Optimized for code |
-| Low memory | `tinyllama` | `gpt-3.5-turbo` | Under 1GB RAM |
+| Use Case | Hugging Face Model | Ollama Model | Memory |
+|----------|-------------------|--------------|--------|
+| **Skill extraction** | SmolLM2-360M-Instruct | smollm2:360m | ~750MB |
+| **CV summarization** | Qwen2.5-1.5B-Instruct | qwen2.5:1.5b | ~3GB |
+| **Candidate comparison** | Phi-3.5-mini-instruct | phi3.5:3.8b | ~4GB |
+| **Interview questions** | Qwen2.5-1.5B-Instruct | qwen2.5:1.5b | ~3GB |
+| **Multilingual CVs** | Qwen2.5-1.5B-Instruct | qwen2.5:1.5b | ~3GB |
+| **Simple classification** | SmolLM2-135M-Instruct | smollm2:135m | ~300MB |
 
 ### By Hardware
 
-| Hardware | Recommended Model | RAM Required |
-|----------|-------------------|--------------|
-| 8GB RAM | `phi3:mini` | ~2GB |
-| 16GB RAM | `llama3.2:3b` | ~3GB |
-| 32GB+ RAM | `mistral:7b` or larger | ~4-8GB |
-| GPU (8GB VRAM) | `llama3.1:8b` | Fast inference |
+| Hardware | Recommended Model | Notes |
+|----------|-------------------|-------|
+| **2GB RAM** | SmolLM2-135M | Ultra-fast, basic tasks |
+| **4GB RAM** | SmolLM2-360M or Qwen2.5-0.5B | Good for most extraction |
+| **8GB RAM** | Qwen2.5-1.5B | **Best balance** - recommended |
+| **16GB RAM** | Phi-3.5-mini (3.8B) | Best quality, full FP16 |
+| **GPU 4GB VRAM** | Qwen2.5-1.5B quantized | Fast inference |
+| **GPU 8GB VRAM** | Phi-3.5-mini | Excellent quality |
+
+### Model Benchmarks (Relevant to HR Tasks)
+
+| Model | Params | MMLU | MT-Bench | Memory | Speed |
+|-------|--------|------|----------|--------|-------|
+| SmolLM2-135M | 135M | ~35% | ~4.5 | 300MB | ⚡⚡⚡⚡ |
+| SmolLM2-360M | 360M | ~42% | ~5.2 | 750MB | ⚡⚡⚡⚡ |
+| Qwen2.5-0.5B | 0.5B | ~47% | ~5.5 | 1GB | ⚡⚡⚡ |
+| SmolLM2-1.7B | 1.7B | ~50% | ~6.0 | 3.4GB | ⚡⚡⚡ |
+| Qwen2.5-1.5B | 1.5B | ~58% | ~6.5 | 3GB | ⚡⚡⚡ |
+| Phi-3.5-mini | 3.8B | ~69% | ~8.4 | 7.6GB | ⚡⚡ |
+
+*MMLU = Massive Multitask Language Understanding (general knowledge)*
+*MT-Bench = Multi-turn conversation quality*
 
 ## Configuration
 
