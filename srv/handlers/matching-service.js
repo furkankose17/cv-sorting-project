@@ -310,72 +310,126 @@ module.exports = class MatchingService extends cds.ApplicationService {
                 const jobPosting = await SELECT.one.from(JobPostings).where({ ID: jobPostingId });
                 if (!jobPosting) throw new NotFoundError('JobPosting', jobPostingId);
 
-                const jobRequiredSkills = await SELECT.from(JobRequiredSkills)
-                    .where({ jobPosting_ID: jobPostingId });
-
-                // Get candidates
-                let candidates;
-                if (candidateIds && candidateIds.length > 0) {
-                    candidates = await SELECT.from(Candidates)
-                        .where({ ID: { in: candidateIds }, isDeleted: false });
-                } else {
-                    candidates = await SELECT.from(Candidates)
-                        .where({ isDeleted: false })
-                        .limit(1000);
-                }
-
+                const threshold = Number(minScore) || 0;
                 let matchesCreated = 0;
                 let totalScore = 0;
-                const threshold = Number(minScore) || 0;
+                let usedSemanticMatching = false;
 
-                for (const candidate of candidates) {
-                    const candidateSkills = await SELECT.from(CandidateSkills)
-                        .where({ candidate_ID: candidate.ID });
+                // Try ML semantic matching first
+                try {
+                    LOG.info('Attempting ML semantic matching', { jobPostingId });
+                    const mlResult = await this.mlClient.findSemanticMatches({
+                        jobPostingId,
+                        minScore: threshold,
+                        limit: 100,
+                        includeBreakdown: true,
+                        excludeDisqualified: false
+                    });
 
-                    const result = await this.calculateMatchScore(
-                        candidate,
-                        jobPosting,
-                        candidateSkills,
-                        jobRequiredSkills
-                    );
+                    if (mlResult && mlResult.matches && mlResult.matches.length > 0) {
+                        usedSemanticMatching = true;
+                        LOG.info('ML semantic matching succeeded', { matchCount: mlResult.matches.length });
 
-                    if (result.overallScore >= threshold) {
-                        // Upsert match result
-                        const existing = await SELECT.one.from(MatchResults)
-                            .where({ candidate_ID: candidate.ID, jobPosting_ID: jobPostingId });
+                        // Store ML results in HANA
+                        for (const match of mlResult.matches) {
+                            const existing = await SELECT.one.from(MatchResults)
+                                .where({ candidate_ID: match.candidate_id, jobPosting_ID: jobPostingId });
 
-                        const matchData = {
-                            candidate_ID: candidate.ID,
-                            jobPosting_ID: jobPostingId,
-                            overallScore: result.overallScore,
-                            skillScore: result.skillScore,
-                            experienceScore: result.experienceScore,
-                            educationScore: result.educationScore,
-                            locationScore: result.locationScore,
-                            scoreBreakdown: JSON.stringify(result.breakdown),
-                            matchedSkills: JSON.stringify(result.breakdown.skillDetails.matched),
-                            missingSkills: JSON.stringify(result.breakdown.skillDetails.missing),
-                            reviewStatus: 'pending'
-                        };
+                            const matchData = {
+                                candidate_ID: match.candidate_id,
+                                jobPosting_ID: jobPostingId,
+                                overallScore: match.combined_score,
+                                skillScore: match.criteria_score || 0,
+                                experienceScore: 0,
+                                educationScore: 0,
+                                locationScore: 0,
+                                scoreBreakdown: JSON.stringify(match.score_breakdown || {}),
+                                matchedSkills: JSON.stringify(match.matched_criteria || []),
+                                missingSkills: JSON.stringify(match.missing_criteria || []),
+                                aiRecommendation: `Semantic similarity: ${(match.cosine_similarity * 100).toFixed(1)}%`,
+                                reviewStatus: 'pending'
+                            };
 
-                        if (existing) {
-                            await UPDATE(MatchResults).where({ ID: existing.ID }).set(matchData);
-                        } else {
-                            await INSERT.into(MatchResults).entries(matchData);
+                            if (existing) {
+                                await UPDATE(MatchResults).where({ ID: existing.ID }).set(matchData);
+                            } else {
+                                await INSERT.into(MatchResults).entries(matchData);
+                            }
+
+                            matchesCreated++;
+                            totalScore += match.combined_score;
                         }
 
-                        matchesCreated++;
-                        totalScore += result.overallScore;
+                        // Update rankings
+                        await this._updateRankings(jobPostingId);
                     }
+                } catch (mlError) {
+                    LOG.warn('ML semantic matching failed, falling back to local', { error: mlError.message });
                 }
 
-                // Update rankings
-                await this._updateRankings(jobPostingId);
+                // Fallback to local matching if ML didn't work
+                if (!usedSemanticMatching) {
+                    LOG.info('Using local matching algorithm');
+                    const jobRequiredSkills = await SELECT.from(JobRequiredSkills)
+                        .where({ jobPosting_ID: jobPostingId });
 
-                const duration = timer.stop({ jobPostingId, matched: matchesCreated });
+                    let candidates;
+                    if (candidateIds && candidateIds.length > 0) {
+                        candidates = await SELECT.from(Candidates)
+                            .where({ ID: { in: candidateIds }, isDeleted: false });
+                    } else {
+                        candidates = await SELECT.from(Candidates)
+                            .where({ isDeleted: false })
+                            .limit(1000);
+                    }
+
+                    for (const candidate of candidates) {
+                        const candidateSkills = await SELECT.from(CandidateSkills)
+                            .where({ candidate_ID: candidate.ID });
+
+                        const result = await this.calculateMatchScore(
+                            candidate,
+                            jobPosting,
+                            candidateSkills,
+                            jobRequiredSkills
+                        );
+
+                        if (result.overallScore >= threshold) {
+                            const existing = await SELECT.one.from(MatchResults)
+                                .where({ candidate_ID: candidate.ID, jobPosting_ID: jobPostingId });
+
+                            const matchData = {
+                                candidate_ID: candidate.ID,
+                                jobPosting_ID: jobPostingId,
+                                overallScore: result.overallScore,
+                                skillScore: result.skillScore,
+                                experienceScore: result.experienceScore,
+                                educationScore: result.educationScore,
+                                locationScore: result.locationScore,
+                                scoreBreakdown: JSON.stringify(result.breakdown),
+                                matchedSkills: JSON.stringify(result.breakdown.skillDetails.matched),
+                                missingSkills: JSON.stringify(result.breakdown.skillDetails.missing),
+                                reviewStatus: 'pending'
+                            };
+
+                            if (existing) {
+                                await UPDATE(MatchResults).where({ ID: existing.ID }).set(matchData);
+                            } else {
+                                await INSERT.into(MatchResults).entries(matchData);
+                            }
+
+                            matchesCreated++;
+                            totalScore += result.overallScore;
+                        }
+                    }
+
+                    await this._updateRankings(jobPostingId);
+                }
+
+                const duration = timer.stop({ jobPostingId, matched: matchesCreated, semantic: usedSemanticMatching });
 
                 return {
-                    totalProcessed: candidates.length,
+                    totalProcessed: matchesCreated,
                     matchesCreated,
                     avgScore: matchesCreated > 0 ? Math.round((totalScore / matchesCreated) * 100) / 100 : 0,
                     processingTime: duration
