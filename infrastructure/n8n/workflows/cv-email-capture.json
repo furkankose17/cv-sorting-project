@@ -1,0 +1,416 @@
+{
+  "name": "CV Email Capture Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute",
+              "minute": 5
+            }
+          ]
+        },
+        "mailbox": "INBOX",
+        "options": {
+          "customEmailConfig": ""
+        }
+      },
+      "id": "imap-trigger",
+      "name": "IMAP Email Trigger",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "credentials": {
+        "imap": {
+          "id": "1",
+          "name": "CV Inbox IMAP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.attachments.length }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "filter-with-attachments",
+      "name": "Has Attachments?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "attachments",
+        "options": {}
+      },
+      "id": "split-attachments",
+      "name": "Split Attachments",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 3,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.filename.toLowerCase() }}",
+              "operation": "regex",
+              "value2": "\\.(pdf|docx|doc|png|jpg|jpeg|tiff|tif)$"
+            }
+          ]
+        }
+      },
+      "id": "filter-valid-files",
+      "name": "Valid CV File?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract file extension\nconst filename = $input.item.json.filename;\nconst extension = filename.split('.').pop().toLowerCase();\n\n// Map extension to file type\nconst fileTypeMap = {\n  'pdf': 'pdf',\n  'png': 'png',\n  'jpg': 'jpg',\n  'jpeg': 'jpg',\n  'tiff': 'tiff',\n  'tif': 'tiff',\n  'doc': 'doc',\n  'docx': 'docx'\n};\n\nconst fileType = fileTypeMap[extension] || extension;\nconst isPdf = fileType === 'pdf';\nconst isImage = ['png', 'jpg', 'jpeg', 'tiff', 'tif'].includes(extension);\n\n// Get sender email for candidate info\nconst fromEmail = $('IMAP Email Trigger').item.json.from || '';\nconst fromName = fromEmail.includes('<') ? fromEmail.split('<')[0].trim() : fromEmail;\n\nreturn {\n  json: {\n    filename: filename,\n    fileType: fileType,\n    extension: extension,\n    isPdf: isPdf,\n    isImage: isImage,\n    contentBase64: $input.item.json.content,\n    fromEmail: fromEmail,\n    fromName: fromName,\n    receivedAt: new Date().toISOString(),\n    subject: $('IMAP Email Trigger').item.json.subject || 'CV Application'\n  }\n};"
+      },
+      "id": "prepare-file-data",
+      "name": "Prepare File Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CAP_SERVICE_URL }}/api/candidates/uploadDocument",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "fileName",
+              "value": "={{ $json.filename }}"
+            },
+            {
+              "name": "fileContent",
+              "value": "={{ $json.contentBase64 }}"
+            },
+            {
+              "name": "contentType",
+              "value": "={{ $json.fileType === 'pdf' ? 'application/pdf' : 'image/' + $json.extension }}"
+            },
+            {
+              "name": "candidateEmail",
+              "value": "={{ $json.fromEmail }}"
+            },
+            {
+              "name": "candidateName",
+              "value": "={{ $json.fromName }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "upload-to-cap",
+      "name": "Upload to CAP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1340, 300],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "2",
+          "name": "CAP Service OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ML_SERVICE_URL }}/api/ocr/process",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "file_content",
+              "value": "={{ $('Prepare File Data').item.json.contentBase64 }}"
+            },
+            {
+              "name": "file_type",
+              "value": "={{ $('Prepare File Data').item.json.fileType }}"
+            },
+            {
+              "name": "language",
+              "value": "eng"
+            },
+            {
+              "name": "extract_structured",
+              "value": "={{ true }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ocr-process",
+      "name": "OCR Process",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ML_SERVICE_URL }}/api/embeddings/generate",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "entity_type",
+              "value": "candidate"
+            },
+            {
+              "name": "entity_id",
+              "value": "={{ $('Upload to CAP').item.json.candidateId }}"
+            },
+            {
+              "name": "text_content",
+              "value": "={{ $json.text }}"
+            },
+            {
+              "name": "store",
+              "value": "={{ true }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "generate-embedding",
+      "name": "Generate Embedding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1780, 300]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.CAP_SERVICE_URL }}/api/candidates/CVDocuments({{ $('Upload to CAP').item.json.documentId }})",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "extractedText",
+              "value": "={{ $('OCR Process').item.json.text }}"
+            },
+            {
+              "name": "ocrConfidence",
+              "value": "={{ $('OCR Process').item.json.confidence }}"
+            },
+            {
+              "name": "status",
+              "value": "Processed"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "update-document-status",
+      "name": "Update Document Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2000, 300],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "2",
+          "name": "CAP Service OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.NOTIFICATION_FROM_EMAIL }}",
+        "toEmail": "={{ $('Prepare File Data').item.json.fromEmail }}",
+        "subject": "CV Received - {{ $('Prepare File Data').item.json.filename }}",
+        "text": "Dear {{ $('Prepare File Data').item.json.fromName }},\n\nThank you for submitting your CV. We have successfully received and processed your application.\n\nDocument: {{ $('Prepare File Data').item.json.filename }}\nReceived: {{ $('Prepare File Data').item.json.receivedAt }}\n\nOur team will review your application and contact you if your profile matches our requirements.\n\nBest regards,\nHR Team",
+        "options": {}
+      },
+      "id": "send-confirmation",
+      "name": "Send Confirmation Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [2220, 300],
+      "credentials": {
+        "smtp": {
+          "id": "3",
+          "name": "SMTP Notification"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log processing error\nconst error = $input.item.json;\nconsole.error('CV Processing failed:', error);\n\nreturn {\n  json: {\n    status: 'error',\n    message: error.message || 'Unknown error',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 500]
+    },
+    {
+      "parameters": {},
+      "id": "no-attachments",
+      "name": "No Attachments",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [680, 500]
+    },
+    {
+      "parameters": {},
+      "id": "invalid-file",
+      "name": "Invalid File Type",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1120, 500]
+    }
+  ],
+  "connections": {
+    "IMAP Email Trigger": {
+      "main": [
+        [
+          {
+            "node": "Has Attachments?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Attachments?": {
+      "main": [
+        [
+          {
+            "node": "Split Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Attachments": {
+      "main": [
+        [
+          {
+            "node": "Valid CV File?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid CV File?": {
+      "main": [
+        [
+          {
+            "node": "Prepare File Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invalid File Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare File Data": {
+      "main": [
+        [
+          {
+            "node": "Upload to CAP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to CAP": {
+      "main": [
+        [
+          {
+            "node": "OCR Process",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OCR Process": {
+      "main": [
+        [
+          {
+            "node": "Generate Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Embedding": {
+      "main": [
+        [
+          {
+            "node": "Update Document Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Document Status": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "tags": [
+    {
+      "id": "1",
+      "name": "cv-sorting"
+    },
+    {
+      "id": "2",
+      "name": "email-automation"
+    }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "cv-sorting-n8n"
+  }
+}

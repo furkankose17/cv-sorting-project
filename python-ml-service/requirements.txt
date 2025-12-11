@@ -1,0 +1,60 @@
+# ============================================
+# CV Sorting ML Service - Python Dependencies
+# ============================================
+
+# Web Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# ML / NLP - Embedding Models
+# Using multilingual-e5-small for 100+ language support
+sentence-transformers==2.2.2
+torch==2.1.2
+transformers==4.36.2
+
+# OCR - Primary: PaddleOCR (faster, better tables), Fallback: Tesseract
+# PaddlePaddle CPU version (no GPU required)
+paddlepaddle==2.6.0
+paddleocr==2.7.0
+
+# OCR - Tesseract (fallback engine)
+pytesseract==0.3.10
+pdf2image==1.16.3
+Pillow==10.2.0
+PyPDF2==3.0.1
+
+# Database
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+
+# Data Processing
+numpy==1.26.3
+pandas==2.1.4
+
+# HTTP Client
+httpx==0.26.0
+aiohttp==3.9.1
+
+# Configuration
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+
+# Utilities
+uuid==1.30
+python-dateutil==2.8.2
+
+# Logging
+structlog==24.1.0
+
+# Testing
+pytest==7.4.4
+pytest-asyncio==0.23.3
+pytest-cov==4.1.0
+
+# Code Quality
+black==23.12.1
+isort==5.13.2
+flake8==7.0.0
+mypy==1.8.0

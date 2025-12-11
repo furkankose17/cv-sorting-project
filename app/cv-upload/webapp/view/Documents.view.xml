@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mvc:View
+    controllerName="cv.sorting.cvupload.controller.Documents"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:f="sap.f">
+
+    <Page
+        id="idDocumentsPage"
+        title="{i18n>documentsPageTitle}"
+        showNavButton="true"
+        navButtonPress="onNavBack">
+
+        <headerContent>
+            <Button
+                icon="sap-icon://refresh"
+                tooltip="{i18n>refresh}"
+                press="onRefresh"
+                type="Transparent"/>
+            <Button
+                icon="sap-icon://upload"
+                text="{i18n>uploadNew}"
+                press="onNavigateToUpload"
+                type="Emphasized"/>
+        </headerContent>
+
+        <content>
+            <f:Card class="sapUiMediumMargin">
+                <f:content>
+                    <Table
+                        id="idDocumentsTable"
+                        items="{
+                            path: '/Documents',
+                            sorter: { path: 'createdAt', descending: true },
+                            parameters: { $expand: 'candidate' }
+                        }"
+                        growing="true"
+                        growingThreshold="20"
+                        mode="SingleSelectMaster"
+                        selectionChange="onDocumentSelect">
+                        <headerToolbar>
+                            <OverflowToolbar>
+                                <Title text="{i18n>allDocuments}"/>
+                                <ToolbarSpacer/>
+                                <SearchField
+                                    id="idDocumentsSearch"
+                                    width="20rem"
+                                    search="onSearch"
+                                    placeholder="{i18n>searchDocuments}"/>
+                                <Select
+                                    id="idStatusFilter"
+                                    change="onStatusFilterChange"
+                                    selectedKey="all">
+                                    <core:Item xmlns:core="sap.ui.core" key="all" text="{i18n>allStatuses}"/>
+                                    <core:Item xmlns:core="sap.ui.core" key="pending" text="{i18n>pending}"/>
+                                    <core:Item xmlns:core="sap.ui.core" key="processing" text="{i18n>processing}"/>
+                                    <core:Item xmlns:core="sap.ui.core" key="completed" text="{i18n>completed}"/>
+                                    <core:Item xmlns:core="sap.ui.core" key="failed" text="{i18n>failed}"/>
+                                </Select>
+                            </OverflowToolbar>
+                        </headerToolbar>
+                        <columns>
+                            <Column width="25%">
+                                <Text text="{i18n>fileName}"/>
+                            </Column>
+                            <Column width="10%">
+                                <Text text="{i18n>fileType}"/>
+                            </Column>
+                            <Column width="12%">
+                                <Text text="{i18n>status}"/>
+                            </Column>
+                            <Column width="10%">
+                                <Text text="{i18n>confidence}"/>
+                            </Column>
+                            <Column width="15%">
+                                <Text text="{i18n>uploadDate}"/>
+                            </Column>
+                            <Column width="18%">
+                                <Text text="{i18n>candidate}"/>
+                            </Column>
+                            <Column width="10%">
+                                <Text text="{i18n>actions}"/>
+                            </Column>
+                        </columns>
+                        <items>
+                            <ColumnListItem type="Navigation" press="onDocumentPress">
+                                <cells>
+                                    <ObjectIdentifier
+                                        title="{fileName}"
+                                        text="{= ${fileSize} ? (${fileSize} / 1024).toFixed(1) + ' KB' : ''}"/>
+                                    <Text text="{fileType}"/>
+                                    <ObjectStatus
+                                        text="{processingStatus}"
+                                        state="{= ${processingStatus} === 'completed' ? 'Success' : ${processingStatus} === 'failed' ? 'Error' : ${processingStatus} === 'processing' ? 'Information' : 'None'}"/>
+                                    <ObjectNumber
+                                        number="{= ${ocrConfidence} ? ${ocrConfidence}.toFixed(0) : '-'}"
+                                        unit="%"
+                                        state="{= ${ocrConfidence} >= 80 ? 'Success' : ${ocrConfidence} >= 50 ? 'Warning' : 'Error'}"/>
+                                    <Text text="{
+                                        path: 'createdAt',
+                                        type: 'sap.ui.model.type.DateTime',
+                                        formatOptions: { style: 'medium' }
+                                    }"/>
+                                    <Text text="{candidate/firstName} {candidate/lastName}"/>
+                                    <HBox>
+                                        <Button
+                                            icon="sap-icon://synchronize"
+                                            tooltip="{i18n>reprocess}"
+                                            press="onReprocessDocument"
+                                            type="Transparent"
+                                            visible="{= ${processingStatus} === 'failed'}"/>
+                                        <Button
+                                            icon="sap-icon://download"
+                                            tooltip="{i18n>download}"
+                                            press="onDownloadDocument"
+                                            type="Transparent"/>
+                                        <Button
+                                            icon="sap-icon://delete"
+                                            tooltip="{i18n>delete}"
+                                            press="onDeleteDocument"
+                                            type="Transparent"/>
+                                    </HBox>
+                                </cells>
+                            </ColumnListItem>
+                        </items>
+                    </Table>
+                </f:content>
+            </f:Card>
+        </content>
+    </Page>
+</mvc:View>

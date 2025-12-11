@@ -1,0 +1,197 @@
+{
+    "_version": "1.49.0",
+    "sap.app": {
+        "id": "cv.sorting.candidatemanagement",
+        "type": "application",
+        "title": "{{appTitle}}",
+        "description": "{{appDescription}}",
+        "applicationVersion": {
+            "version": "1.0.0"
+        },
+        "dataSources": {
+            "mainService": {
+                "uri": "/api/candidates/",
+                "type": "OData",
+                "settings": {
+                    "odataVersion": "4.0"
+                }
+            }
+        },
+        "crossNavigation": {
+            "inbounds": {
+                "candidatemanagement-display": {
+                    "semanticObject": "Candidate",
+                    "action": "manage",
+                    "title": "{{flpTitle}}",
+                    "signature": {
+                        "parameters": {},
+                        "additionalParameters": "allowed"
+                    }
+                }
+            },
+            "outbounds": {
+                "uploadCV": {
+                    "semanticObject": "CVDocument",
+                    "action": "upload"
+                },
+                "displayJob": {
+                    "semanticObject": "JobPosting",
+                    "action": "display"
+                },
+                "displayAnalytics": {
+                    "semanticObject": "Analytics",
+                    "action": "display"
+                },
+                "displayDocument": {
+                    "semanticObject": "CVDocument",
+                    "action": "display"
+                }
+            }
+        }
+    },
+    "sap.ui": {
+        "technology": "UI5",
+        "icons": {
+            "icon": "sap-icon://person-placeholder"
+        },
+        "deviceTypes": {
+            "desktop": true,
+            "tablet": true,
+            "phone": true
+        }
+    },
+    "sap.ui5": {
+        "flexEnabled": true,
+        "dependencies": {
+            "minUI5Version": "1.120.0",
+            "libs": {
+                "sap.m": {},
+                "sap.ui.core": {},
+                "sap.ui.layout": {},
+                "sap.uxap": {},
+                "sap.f": {},
+                "sap.fe.templates": {}
+            }
+        },
+        "contentDensities": {
+            "compact": true,
+            "cozy": true
+        },
+        "models": {
+            "i18n": {
+                "type": "sap.ui.model.resource.ResourceModel",
+                "settings": {
+                    "bundleName": "cv.sorting.candidatemanagement.i18n.i18n"
+                }
+            },
+            "": {
+                "dataSource": "mainService",
+                "preload": true,
+                "settings": {
+                    "synchronizationMode": "None",
+                    "operationMode": "Server",
+                    "autoExpandSelect": true,
+                    "earlyRequests": true
+                }
+            }
+        },
+        "routing": {
+            "routes": [
+                {
+                    "pattern": ":?query:",
+                    "name": "CandidatesList",
+                    "target": "CandidatesList"
+                },
+                {
+                    "pattern": "Candidates({key}):?query:",
+                    "name": "CandidatesObjectPage",
+                    "target": "CandidatesObjectPage"
+                },
+                {
+                    "pattern": "Candidates({key})/experiences({key2}):?query:",
+                    "name": "WorkExperiencesObjectPage",
+                    "target": "WorkExperiencesObjectPage"
+                }
+            ],
+            "targets": {
+                "CandidatesList": {
+                    "type": "Component",
+                    "id": "CandidatesList",
+                    "name": "sap.fe.templates.ListReport",
+                    "options": {
+                        "settings": {
+                            "contextPath": "/Candidates",
+                            "variantManagement": "Page",
+                            "navigation": {
+                                "Candidates": {
+                                    "detail": {
+                                        "route": "CandidatesObjectPage"
+                                    }
+                                }
+                            },
+                            "controlConfiguration": {
+                                "@com.sap.vocabularies.UI.v1.LineItem": {
+                                    "tableSettings": {
+                                        "type": "ResponsiveTable",
+                                        "selectionMode": "Multi",
+                                        "condensedTableLayout": true,
+                                        "enableExport": true
+                                    },
+                                    "actions": {
+                                        "BulkStatusChange": {
+                                            "press": "cv.sorting.candidatemanagement.ext.controller.ListReportExt.onBulkStatusChange",
+                                            "text": "{i18n>BulkStatusChange}",
+                                            "requiresSelection": true,
+                                            "enabled": "{= ${ui>/editMode} !== 'Editable'}"
+                                        },
+                                        "FindSimilar": {
+                                            "press": "cv.sorting.candidatemanagement.ext.controller.ListReportExt.onFindSimilar",
+                                            "text": "{i18n>FindSimilar}",
+                                            "requiresSelection": true
+                                        },
+                                        "AdvancedSearch": {
+                                            "press": "cv.sorting.candidatemanagement.ext.controller.ListReportExt.onAdvancedSearch",
+                                            "text": "{i18n>AdvancedSearch}"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "CandidatesObjectPage": {
+                    "type": "Component",
+                    "id": "CandidatesObjectPage",
+                    "name": "sap.fe.templates.ObjectPage",
+                    "options": {
+                        "settings": {
+                            "contextPath": "/Candidates",
+                            "editableHeaderContent": false,
+                            "navigation": {
+                                "experiences": {
+                                    "detail": {
+                                        "route": "WorkExperiencesObjectPage"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "WorkExperiencesObjectPage": {
+                    "type": "Component",
+                    "id": "WorkExperiencesObjectPage",
+                    "name": "sap.fe.templates.ObjectPage",
+                    "options": {
+                        "settings": {
+                            "contextPath": "/Candidates/experiences"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "sap.cloud": {
+        "public": true,
+        "service": "cv-sorting"
+    }
+}

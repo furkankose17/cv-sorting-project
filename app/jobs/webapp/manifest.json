@@ -1,0 +1,196 @@
+{
+    "_version": "1.49.0",
+    "sap.app": {
+        "id": "cv.sorting.jobs",
+        "type": "application",
+        "title": "{{appTitle}}",
+        "description": "{{appDescription}}",
+        "applicationVersion": {
+            "version": "1.0.0"
+        },
+        "dataSources": {
+            "mainService": {
+                "uri": "/api/jobs/",
+                "type": "OData",
+                "settings": {
+                    "odataVersion": "4.0"
+                }
+            }
+        },
+        "crossNavigation": {
+            "inbounds": {
+                "jobs-display": {
+                    "semanticObject": "JobPosting",
+                    "action": "manage",
+                    "title": "{{flpTitle}}",
+                    "signature": {
+                        "parameters": {},
+                        "additionalParameters": "allowed"
+                    }
+                }
+            },
+            "outbounds": {
+                "displayCandidate": {
+                    "semanticObject": "Candidate",
+                    "action": "manage"
+                },
+                "displayAnalytics": {
+                    "semanticObject": "Analytics",
+                    "action": "display"
+                },
+                "uploadCV": {
+                    "semanticObject": "CVDocument",
+                    "action": "upload"
+                }
+            }
+        }
+    },
+    "sap.ui": {
+        "technology": "UI5",
+        "icons": {
+            "icon": "sap-icon://business-card"
+        },
+        "deviceTypes": {
+            "desktop": true,
+            "tablet": true,
+            "phone": true
+        }
+    },
+    "sap.ui5": {
+        "flexEnabled": true,
+        "dependencies": {
+            "minUI5Version": "1.120.0",
+            "libs": {
+                "sap.m": {},
+                "sap.ui.core": {},
+                "sap.ui.layout": {},
+                "sap.uxap": {},
+                "sap.f": {},
+                "sap.fe.templates": {}
+            }
+        },
+        "contentDensities": {
+            "compact": true,
+            "cozy": true
+        },
+        "models": {
+            "i18n": {
+                "type": "sap.ui.model.resource.ResourceModel",
+                "settings": {
+                    "bundleName": "cv.sorting.jobs.i18n.i18n"
+                }
+            },
+            "": {
+                "dataSource": "mainService",
+                "preload": true,
+                "settings": {
+                    "synchronizationMode": "None",
+                    "operationMode": "Server",
+                    "autoExpandSelect": true,
+                    "earlyRequests": true
+                }
+            }
+        },
+        "routing": {
+            "routes": [
+                {
+                    "pattern": ":?query:",
+                    "name": "JobPostingsList",
+                    "target": "JobPostingsList"
+                },
+                {
+                    "pattern": "JobPostings({key}):?query:",
+                    "name": "JobPostingsObjectPage",
+                    "target": "JobPostingsObjectPage"
+                },
+                {
+                    "pattern": "JobPostings({key})/requiredSkills({key2}):?query:",
+                    "name": "RequiredSkillsObjectPage",
+                    "target": "RequiredSkillsObjectPage"
+                },
+                {
+                    "pattern": "JobPostings({key})/matchResults({key2}):?query:",
+                    "name": "MatchResultsObjectPage",
+                    "target": "MatchResultsObjectPage"
+                }
+            ],
+            "targets": {
+                "JobPostingsList": {
+                    "type": "Component",
+                    "id": "JobPostingsList",
+                    "name": "sap.fe.templates.ListReport",
+                    "options": {
+                        "settings": {
+                            "contextPath": "/JobPostings",
+                            "variantManagement": "Page",
+                            "navigation": {
+                                "JobPostings": {
+                                    "detail": {
+                                        "route": "JobPostingsObjectPage"
+                                    }
+                                }
+                            },
+                            "controlConfiguration": {
+                                "@com.sap.vocabularies.UI.v1.LineItem": {
+                                    "tableSettings": {
+                                        "type": "ResponsiveTable",
+                                        "selectionMode": "Multi",
+                                        "condensedTableLayout": true,
+                                        "enableExport": true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "JobPostingsObjectPage": {
+                    "type": "Component",
+                    "id": "JobPostingsObjectPage",
+                    "name": "sap.fe.templates.ObjectPage",
+                    "options": {
+                        "settings": {
+                            "contextPath": "/JobPostings",
+                            "editableHeaderContent": false,
+                            "navigation": {
+                                "requiredSkills": {
+                                    "detail": {
+                                        "route": "RequiredSkillsObjectPage"
+                                    }
+                                },
+                                "matchResults": {
+                                    "detail": {
+                                        "route": "MatchResultsObjectPage"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "RequiredSkillsObjectPage": {
+                    "type": "Component",
+                    "id": "RequiredSkillsObjectPage",
+                    "name": "sap.fe.templates.ObjectPage",
+                    "options": {
+                        "settings": {
+                            "contextPath": "/JobPostings/requiredSkills"
+                        }
+                    }
+                },
+                "MatchResultsObjectPage": {
+                    "type": "Component",
+                    "id": "MatchResultsObjectPage",
+                    "name": "sap.fe.templates.ObjectPage",
+                    "options": {
+                        "settings": {
+                            "contextPath": "/JobPostings/matchResults"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "sap.cloud": {
+        "public": true,
+        "service": "cv-sorting"
+    }
+}

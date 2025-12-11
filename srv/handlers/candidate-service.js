@@ -605,6 +605,253 @@ module.exports = class CandidateService extends cds.ApplicationService {
             return timeline;
         });
 
+        // ===========================================
+        // Interview Bound Actions
+        // ===========================================
+
+        const { Interviews } = this.entities;
+
+        /**
+         * Confirm an interview
+         */
+        this.on('confirm', 'Interviews', async (req) => {
+            const interviewId = req.params[0];
+            LOG.info('Confirming interview', { interviewId });
+
+            const interview = await SELECT.one.from(Interviews).where({ ID: interviewId });
+            if (!interview) {
+                throw new NotFoundError('Interview', interviewId);
+            }
+
+            if (interview.status_code !== 'scheduled') {
+                throw new BusinessRuleError(
+                    `Cannot confirm interview with status '${interview.status_code}'`,
+                    'INTERVIEW_STATUS',
+                    { currentStatus: interview.status_code, allowedStatus: 'scheduled' }
+                );
+            }
+
+            await UPDATE(Interviews)
+                .where({ ID: interviewId })
+                .set({ status_code: 'confirmed' });
+
+            LOG.audit('CONFIRM', 'Interview', interviewId, req.user.id);
+
+            return SELECT.one.from(Interviews).where({ ID: interviewId });
+        });
+
+        /**
+         * Complete an interview with basic feedback
+         */
+        this.on('complete', 'Interviews', async (req) => {
+            const interviewId = req.params[0];
+            const { overallRating, feedback, recommendation } = req.data;
+
+            LOG.info('Completing interview', { interviewId, overallRating });
+
+            const interview = await SELECT.one.from(Interviews).where({ ID: interviewId });
+            if (!interview) {
+                throw new NotFoundError('Interview', interviewId);
+            }
+
+            const allowedStatuses = ['confirmed', 'scheduled'];
+            if (!allowedStatuses.includes(interview.status_code)) {
+                throw new BusinessRuleError(
+                    `Cannot complete interview with status '${interview.status_code}'`,
+                    'INTERVIEW_STATUS',
+                    { currentStatus: interview.status_code, allowedStatuses }
+                );
+            }
+
+            await UPDATE(Interviews)
+                .where({ ID: interviewId })
+                .set({
+                    status_code: 'completed',
+                    overallRating: overallRating || null,
+                    feedback: feedback || null,
+                    recommendation: recommendation || null,
+                    completedAt: new Date().toISOString()
+                });
+
+            LOG.audit('COMPLETE', 'Interview', interviewId, req.user.id, { overallRating });
+
+            return SELECT.one.from(Interviews).where({ ID: interviewId });
+        });
+
+        /**
+         * Cancel an interview
+         */
+        this.on('cancel', 'Interviews', async (req) => {
+            const interviewId = req.params[0];
+            const { reason } = req.data;
+
+            LOG.info('Cancelling interview', { interviewId, reason });
+
+            const interview = await SELECT.one.from(Interviews).where({ ID: interviewId });
+            if (!interview) {
+                throw new NotFoundError('Interview', interviewId);
+            }
+
+            const nonCancellableStatuses = ['completed', 'cancelled', 'no_show'];
+            if (nonCancellableStatuses.includes(interview.status_code)) {
+                throw new BusinessRuleError(
+                    `Cannot cancel interview with status '${interview.status_code}'`,
+                    'INTERVIEW_STATUS',
+                    { currentStatus: interview.status_code }
+                );
+            }
+
+            await UPDATE(Interviews)
+                .where({ ID: interviewId })
+                .set({
+                    status_code: 'cancelled',
+                    cancellationReason: reason || 'No reason provided'
+                });
+
+            LOG.audit('CANCEL', 'Interview', interviewId, req.user.id, { reason });
+
+            return SELECT.one.from(Interviews).where({ ID: interviewId });
+        });
+
+        /**
+         * Reschedule an interview
+         */
+        this.on('reschedule', 'Interviews', async (req) => {
+            const interviewId = req.params[0];
+            const { newDateTime, reason } = req.data;
+
+            LOG.info('Rescheduling interview', { interviewId, newDateTime });
+
+            if (!newDateTime) {
+                throw new ValidationError('newDateTime is required for rescheduling');
+            }
+
+            const interview = await SELECT.one.from(Interviews).where({ ID: interviewId });
+            if (!interview) {
+                throw new NotFoundError('Interview', interviewId);
+            }
+
+            const nonReschedulableStatuses = ['completed', 'cancelled', 'no_show'];
+            if (nonReschedulableStatuses.includes(interview.status_code)) {
+                throw new BusinessRuleError(
+                    `Cannot reschedule interview with status '${interview.status_code}'`,
+                    'INTERVIEW_STATUS',
+                    { currentStatus: interview.status_code }
+                );
+            }
+
+            const previousDateTime = interview.scheduledAt;
+
+            await UPDATE(Interviews)
+                .where({ ID: interviewId })
+                .set({
+                    scheduledAt: newDateTime,
+                    status_code: 'scheduled', // Reset to scheduled after reschedule
+                    rescheduledFrom: previousDateTime,
+                    rescheduledReason: reason || null
+                });
+
+            LOG.audit('RESCHEDULE', 'Interview', interviewId, req.user.id, {
+                previousDateTime,
+                newDateTime,
+                reason
+            });
+
+            return SELECT.one.from(Interviews).where({ ID: interviewId });
+        });
+
+        /**
+         * Record a no-show for an interview
+         */
+        this.on('recordNoShow', 'Interviews', async (req) => {
+            const interviewId = req.params[0];
+
+            LOG.info('Recording no-show for interview', { interviewId });
+
+            const interview = await SELECT.one.from(Interviews).where({ ID: interviewId });
+            if (!interview) {
+                throw new NotFoundError('Interview', interviewId);
+            }
+
+            const allowedStatuses = ['scheduled', 'confirmed'];
+            if (!allowedStatuses.includes(interview.status_code)) {
+                throw new BusinessRuleError(
+                    `Cannot record no-show for interview with status '${interview.status_code}'`,
+                    'INTERVIEW_STATUS',
+                    { currentStatus: interview.status_code, allowedStatuses }
+                );
+            }
+
+            await UPDATE(Interviews)
+                .where({ ID: interviewId })
+                .set({ status_code: 'no_show' });
+
+            LOG.audit('NO_SHOW', 'Interview', interviewId, req.user.id);
+
+            return SELECT.one.from(Interviews).where({ ID: interviewId });
+        });
+
+        /**
+         * Submit detailed feedback for an interview
+         */
+        this.on('submitFeedback', 'Interviews', async (req) => {
+            const interviewId = req.params[0];
+            const {
+                overallRating,
+                technicalRating,
+                communicationRating,
+                cultureFitRating,
+                feedback,
+                strengths,
+                areasOfImprovement,
+                recommendation,
+                nextSteps
+            } = req.data;
+
+            LOG.info('Submitting feedback for interview', { interviewId, overallRating });
+
+            const interview = await SELECT.one.from(Interviews).where({ ID: interviewId });
+            if (!interview) {
+                throw new NotFoundError('Interview', interviewId);
+            }
+
+            // Can submit feedback for completed interviews or confirm+complete in one step
+            const allowedStatuses = ['scheduled', 'confirmed', 'completed'];
+            if (!allowedStatuses.includes(interview.status_code)) {
+                throw new BusinessRuleError(
+                    `Cannot submit feedback for interview with status '${interview.status_code}'`,
+                    'INTERVIEW_STATUS',
+                    { currentStatus: interview.status_code, allowedStatuses }
+                );
+            }
+
+            const updateData = {
+                status_code: 'completed',
+                overallRating: overallRating || null,
+                technicalRating: technicalRating || null,
+                communicationRating: communicationRating || null,
+                cultureFitRating: cultureFitRating || null,
+                feedback: feedback || null,
+                strengths: strengths || null,
+                areasOfImprovement: areasOfImprovement || null,
+                recommendation: recommendation || null,
+                nextSteps: nextSteps || null,
+                feedbackSubmittedAt: new Date().toISOString(),
+                feedbackSubmittedBy: req.user.id
+            };
+
+            await UPDATE(Interviews)
+                .where({ ID: interviewId })
+                .set(updateData);
+
+            LOG.audit('SUBMIT_FEEDBACK', 'Interview', interviewId, req.user.id, {
+                overallRating,
+                recommendation
+            });
+
+            return SELECT.one.from(Interviews).where({ ID: interviewId });
+        });
+
         await super.init();
     }
 };

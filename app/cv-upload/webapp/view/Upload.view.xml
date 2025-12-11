@@ -6,6 +6,7 @@
     xmlns:u="sap.ui.unified"
     xmlns:layout="sap.ui.layout"
     xmlns:f="sap.f"
+    xmlns:cards="sap.f.cards"
     xmlns:core="sap.ui.core">
 
     <Page
@@ -24,8 +25,8 @@
         <content>
             <f:Card class="sapUiMediumMargin">
                 <f:header>
-                    <f:cards:Header
-                        xmlns:f.cards="sap.f.cards"
+                    <cards:Header
+                        id="idUploadCardHeader"
                         title="{i18n>uploadCVTitle}"
                         subtitle="{i18n>uploadCVSubtitle}"
                         iconSrc="sap-icon://upload"/>
@@ -36,7 +37,7 @@
                         <u:FileUploader
                             id="fileUploader"
                             name="cvFile"
-                            uploadUrl="/cv/uploadDocument"
+                            uploadUrl="/api/cv/uploadDocument"
                             uploadComplete="onUploadComplete"
                             change="onFileChange"
                             fileType="pdf,doc,docx,png,jpg,jpeg"
@@ -114,8 +115,8 @@
             <!-- Recent Uploads Section -->
             <f:Card class="sapUiMediumMargin">
                 <f:header>
-                    <f:cards:Header
-                        xmlns:f.cards="sap.f.cards"
+                    <cards:Header
+                        id="idRecentUploadsHeader"
                         title="{i18n>recentUploads}"
                         subtitle="{i18n>lastUploaded}"/>
                 </f:header>
@@ -161,7 +162,7 @@
                                         type: 'sap.ui.model.type.DateTime',
                                         formatOptions: { style: 'medium' }
                                     }"/>
-                                    <Text text="{candidate_firstName} {candidate_lastName}"/>
+                                    <Text text="{candidate/firstName} {candidate/lastName}"/>
                                     <HBox>
                                         <Button
                                             icon="sap-icon://synchronize"

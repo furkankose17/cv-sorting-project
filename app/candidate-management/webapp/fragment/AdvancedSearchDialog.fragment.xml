@@ -1,0 +1,98 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:form="sap.ui.layout.form">
+    <Dialog
+        id="advancedSearchDialog"
+        title="{i18n>AdvancedSearch}"
+        contentWidth="600px"
+        contentHeight="auto"
+        busy="{dialog>/isLoading}"
+        busyIndicatorDelay="0"
+        ariaLabelledBy="advancedSearchTitle">
+        <content>
+            <VBox id="advancedSearchVBox" class="sapUiSmallMargin">
+                <form:SimpleForm
+                    id="advancedSearchForm"
+                    editable="true"
+                    layout="ResponsiveGridLayout"
+                    labelSpanXL="4"
+                    labelSpanL="4"
+                    labelSpanM="4"
+                    labelSpanS="12"
+                    columnsXL="2"
+                    columnsL="2"
+                    columnsM="1">
+                    <form:content>
+                        <core:Title id="searchCriteriaTitle" text="{i18n>searchCriteria}"/>
+                        <Label id="searchQueryLabel" text="{i18n>searchQuery}" labelFor="searchQueryInput"/>
+                        <Input
+                            id="searchQueryInput"
+                            value="{dialog>/query}"
+                            placeholder="{i18n>searchPlaceholder}"
+                            ariaLabelledBy="searchQueryLabel"/>
+                        <Label id="minExpLabel" text="{i18n>minExperience}" labelFor="minExpInput"/>
+                        <Input
+                            id="minExpInput"
+                            value="{dialog>/minExperience}"
+                            type="Number"
+                            placeholder="0"
+                            ariaLabelledBy="minExpLabel"/>
+                        <Label id="maxExpLabel" text="{i18n>maxExperience}" labelFor="maxExpInput"/>
+                        <Input
+                            id="maxExpInput"
+                            value="{dialog>/maxExperience}"
+                            type="Number"
+                            placeholder="50"
+                            ariaLabelledBy="maxExpLabel"/>
+                        <core:Title id="locationTitle" text="{i18n>Location}"/>
+                        <Label id="locationFilterLabel" text="{i18n>Location}" labelFor="locationInput"/>
+                        <Input
+                            id="locationInput"
+                            value="{dialog>/location}"
+                            placeholder="{i18n>locationPlaceholder}"
+                            ariaLabelledBy="locationFilterLabel"/>
+                        <core:Title id="statusTitle" text="{i18n>Status}"/>
+                        <Label id="statusFilterLabel" text="{i18n>Status}" labelFor="statusMultiCombo"/>
+                        <MultiComboBox
+                            id="statusMultiCombo"
+                            selectedKeys="{dialog>/selectedStatuses}"
+                            items="{dialog>/CandidateStatuses}"
+                            ariaLabelledBy="statusFilterLabel">
+                            <core:Item id="statusFilterItem" key="{dialog>code}" text="{dialog>name}"/>
+                        </MultiComboBox>
+                        <core:Title id="skillsTitle" text="{i18n>Skills}"/>
+                        <Label id="skillsFilterLabel" text="{i18n>Skills}" labelFor="skillsMultiCombo"/>
+                        <MultiComboBox
+                            id="skillsMultiCombo"
+                            selectedKeys="{dialog>/selectedSkills}"
+                            items="{dialog>/Skills}"
+                            ariaLabelledBy="skillsFilterLabel">
+                            <core:Item id="skillFilterItem" key="{dialog>ID}" text="{dialog>name}"/>
+                        </MultiComboBox>
+                    </form:content>
+                </form:SimpleForm>
+            </VBox>
+        </content>
+        <beginButton>
+            <Button
+                id="executeSearchBtn"
+                text="{i18n>search}"
+                type="Emphasized"
+                press=".onExecuteAdvancedSearch"
+                enabled="{= !${dialog>/isLoading} }"/>
+        </beginButton>
+        <buttons>
+            <Button
+                id="clearSearchBtn"
+                text="{i18n>clear}"
+                press=".onClearAdvancedSearch"/>
+        </buttons>
+        <endButton>
+            <Button
+                id="closeSearchBtn"
+                text="{i18n>dialogCancel}"
+                press=".onCloseAdvancedSearch"/>
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>

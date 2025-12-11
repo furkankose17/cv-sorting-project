@@ -1,0 +1,16 @@
+ID;candidate_ID;institution;degree;fieldOfStudy;startDate;endDate;isOngoing;gpa;maxGpa;degreeLevel_code
+d1b2c3d4-e5f6-7890-abcd-ef1234567801;a1b2c3d4-e5f6-7890-abcd-ef1234567801;Stanford University;Bachelor of Science;Computer Science;2011-09-01;2015-06-15;false;3.8;4.0;bachelor
+d1b2c3d4-e5f6-7890-abcd-ef1234567802;a1b2c3d4-e5f6-7890-abcd-ef1234567802;MIT;Master of Science;Information Systems;2014-09-01;2016-05-15;false;3.9;4.0;master
+d1b2c3d4-e5f6-7890-abcd-ef1234567803;a1b2c3d4-e5f6-7890-abcd-ef1234567802;University of Michigan;Bachelor of Science;Computer Engineering;2010-09-01;2014-05-15;false;3.7;4.0;bachelor
+d1b2c3d4-e5f6-7890-abcd-ef1234567804;a1b2c3d4-e5f6-7890-abcd-ef1234567803;Carnegie Mellon University;Master of Science;Software Engineering;2012-09-01;2014-05-15;false;3.85;4.0;master
+d1b2c3d4-e5f6-7890-abcd-ef1234567805;a1b2c3d4-e5f6-7890-abcd-ef1234567803;UC Berkeley;Bachelor of Arts;Computer Science;2008-09-01;2012-05-15;false;3.75;4.0;bachelor
+d1b2c3d4-e5f6-7890-abcd-ef1234567806;a1b2c3d4-e5f6-7890-abcd-ef1234567804;Technical University Berlin;Bachelor of Science;Web Development;2016-10-01;2019-09-15;false;1.7;5.0;bachelor
+d1b2c3d4-e5f6-7890-abcd-ef1234567807;a1b2c3d4-e5f6-7890-abcd-ef1234567805;University of Oxford;Master of Science;Data Science;2013-10-01;2015-06-15;false;3.9;4.0;master
+d1b2c3d4-e5f6-7890-abcd-ef1234567808;a1b2c3d4-e5f6-7890-abcd-ef1234567805;University of Manchester;Bachelor of Science;Mathematics;2009-09-01;2013-06-15;false;3.7;4.0;bachelor
+d1b2c3d4-e5f6-7890-abcd-ef1234567809;a1b2c3d4-e5f6-7890-abcd-ef1234567806;University of Texas Austin;MBA;Business Administration;2011-09-01;2013-05-15;false;3.6;4.0;master
+d1b2c3d4-e5f6-7890-abcd-ef1234567810;a1b2c3d4-e5f6-7890-abcd-ef1234567806;Texas A&M University;Bachelor of Science;Industrial Engineering;2007-09-01;2011-05-15;false;3.5;4.0;bachelor
+d1b2c3d4-e5f6-7890-abcd-ef1234567811;a1b2c3d4-e5f6-7890-abcd-ef1234567807;Northwestern University;Bachelor of Science;Computer Science;2014-09-01;2018-05-15;false;3.4;4.0;bachelor
+d1b2c3d4-e5f6-7890-abcd-ef1234567812;a1b2c3d4-e5f6-7890-abcd-ef1234567808;Universidad Complutense Madrid;Bachelor of Arts;Graphic Design;2016-09-01;2020-06-15;false;8.5;10.0;bachelor
+d1b2c3d4-e5f6-7890-abcd-ef1234567813;a1b2c3d4-e5f6-7890-abcd-ef1234567809;Boston University;Master of Science;Computer Systems;2015-09-01;2017-05-15;false;3.8;4.0;master
+d1b2c3d4-e5f6-7890-abcd-ef1234567814;a1b2c3d4-e5f6-7890-abcd-ef1234567809;Northeastern University;Bachelor of Science;Information Technology;2011-09-01;2015-05-15;false;3.6;4.0;bachelor
+d1b2c3d4-e5f6-7890-abcd-ef1234567815;a1b2c3d4-e5f6-7890-abcd-ef1234567810;UCLA;Bachelor of Arts;Business Economics;2015-09-01;2019-06-15;false;3.5;4.0;bachelor

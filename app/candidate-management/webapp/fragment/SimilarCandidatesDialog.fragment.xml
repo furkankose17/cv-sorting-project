@@ -1,0 +1,77 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core">
+    <Dialog
+        id="similarCandidatesDialog"
+        title="{i18n>FindSimilar}"
+        contentWidth="700px"
+        contentHeight="500px"
+        busy="{dialog>/isLoading}"
+        busyIndicatorDelay="0"
+        ariaLabelledBy="similarTitle">
+        <content>
+            <VBox id="similarVBox" class="sapUiSmallMargin">
+                <MessageStrip
+                    id="similarInfoStrip"
+                    text="{i18n>similarCandidatesInfo}"
+                    type="Information"
+                    showIcon="true"
+                    class="sapUiSmallMarginBottom"/>
+                <Table
+                    id="similarCandidatesTable"
+                    items="{dialog>/similarCandidates}"
+                    mode="MultiSelect"
+                    growing="true"
+                    growingThreshold="20"
+                    noDataText="{i18n>noSimilarCandidates}">
+                    <headerToolbar>
+                        <OverflowToolbar id="similarTableToolbar">
+                            <Title id="similarTableTitle" text="{i18n>similarCandidates}"/>
+                            <ToolbarSpacer id="similarSpacer"/>
+                            <Button
+                                id="mergeCandidatesBtn"
+                                text="{i18n>mergeCandidates}"
+                                type="Emphasized"
+                                press=".onMergeCandidates"
+                                enabled="{= ${dialog>/selectedSimilarCount} > 0 }"/>
+                        </OverflowToolbar>
+                    </headerToolbar>
+                    <columns>
+                        <Column id="similarNameCol">
+                            <Text id="similarNameHeader" text="{i18n>Name}"/>
+                        </Column>
+                        <Column id="similarEmailCol">
+                            <Text id="similarEmailHeader" text="{i18n>Email}"/>
+                        </Column>
+                        <Column id="similarScoreCol" width="8rem" hAlign="Center">
+                            <Text id="similarScoreHeader" text="{i18n>MatchScore}"/>
+                        </Column>
+                        <Column id="similarFactorsCol">
+                            <Text id="similarFactorsHeader" text="{i18n>matchingFactors}"/>
+                        </Column>
+                    </columns>
+                    <items>
+                        <ColumnListItem id="similarItem" type="Active">
+                            <cells>
+                                <Text id="similarNameCell" text="{dialog>fullName}"/>
+                                <Text id="similarEmailCell" text="{dialog>email}"/>
+                                <ObjectNumber
+                                    id="similarScoreCell"
+                                    number="{dialog>similarityScore}"
+                                    unit="%"
+                                    state="{= ${dialog>similarityScore} >= 80 ? 'Success' : (${dialog>similarityScore} >= 60 ? 'Warning' : 'Error') }"/>
+                                <Text id="similarFactorsCell" text="{dialog>matchingFactors}"/>
+                            </cells>
+                        </ColumnListItem>
+                    </items>
+                </Table>
+            </VBox>
+        </content>
+        <endButton>
+            <Button
+                id="closeSimilarBtn"
+                text="{i18n>dialogCancel}"
+                press=".onCloseSimilarDialog"/>
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>

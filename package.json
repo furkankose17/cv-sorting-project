@@ -65,11 +65,15 @@
           "users": {
             "admin": {
               "password": "admin",
-              "roles": ["CVAdmin", "Recruiter", "HRManager"]
+              "roles": ["CVAdmin", "Recruiter", "HRManager", "JobManager", "Viewer"]
             },
             "recruiter": {
               "password": "recruiter",
-              "roles": ["Recruiter"]
+              "roles": ["Recruiter", "Viewer"]
+            },
+            "manager": {
+              "password": "manager",
+              "roles": ["HRManager", "Viewer"]
             },
             "viewer": {
               "password": "viewer",
@@ -93,10 +97,15 @@
           "credentials": {
             "destination": "sap-ai-core-destination"
           }
-        },
-        "[development]": {
-          "impl": "./srv/joule-service.js"
         }
+      }
+    },
+    "fiori": {
+      "lean_draft": true
+    },
+    "[development]": {
+      "server": {
+        "app": true
       }
     },
     "features": {
@@ -125,9 +134,10 @@
     }
   },
   "sapux": [
-    "app/candidates",
     "app/jobs",
-    "app/cv-upload"
+    "app/cv-upload",
+    "app/candidate-management",
+    "app/analytics-dashboard"
   ],
   "engines": {
     "node": "^18 || ^20"

@@ -1,0 +1,18 @@
+{
+    "name": "cv-sorting-candidate-management",
+    "version": "1.0.0",
+    "description": "Fiori Elements app for Candidate Management",
+    "scripts": {
+        "start": "fiori run --open \"test/flpSandbox.html?sap-ui-xx-viewCache=false#candidatemanagement-display\"",
+        "start-local": "fiori run --config ./ui5-local.yaml --open \"test/flpSandbox.html?sap-ui-xx-viewCache=false#candidatemanagement-display\"",
+        "build": "ui5 build --config=ui5.yaml --clean-dest --dest dist",
+        "deploy": "npm run build && fiori deploy --config ui5-deploy.yaml",
+        "lint": "eslint webapp"
+    },
+    "devDependencies": {
+        "@sap/ux-specification": "^1",
+        "@ui5/cli": "^3",
+        "@sap/ux-ui5-tooling": "^1"
+    },
+    "sapux": true
+}

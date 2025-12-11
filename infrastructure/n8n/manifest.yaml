@@ -1,0 +1,92 @@
+# ============================================
+# n8n Workflow Automation - Cloud Foundry Manifest
+# Self-hosted n8n for CV email capture and notifications
+# ============================================
+
+applications:
+  - name: cv-sorting-n8n
+    # Resource allocation
+    memory: 1G
+    disk_quota: 2G
+    instances: 1
+
+    # Docker image
+    docker:
+      image: n8nio/n8n:latest
+
+    # Health check
+    health-check-type: http
+    health-check-http-endpoint: /healthz
+    timeout: 180
+
+    # Environment variables
+    env:
+      # Basic Authentication
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: "((n8n-user))"
+      N8N_BASIC_AUTH_PASSWORD: "((n8n-password))"
+
+      # Host configuration
+      N8N_HOST: "cv-sorting-n8n.cfapps.eu10.hana.ondemand.com"
+      N8N_PORT: "8080"
+      N8N_PROTOCOL: "https"
+      WEBHOOK_URL: "https://cv-sorting-n8n.cfapps.eu10.hana.ondemand.com"
+
+      # Security
+      N8N_ENCRYPTION_KEY: "((n8n-encryption-key))"
+      N8N_USER_MANAGEMENT_DISABLED: "false"
+
+      # Database (PostgreSQL)
+      DB_TYPE: "postgresdb"
+      DB_POSTGRESDB_HOST: "((postgres-host))"
+      DB_POSTGRESDB_PORT: "5432"
+      DB_POSTGRESDB_DATABASE: "n8n"
+      DB_POSTGRESDB_USER: "((postgres-user))"
+      DB_POSTGRESDB_PASSWORD: "((postgres-password))"
+      DB_POSTGRESDB_SSL_ENABLED: "true"
+
+      # Execution settings
+      EXECUTIONS_PROCESS: "main"
+      EXECUTIONS_DATA_SAVE_ON_ERROR: "all"
+      EXECUTIONS_DATA_SAVE_ON_SUCCESS: "all"
+      EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS: "true"
+
+      # Timezone
+      GENERIC_TIMEZONE: "Europe/Istanbul"
+
+      # Logging
+      N8N_LOG_LEVEL: "info"
+      N8N_LOG_OUTPUT: "console"
+
+      # Feature flags
+      N8N_METRICS: "true"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+
+    # Routes
+    routes:
+      - route: cv-sorting-n8n.cfapps.eu10.hana.ondemand.com
+
+    # Service bindings
+    services:
+      - cv-sorting-postgresql
+
+# ============================================
+# Deployment Notes:
+#
+# 1. Create PostgreSQL service first:
+#    cf create-service postgresql-db standard cv-sorting-postgresql
+#
+# 2. Create n8n database in PostgreSQL:
+#    Connect to PostgreSQL and run: CREATE DATABASE n8n;
+#
+# 3. Set credentials using cf set-env or vars file:
+#    cf set-env cv-sorting-n8n N8N_BASIC_AUTH_USER "admin"
+#    cf set-env cv-sorting-n8n N8N_BASIC_AUTH_PASSWORD "your-secure-password"
+#    cf set-env cv-sorting-n8n N8N_ENCRYPTION_KEY "your-32-char-encryption-key"
+#
+# 4. Deploy:
+#    cf push -f infrastructure/n8n/manifest.yaml
+#
+# 5. Access n8n at:
+#    https://cv-sorting-n8n.cfapps.eu10.hana.ondemand.com
+# ============================================

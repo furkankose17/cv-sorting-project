@@ -1,0 +1,11 @@
+# Tesseract OCR and dependencies
+tesseract-ocr
+tesseract-ocr-eng
+tesseract-ocr-deu
+tesseract-ocr-tur
+tesseract-ocr-fra
+tesseract-ocr-spa
+
+# Poppler for PDF processing
+poppler-utils
+libpoppler-cpp-dev

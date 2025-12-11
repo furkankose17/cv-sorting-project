@@ -185,8 +185,8 @@ sap.ui.define([
                         oFileData.status = "Processing...";
                         oUploadModel.refresh();
 
-                        var oProcessContext = oModel.bindContext("/processDocument(...)");
-                        oProcessContext.setParameter("documentId", oResult.documentId);
+                        // Call bound action on Documents entity
+                        var oProcessContext = oModel.bindContext("/Documents(" + oResult.documentId + ")/CVProcessingService.process(...)");
                         await oProcessContext.execute();
 
                         oFileData.status = "Completed";
@@ -286,8 +286,8 @@ sap.ui.define([
             MessageBox.confirm(this._getText("confirmReprocess"), {
                 onClose: function (oAction) {
                     if (oAction === MessageBox.Action.OK) {
-                        var oActionContext = oModel.bindContext("/reprocessDocument(...)");
-                        oActionContext.setParameter("documentId", sDocumentId);
+                        // Call bound action on Documents entity
+                        var oActionContext = oModel.bindContext("/Documents(" + sDocumentId + ")/CVProcessingService.reprocess(...)");
                         oActionContext.execute().then(function () {
                             MessageToast.show(this._getText("reprocessStarted"));
                             this.byId("recentUploadsTable").getBinding("items").refresh();
@@ -313,7 +313,7 @@ sap.ui.define([
          */
         onUploadComplete: function (oEvent) {
             var sResponse = oEvent.getParameter("response");
-            MessageToast.show("Upload complete: " + sResponse);
+            MessageToast.show(this._getText("uploadCompleteResponse", [sResponse]));
         },
 
         // Helper functions

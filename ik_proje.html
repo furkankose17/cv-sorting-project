@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Destekli CV Otomasyonu</title>
+    <style>
+      /* Base */
+      body { font-family: 'Segoe UI', sans-serif; line-height: 1.7; color: #2c3e50; max-width: 1000px; margin: 0 auto; padding: 30px; background: #f8f9fa; }
+      h1 { color: #1a5276; text-align: center; border-bottom: 4px solid #3498db; padding-bottom: 15px; margin-bottom: 10px; }
+      h2 { color: #2c3e50; border-left: 5px solid #3498db; padding: 10px 20px; margin-top: 40px; background: #eaf2f8; border-radius: 0 8px 8px 0; }
+      h3 { color: #34495e; border-bottom: 2px solid #ebedee; padding-bottom: 8px; margin-top: 25px; }
+      a { color: #2980b9; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+
+      /* Tables */
+      table { width: 100%; border-collapse: collapse; margin: 25px 0; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+      th { background: #2c3e50; color: white; padding: 15px; text-align: left; font-weight: 600; }
+      th:first-child, td:first-child { min-width: 150px; width: auto; white-space: nowrap; }
+      td { padding: 12px 15px; border-bottom: 1px solid #eee; }
+      tr:hover { background: #f5f8fa; }
+      tr:nth-child(even) { background: #fafbfc; }
+
+      /* Code */
+      pre { background: #2d3436; color: #dfe6e9; padding: 20px; border-radius: 8px; overflow-x: auto; border-left: 4px solid #3498db; margin: 25px 0; font-family: Consolas, monospace; font-size: 13px; }
+
+      /* Layout */
+      .flex-row { display: flex; align-items: center; justify-content: center; gap: 15px; margin: 20px 0; }
+      .flex-wrap { display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin: 20px 0; }
+      .text-center { text-align: center; }
+
+      /* Layers */
+      .layer { border-radius: 10px; padding: 20px; margin: 20px 0; }
+      .layer-purple { border: 3px solid #9b59b6; background: #f5eef8; }
+      .layer-blue { border: 3px solid #3498db; background: #ebf5fb; }
+      .layer-green { border: 3px solid #27ae60; background: #eafaf1; }
+      .layer-orange { border: 3px solid #e67e22; background: #fef5e7; }
+      .layer-title { text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 15px; }
+      .layer-title.purple { color: #8e44ad; }
+      .layer-title.blue { color: #2980b9; }
+      .layer-title.green { color: #229954; }
+      .layer-title.orange { color: #d35400; }
+
+      /* Boxes */
+      .box { padding: 15px 25px; border-radius: 8px; text-align: center; color: white; margin: 5px 0; }
+      .box-purple { border: 2px solid #9b59b6; background: #8e44ad; }
+      .box-blue { border: 2px solid #3498db; background: #2c3e50; }
+      .box-green { border: 2px solid #27ae60; background: #27ae60; }
+      .box-orange { border: 2px solid #e67e22; background: #d35400; }
+      .box-sm { padding: 12px 18px; min-width: 100px; border-radius: 6px; }
+      .box-title { font-weight: bold; }
+      .box-sub { font-size: 12px; }
+      .box-desc { margin-top: 10px; font-size: 12px; color: #2c3e50; }
+
+      /* Arrows */
+      .arrow { font-size: 28px; color: #3498db; }
+      .arrow-sm { font-size: 24px; color: #3498db; }
+
+      /* Cards */
+      .card { border-radius: 8px; min-width: 280px; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; margin: 15px; }
+      .card-header { padding: 10px; font-weight: bold; text-align: center; color: white; }
+      .card-header.blue { background: #3498db; }
+      .card-header.purple { background: #9b59b6; }
+      .card-header.green { background: #27ae60; }
+      .card-header.orange { background: #e67e22; }
+      .card-header.red { background: #e74c3c; }
+      .card-header.teal { background: #1abc9c; }
+      .card-header.brown { background: #8b4513; }
+      .card-header.gray { background: #7f8c8d; }
+      .card-body { padding: 10px; font-size: 13px; color: #2c3e50; }
+
+      /* Workflow */
+      .workflow-container { margin: 30px 20px; padding: 25px 30px; border: 2px solid #3498db; border-radius: 8px; background: #ecf0f1; }
+      .workflow-title { font-weight: bold; margin-bottom: 20px; font-size: 16px; color: #2c3e50; }
+      .workflow-step { text-align: center; display: flex; flex-direction: column; align-items: center; }
+      .workflow-step .arrow-sm { margin: 0; }
+      .workflow-container .flex-row { align-items: flex-start; }
+      .workflow-container .flex-row > .arrow-sm { margin-top: 25px; }
+
+      /* Flow */
+      .flow-box { background: #ecf0f1; border-radius: 8px; padding: 20px; margin: 20px 0; }
+      .flow-item { display: flex; align-items: center; margin: 10px 0; padding: 8px; background: white; border-radius: 6px; }
+      .flow-num { background: #3498db; color: white; padding: 4px 10px; border-radius: 4px; font-size: 12px; margin-right: 15px; }
+      .flow-num.purple { background: #9b59b6; }
+      .flow-num.green { background: #27ae60; }
+      .flow-num.orange { background: #e67e22; }
+      .flow-label { font-weight: bold; margin: 0 10px; }
+      .flow-desc { margin-left: 15px; color: #7f8c8d; }
+
+      /* Actors */
+      .actor { padding: 10px 20px; border-radius: 8px; font-weight: bold; color: white; }
+      .actor.blue { background: #3498db; }
+      .actor.purple { background: #9b59b6; }
+      .actor.orange { background: #f39c12; }
+      .actor.green { background: #27ae60; }
+
+      /* Alert */
+      .alert { border: 3px solid #e74c3c; border-radius: 10px; padding: 20px; margin: 20px 0 50px 0; background: #fdedec; }
+      .alert-title { font-weight: bold; font-size: 16px; color: #c0392b; margin-bottom: 15px; }
+      .alert-code { background: #fff; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 13px; }
+
+      hr {border: none;height: 3px;background: linear-gradient(90deg, #3498db, #9b59b6);margin: 35px 0;border-radius: 2px;}
+      li { margin: 8px 0; }
+      a[id] { display: block; position: relative; top: -20px; visibility: hidden; }
+
+      /* Inline CSS Replacements */
+      .ol-clean { list-style-position: inside; padding-left: 0; }
+      .arrow-sm-spaced { margin: 25px 0; }
+      .section-title { font-weight: bold; font-size: 18px; margin: 20px 0; }
+      .box-red { background: #e74c3c; border-color: #e74c3c; }
+      .box-orange-light { background: #f39c12; border-color: #f39c12; }
+      .arrow-mt { margin-top: 35px; }
+      .card-border-purple { border: 2px solid #9b59b6; }
+      .card-border-blue { border: 2px solid #3498db; }
+      .box-wide { padding: 15px 40px; }
+      .flex-space-around { justify-content: space-around; }
+      .actor-red { background: #e74c3c; }
+      .actor-orange { background: #f39c12; }
+      .actor-brown { background: #e67e22; }
+      .flow-num-dark { background: #2c3e50; color: #fff; font-weight: bold; }
+      .flow-label-red { color: #e74c3c; }
+      .flow-label-blue { color: #3498db; }
+      .flow-label-purple { color: #9b59b6; }
+      .flow-label-orange { color: #f39c12; }
+      .flow-label-green { color: #27ae60; }
+      .arrow-sm-blue { color: #3498db; font-size: 18px; }
+      .flow-desc-green { color: #27ae60; font-weight: bold; }
+      .flow-item-success { background: #d5f5e3; border: 2px solid #27ae60; }
+      .flow-label-brown { color: #e67e22; }
+      .comparison-container { max-width: 900px; margin: 20px auto; padding: 20px; background: #f8f9fa; border: 2px solid #3498db; }
+      .comparison-title { font-weight: bold; font-size: 18px; margin-bottom: 15px; color: #2c3e50; }
+      .flex-center { justify-content: center; }
+      .box-margin { margin: 0 10px; }
+      .vs-divider { margin: 0 15px; font-size: 24px; color: #3498db; align-self: center; }
+      .section-spacing { margin: 20px 0; }
+      .section-subtitle { font-weight: bold; margin-bottom: 10px; color: #2c3e50; }
+      .box-min-width { min-width: 200px; }
+      .info-box { padding: 10px; background: #fff; border-radius: 5px; }
+      .chart-placeholder { margin: 30px 0; padding: 40px; background: #fff; border-radius: 5px; border: 2px dashed #3498db; text-align: center; min-height: 300px; }
+      .chart-title { font-weight: bold; margin-bottom: 15px; color: #2c3e50; font-size: 16px; }
+      .chart-desc { color: #7f8c8d; margin: 10px 0; }
+      .chart-features { color: #7f8c8d; margin-top: 20px; font-size: 14px; }
+      .flex-wrap-chart { flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+      .mb-20 { margin-bottom: 20px; }
+      .mt-20 { margin-top: 20px; }
+      .gap-10 { gap: 10px; }
+      .info-item { margin: 5px 0; }
+      .chart-box { padding: 15px; background: #fff; border-radius: 5px; text-align: center; }
+
+      /* Scroll to Top Button */
+      .scroll-to-top {position: fixed;bottom: 30px;right: 30px;width: 48px;height: 48px;background: #3498db;color: white;border: 2px solid #2980b9;border-radius: 50%;display: none;align-items: center;justify-content: center;cursor: pointer;font-size: 20px;box-shadow: 0 2px 8px rgba(52, 152, 219, 0.25);transition: all 0.3s ease;z-index: 1000;opacity: 0;}
+      .scroll-to-top.show {display: flex;opacity: 0.85;}
+      .scroll-to-top:hover {background: #2980b9;opacity: 1;transform: translateY(-2px);box-shadow: 0 4px 12px rgba(52, 152, 219, 0.35);}
+      .scroll-to-top:active {transform: translateY(0);}
+    </style>
+  </head>
+  <body>
+
+    <h1>🚀 AI Destekli CV Otomasyonu</h1>
+    <h2>Teknik Mimari Tasarım Raporu</h2>
+
+    <hr>
+
+    <h2>📑 İçindekiler</h2>
+
+    <ol class="ol-clean">
+    <li><a href="#1-proje-isim-önerileri">Proje İsim Önerileri</a></li>
+    <li><a href="#2-iş-gereksinimleri">İş Gereksinimleri</a></li>
+    <li><a href="#3-teknik-mimari">Teknik Mimari</a></li>
+    <li><a href="#4-veri-modeli">Veri Modeli</a></li>
+    <li><a href="#5-iş-akışları">İş Akışları</a></li>
+    <li><a href="#6-sistem-akışı-mailden-veritabanına-cv-işleme">Sistem Akışı</a></li>
+    <li><a href="#7-ui5-kullanıcı-arayüzü">UI5 Kullanıcı Arayüzü</a></li>
+    </ol>
+
+    <hr>
+
+    <a id="1-proje-isim-önerileri"></a>
+
+    <h2>1. Proje İsim Önerileri</h2>
+
+    <table>
+      <thead>
+        <tr><th>#</th><th>İsim</th><th>Slogan</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td><strong>TalentSphere</strong></td><td>"Yeteneği Keşfet, Geleceği Şekillendir"</td></tr>
+        <tr><td>2</td><td><strong>CV Lens</strong></td><td>"Satır Aralarındaki Potansiyeli Gör"</td></tr>
+        <tr><td>3</td><td><strong>CVGenius</strong></td><td>"CV Dehasını Keşfet"</td></tr>
+      </tbody>
+    </table>
+
+
+    <hr>
+
+    <a id="2-iş-gereksinimleri"></a>
+
+    <h2>2. İş Gereksinimleri</h2>
+
+    <h3>2.1 Fonksiyonel Gereksinimler</h3>
+
+    <table>
+    <thead><tr><th>ID</th><th>Gereksinim</th><th>Açıklama</th></tr></thead>
+    <tbody>
+    <tr><td>FR-01</td><td>Mail Entegrasyonu</td><td><code>ik@sirket.com</code> adresine gelen CV'ler otomatik alınmalı</td></tr>
+    <tr><td>FR-02</td><td>OCR & Veri Çıkarımı</td><td>PDF/Word'den isim, telefon, yetenekler çıkarılmalı</td></tr>
+    <tr><td>FR-03</td><td>Otomatik Sınıflandırma</td><td>AI ile pozisyon etiketlemesi (UI5 Uzmanı, ABAP Dev vb.)</td></tr>
+    <tr><td>FR-04</td><td>Semantik Arama</td><td>Doğal dil ile aday arama</td></tr>
+    <tr><td>FR-05</td><td>Bildirim Sistemi</td><td>Belirlenen eşik aşıldığında İK'ya uyarı</td></tr>
+    <tr><td>FR-06</td><td>Tek Tuşla Davet</td><td>Seçilen adaylara otomatik mail gönderimi</td></tr>
+    <tr><td>FR-07</td><td>Aday Takip Paneli</td><td>Tüm adayların durumlarını gösteren dashboard</td></tr>
+    <tr><td>FR-08</td><td>Gelişmiş Filtreleme</td><td>Pozisyon, kıdem, skor, yetenek bazlı filtreleme</td></tr>
+    <tr><td>FR-09</td><td>CV PDF Viewer</td><td>Her adayın CV'sini PDF viewer ile görüntüleme</td></tr>
+    <tr><td>FR-10</td><td>Aday Karşılaştırma</td><td>İki veya daha fazla adayı yan yana karşılaştırma</td></tr>
+    <tr><td>FR-11</td><td>Puanlama Sistemi</td><td>Pozisyon bazlı puanlama tanımlama (örn: UI5=3p, İngilizce=2p, Deneyim=1p)</td></tr> 
+    </tbody>
+    </table>
+
+
+    <h3>2.2 Teknik Gereksinimler</h3>
+
+    <table>
+    <thead><tr><th>ID</th><th>Gereksinim</th><th>Detay</th></tr></thead>
+    <tbody>
+    <tr><td>TR-01</td><td>Veritabanı</td><td>PostgreSQL + pgvector</td></tr>
+    <tr><td>TR-02</td><td>Frontend</td><td>SAP UI5 (Freestyle)</td></tr>
+    <tr><td>TR-03</td><td>Backend</td><td>SAP CAP (Node.js) + Python FastAPI</td></tr>
+    <tr><td>TR-04</td><td>Embedding Model</td><td>Sentence Transformers (all-MiniLM-L12-v2)</td></tr>
+    <tr><td>TR-05</td><td>Deployment</td><td>SAP BTP Cloud Foundry</td></tr>
+    <tr><td>TR-06</td><td>Kimlik Doğrulama</td><td>SAP XSUAA (OAuth 2.0)</td></tr>
+    </tbody>
+    </table>
+
+
+    <hr>
+
+    <a id="3-teknik-mimari"></a>
+
+    <h2>3. Teknik Mimari</h2>
+
+    <h3>3.1 Sistem Mimarisi</h3>
+
+    <div class="layer layer-purple">
+      <div class="layer-title purple">KULLANICI KATMANI</div>
+      <div class="flex-row">
+        <div class="box box-purple"><div class="box-title">UI5 PORTAL</div><div class="box-sub">(Dashboard & Yönetim)</div></div>
+        <div class="box box-purple"><div class="box-title">Process Automation</div><div class="box-sub">(Inbox/Onaylar)</div></div>
+      </div>
+    </div>
+
+    <div class="text-center arrow">▼</div>
+
+    <div class="layer layer-green">
+      <div class="layer-title green">SERVİS KATMANI</div>
+      <div class="box box-green">
+        <div class="box-title">CAP OData V4 Service (Node.js)</div>
+        <div class="box-sub">• OData API Layer &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; • Eşleşme Kayıtları &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; • Otomatik Hata Koruması</div>
+      </div>
+      <div class="text-center arrow-sm arrow-sm-spaced">▼</div>
+      <div class="box box-green">
+        <div class="box-title">Python ML Service (FastAPI)</div>
+        <div class="box-sub">• Metin Vektörleştirme &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; • Anlamsal Eşleştirme &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; • CV Analizi</div>
+      </div>
+    </div>
+
+    <div class="text-center arrow">▼</div>
+
+    <div class="layer layer-orange">
+      <div class="layer-title orange">VERİ & ENTEGRASYON KATMANI</div>
+      <div class="flex-wrap">
+        <div class="box box-orange"><div class="box-title">PostgreSQL</div><div class="box-sub">+ pgvector</div></div>
+        <div class="box box-orange"><div class="box-title">n8n</div><div class="box-sub">(Mail)</div></div>
+        <div class="box box-orange"><div class="box-title">SAP Document AI</div><div class="box-sub">(OCR)</div></div>
+        <div class="box box-orange"><div class="box-title">SAP DMS</div><div class="box-sub">(Dosya Deposu)</div></div>
+      </div>
+    </div>
+
+    <h3>3.2 Mail Entegrasyon Mimarisi (n8n)</h3>
+
+    <div class="text-center section-title">MAIL SISTEM AKISI</div>
+
+    <div class="flex-row">
+      <div class="box box-blue"><div class="box-title">E-Mail</div><div class="box-sub">Server</div></div>
+      <div class="arrow">▶</div>
+      <div class="box box-blue"><div class="box-title">n8n</div><div class="box-sub">Workflow</div></div>
+      <div class="arrow">▶</div>
+      <div class="box box-blue"><div class="box-title">CAP</div><div class="box-sub">Backend</div></div>
+      <div class="arrow">▶</div>
+      <div class="box box-blue"><div class="box-title">Document</div><div class="box-sub">AI</div></div>
+    </div>
+
+    <div class="workflow-container">
+      <div class="workflow-title">n8n Workflow Adımları:</div>
+      <div class="flex-row">
+        <div class="workflow-step">
+          <div class="box box-blue box-sm"><div class="box-title">IMAP</div><div class="box-sub">Trigger</div></div>
+          <div class="box-desc">ik@sirket.com<br>dinle</div>
+        </div>
+        <div class="arrow-sm">▶</div>
+        <div class="workflow-step">
+          <div class="box box-blue box-sm"><div class="box-title">Filter</div><div class="box-sub">(CV?)</div></div>
+          <div class="box-desc">Ek var mı?<br>PDF/Word?</div>
+        </div>
+        <div class="arrow-sm">▶</div>
+        <div class="workflow-step">
+          <div class="box box-blue box-sm"><div class="box-title">Extract</div><div class="box-sub">PDF</div></div>
+          <div class="box-desc">Base64 çıkar</div>
+        </div>
+        <div class="arrow-sm">▶</div>
+        <div class="workflow-step">
+          <div class="box box-blue box-sm"><div class="box-title">HTTP</div><div class="box-sub">POST</div></div>
+          <div class="box-desc">CAP Service<br>/api/cv/upload</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>3.3 AI İşleme Akışı (Kendi Embedding Modeli)</h3>
+
+    <div class="text-center section-title">AI İŞLEME AKIŞI</div>
+
+    <div class="flex-row">
+      <div class="workflow-step"><div class="box-desc">PDF CV</div><div class="box box-red"><div class="box-title">Görsel</div><div class="box-sub">Dosya</div></div></div>
+      <div class="arrow arrow-mt">▶</div>
+      <div class="workflow-step"><div class="box-desc">Document AI</div><div class="box box-orange-light"><div class="box-title">JSON</div><div class="box-sub">Veri</div></div></div>
+      <div class="arrow arrow-mt">▶</div>
+      <div class="workflow-step"><div class="box-desc">Python ML</div><div class="box box-green"><div class="box-title">Embedding</div><div class="box-sub">+ Match</div></div></div>
+    </div>
+
+    <div class="text-center arrow">▼</div>
+
+    <div class="flex-row">
+      <div class="card card-border-purple"><div class="card-header purple">Çıkarılan Bilgiler</div><div class="card-body">• Ad: Ali Yılmaz<br>• Tel: 555-1234<br>• Okul: ODTÜ<br>• Skills: [...]</div></div>
+      <div class="card card-border-blue"><div class="card-header blue">AI Analiz Sonucu</div><div class="card-body">• Rol: UI5 Expert<br>• Kıdem: Senior<br>• Skor: 0.92<br>• Vector: [0.1..]</div></div>
+    </div>
+
+    <div class="text-center arrow">▼</div>
+
+    <div class="flex-row">
+      <div class="box box-orange box-wide"><div class="box-title">PostgreSQL</div><div class="box-sub">+ pgvector</div></div>
+    </div>
+
+    <hr>
+
+    <a id="4-veri-modeli"></a>
+
+    <h2>4. Veri Modeli</h2>
+
+    <div class="flex-wrap">
+      <div class="card"><div class="card-header blue">CANDIDATES (Adaylar)</div><div class="card-body">• ID (PK, UUID) - Otomatik<br>• firstName (String) - Document AI<br>• lastName (String) - Document AI<br>• email (String) - Mail gönderen<br>• phone (String) - Document AI<br>• status (Enum) - new/reviewed/invited<br>• cvFileId (String) - DMS<br>• createdAt (Timestamp) - Otomatik<br>• updatedAt (Timestamp) - Otomatik</div></div>
+      <div class="card"><div class="card-header purple">POSITIONS (Pozisyonlar)</div><div class="card-body">• ID (PK, UUID) - Otomatik<br>• title (String) - İK girişi<br>• department (String) - İK girişi<br>• requiredSkills (Array) - İK girişi<br>• seniorityLevel (Enum) - İK girişi<br>• threshold (Integer) - İK girişi<br>• isActive (Boolean) - İK girişi<br>• createdAt (Timestamp) - Otomatik</div></div>
+    </div>
+
+    <div class="text-center arrow-sm arrow-sm-spaced">▼ 1:N İlişki</div>
+
+    <div class="flex-wrap">
+      <div class="card"><div class="card-header green">CV_DATA (CV Verileri)</div><div class="card-body">• ID (PK, UUID) - Otomatik<br>• candidateId (FK) - Candidates.ID<br>• rawText (Text) - Document AI<br>• skills (Array) - Document AI<br>• experience (Array) - Document AI<br>• education (Array) - Document AI<br>• aiSummary (String) - Python ML<br>• suggestedRole (String) - Python ML<br>• seniorityLevel (Enum) - Python ML<br>• confidenceScore (Float) - Python ML</div></div>
+      <div class="card"><div class="card-header orange">CV_EMBEDDINGS (Vektörler)</div><div class="card-body">• ID (PK, UUID) - Otomatik<br>• candidateId (FK) - Candidates.ID<br>• embedding (Vector 384) - Python ML<br>• model (String) - "all-MiniLM-L12-v2"<br>• createdAt (Timestamp) - Otomatik</div></div>
+    </div>
+
+    <div class="flex-wrap">
+      <div class="card"><div class="card-header teal">SCORING_CRITERIA (Kriterler)</div><div class="card-body">• ID (PK, UUID) - Otomatik<br>• positionId (FK) - Positions.ID<br>• criterion (String) - İK girişi<br>• type (Enum) - İK girişi<br>• points (Float) - İK girişi<br>• unit (String) - İK girişi (opsiyonel)<br>• description (Text) - İK girişi (opsiyonel)<br>• order (Integer) - Otomatik</div></div>
+      <div class="card"><div class="card-header red">CANDIDATE_SCORES (Puanlar)</div><div class="card-body">• ID (PK, UUID) - Otomatik<br>• candidateId (FK) - Candidates.ID<br>• positionId (FK) - Positions.ID<br>• aiScore (Float 0-1) - Python ML<br>• scoringPoints (Float) - Hesaplanan<br>• maxScoringPoints (Float) - Hesaplanan<br>• totalScore (Float 0-1) - Hesaplanan<br>• scoreDetails (JSON) - Hesaplanan<br>• calculatedAt (Timestamp) - Otomatik</div></div>
+    </div>
+
+    <div class="flex-wrap">
+      <div class="card"><div class="card-header brown">NOTIFICATIONS (Bildirimler)</div><div class="card-body">• ID (PK, UUID) - Otomatik<br>• type (Enum) - Bildirim tipi<br>• message (Text) - Mesaj içeriği<br>• recipientEmail (String) - Alıcı e-posta<br>• status (Enum) - pending/sent/failed<br>• sentAt (Timestamp) - Gönderim zamanı</div></div>
+      <div class="card"><div class="card-header gray">INTERVIEW_LOGS (Mülakatlar)</div><div class="card-body">• ID (PK, UUID) - Otomatik<br>• candidateId (FK) - Candidates.ID<br>• positionId (FK) - Positions.ID<br>• invitedAt (Timestamp) - Davet zamanı<br>• scheduledDate (Date) - Mülakat tarihi<br>• status (Enum) - completed/cancelled</div></div>
+    </div>
+
+
+
+    <hr>
+
+    <a id="5-iş-akışları"></a>
+
+    <h2>5. İş Akışları</h2>
+
+    <h3>5.1 Ana Senaryo: Mail → Veritabanı → Bildirim</h3>
+
+    <div class="text-center section-title">UÇTAN UCA CV İŞLEME SÜRECİ</div>
+
+    <div class="flex-row flex-space-around">
+      <div class="actor" style="background: #2c3e50;">ADAY</div>
+      <div class="actor" style="background: #2c3e50;">n8n</div>
+      <div class="actor" style="background: #2c3e50;">CAP</div>
+      <div class="actor" style="background: #2c3e50;">DOC AI</div>
+      <div class="actor" style="background: #2c3e50;">PYTHON ML</div>
+      <div class="actor" style="background: #2c3e50;">DB</div>
+    </div>
+
+    <div class="flow-box">
+      <div class="flow-item"><span class="flow-num flow-num-dark">1</span><span class="flow-label" style="color: #2c3e50;">ADAY</span><span class="arrow-sm arrow-sm-blue">▶</span><span class="flow-label" style="color: #2c3e50;">n8n</span><span class="flow-desc">CV Gönder (mail eki)</span></div>
+      <div class="flow-item"><span class="flow-num flow-num-dark">2</span><span class="flow-label" style="color: #2c3e50;">n8n</span><span class="arrow-sm arrow-sm-blue">▶</span><span class="flow-label" style="color: #2c3e50;">CAP</span><span class="flow-desc">POST /api/cv/upload</span></div>
+      <div class="flow-item"><span class="flow-num flow-num-dark">3</span><span class="flow-label" style="color: #2c3e50;">CAP</span><span class="arrow-sm arrow-sm-blue">▶</span><span class="flow-label" style="color: #2c3e50;">DOC AI</span><span class="flow-desc">OCR İsteği</span></div>
+      <div class="flow-item"><span class="flow-num flow-num-dark">4</span><span class="flow-label" style="color: #2c3e50;">DOC AI</span><span class="arrow-sm arrow-sm-blue">▶</span><span class="flow-label" style="color: #2c3e50;">CAP</span><span class="flow-desc">JSON Veri</span></div>
+      <div class="flow-item"><span class="flow-num flow-num-dark">5</span><span class="flow-label" style="color: #2c3e50;">CAP</span><span class="arrow-sm arrow-sm-blue">▶</span><span class="flow-label" style="color: #2c3e50;">PYTHON ML</span><span class="flow-desc">Embedding + Sınıflandırma</span></div>
+      <div class="flow-item"><span class="flow-num flow-num-dark">6</span><span class="flow-label" style="color: #2c3e50;">PYTHON ML</span><span class="arrow-sm arrow-sm-blue">▶</span><span class="flow-label" style="color: #2c3e50;">CAP</span><span class="flow-desc">{role, score, vector}</span></div>
+      <div class="flow-item"><span class="flow-num flow-num-dark">7</span><span class="flow-label" style="color: #2c3e50;">CAP</span><span class="arrow-sm arrow-sm-blue">▶</span><span class="flow-label" style="color: #2c3e50;">DB</span><span class="flow-desc">Kaydet (PostgreSQL)</span></div>
+    </div>
+
+    <h3>5.2 Bildirim Akışı (CAP + Process Automation)</h3>
+
+    <div class="alert">
+      <div class="alert-title">📋 BİLDİRİM KURALI</div>
+      <div><strong>HER YENİ CV KAYDINDAN SONRA:</strong></div>
+      <div class="alert-code">
+        IF Pozisyon için bekleyen aday >= EŞİK_DEĞER<br>
+        AND Son bildirimden bu yana >= 24 saat<br>
+        THEN ▶ Process Automation tetikle ▶ İK'ya mail gönder
+      </div>
+    </div>
+
+    <div class="flex-row flex-space-around">
+      <div class="actor" style="background: #2c3e50;">CAP Service</div>
+      <div class="actor" style="background: #2c3e50;">Process Automation</div>
+      <div class="actor" style="background: #2c3e50;">İK Yöneticisi</div>
+    </div>
+
+    <div class="flow-box">
+      <div class="flow-item"><span class="flow-num flow-num-dark">1</span><span class="flow-label" style="color: #2c3e50;">CAP</span><span class="arrow-sm arrow-sm-blue">▶</span><span class="flow-label" style="color: #2c3e50;">Process Automation</span><span class="flow-desc">POST /workflow/start</span></div>
+      <div class="flow-item"><span class="flow-num flow-num-dark">2</span><span class="flow-label" style="color: #2c3e50;">Process Automation</span><span class="arrow-sm arrow-sm-blue">▶</span><span class="flow-label">İK</span><span class="flow-desc">Mail: "2 aday bulundu"</span></div>
+      <div class="flow-item"><span class="flow-num flow-num-dark">3</span><span class="flow-label">İK</span><span class="arrow-sm arrow-sm-blue">◀</span><span class="flow-desc">İnceleme yapar</span></div>
+      <div class="flow-item"><span class="flow-num flow-num-dark">4</span><span class="flow-label">İK</span><span class="arrow-sm arrow-sm-blue">▶</span><span class="flow-label" style="color: #2c3e50;">Process Automation</span><span class="flow-desc">Onay: "Davet Gönder"</span></div>
+      <div class="flow-item"><span class="flow-num flow-num-dark">5</span><span class="flow-label" style="color: #2c3e50;">Process Automation</span><span class="arrow-sm arrow-sm-blue">▶</span><span class="flow-label" style="color: #2c3e50;">CAP</span><span class="flow-desc">Callback: sendInvite()</span></div>
+      <div class="flow-item flow-item-success"><span class="flow-num flow-num-dark">6</span><span class="flow-label" style="color: #2c3e50;">CAP</span><span class="arrow-sm arrow-sm-blue">▶</span><span class="flow-label" style="color: #2c3e50;">ADAY</span><span class="flow-desc flow-desc-green">✉️ Mülakat davet maili!</span></div>
+    </div>
+
+    <hr>
+
+    <a id="6-sistem-akışı-mailden-veritabanına-cv-işleme"></a>
+
+    <h2>6. Sistem Akışı: Mail'den Veritabanına CV İşleme</h2>
+
+    <h3>6.1 Genel Akış Özeti</h3>
+
+    <table>
+    <thead><tr><th>Aşama</th><th>Servis</th><th>İşlem</th><th>Çıktı</th></tr></thead>
+    <tbody>
+    <tr><td>1</td><td>Mail Server</td><td>CV maili alınır</td><td>IMAP kutusu</td></tr>
+    <tr><td>2</td><td>n8n</td><td>Mail tetiklenir, ek çıkarılır</td><td>Base64 dosya</td></tr>
+    <tr><td>3</td><td>CAP</td><td>Dosya DMS'e kaydedilir</td><td>Document ID</td></tr>
+    <tr><td>4</td><td>Document AI</td><td>OCR + veri çıkarımı</td><td>JSON veri</td></tr>
+    <tr><td>5</td><td>Python ML</td><td>Embedding + sınıflandırma</td><td>Vektör + analiz</td></tr>
+    <tr><td>6</td><td>PostgreSQL</td><td>3 tabloya kayıt</td><td>Aday kaydı</td></tr>
+    <tr><td>7</td><td>Process Automation</td><td>Eşik aşılırsa bildirim</td><td>İK maili</td></tr>
+    </tbody>
+    </table>
+
+
+    <hr>
+
+    <h3>6.2 Servis Detayları</h3>
+
+    <h4>n8n Workflow</h4>
+
+    <table>
+    <thead><tr><th>Node</th><th>İşlev</th><th>Çıktı</th></tr></thead>
+    <tbody>
+    <tr><td>IMAP Trigger</td><td><code>ik@sirket.com</code> dinler</td><td>Mail objesi</td></tr>
+    <tr><td>Filter</td><td>PDF/Word eki kontrol</td><td>Geçerli/geçersiz</td></tr>
+    <tr><td>Extract</td><td>Eki Base64'e çevirir</td><td>Base64 string</td></tr>
+    <tr><td>HTTP POST</td><td>CAP'a gönderir</td><td>Response</td></tr>
+    </tbody>
+    </table>
+
+
+    <h4>CAP Service Endpoints</h4>
+
+    <table>
+    <thead><tr><th>Endpoint</th><th>Method</th><th>Açıklama</th></tr></thead>
+    <tbody>
+    <tr><td><code>/api/cv/upload</code></td><td>POST</td><td>CV yükleme (n8n'den)</td></tr>
+    <tr><td><code>/api/candidates</code></td><td>GET</td><td>Aday listesi</td></tr>
+    <tr><td><code>/api/positions</code></td><td>GET</td><td>Pozisyon listesi</td></tr>
+    <tr><td><code>/api/positions</code></td><td>POST</td><td>Yeni pozisyon oluşturma</td></tr>
+    <tr><td><code>/api/positions/{id}</code></td><td>PUT</td><td>Pozisyon güncelleme</td></tr>
+    <tr><td><code>/api/positions/{id}/scoring-criteria</code></td><td>GET</td><td>Pozisyon puanlama kriterleri</td></tr>
+    <tr><td><code>/api/positions/{id}/scoring-criteria</code></td><td>POST</td><td>Yeni puanlama kriteri ekleme</td></tr>
+    <tr><td><code>/api/positions/{id}/scoring-criteria/{criteriaId}</code></td><td>PUT</td><td>Puanlama kriteri güncelleme</td></tr>
+    <tr><td><code>/api/positions/{id}/scoring-criteria/{criteriaId}</code></td><td>DELETE</td><td>Puanlama kriteri silme</td></tr>
+    <tr><td><code>/api/candidates/{id}/scores</code></td><td>GET</td><td>Adayın tüm pozisyonlar için puanları</td></tr>
+    <tr><td><code>/api/candidates/{id}/scores/{positionId}</code></td><td>GET</td><td>Adayın belirli pozisyon için puan detayı</td></tr>
+    <tr><td><code>/api/match</code></td><td>POST</td><td>CV-pozisyon eşleştirme (AI + puanlama)</td></tr>
+    <tr><td><code>/api/scoring/calculate</code></td><td>POST</td><td>Puanlama hesaplama (test/önizleme için)</td></tr>
+    </tbody>
+    </table>
+
+
+    <h4>SAP Document AI</h4>
+
+    <table>
+    <thead><tr><th>API İşlemi</th><th>İşlev</th><th>Çıktı</th></tr></thead>
+    <tbody>
+    <tr><td>Document Processing</td><td>CAP, DMS Document ID ile Document AI'ya gönderir</td><td>Job ID</td></tr>
+    <tr><td>OCR + Extraction</td><td>PDF/Word'den OCR + yapılandırılmış veri çıkarımı</td><td>JSON (isim, telefon, eğitim, deneyim, yetenekler, ham metin)</td></tr>
+    <tr><td>Result Retrieval</td><td>CAP, işlem sonucunu alır</td><td>Tam JSON yanıt</td></tr>
+    </tbody>
+    </table>
+
+
+    <h4>Python ML Service</h4>
+
+    <table>
+    <thead><tr><th>Endpoint</th><th>İşlev</th><th>Çıktı</th></tr></thead>
+    <tbody>
+    <tr><td><code>/api/v1/process-cv</code></td><td>CV analizi</td><td>JSON sonuç</td></tr>
+    <tr><td><code>/api/v1/embed</code></td><td>Embedding oluşturma</td><td>384-dim vektör</td></tr>
+    <tr><td><code>/api/v1/classify</code></td><td>Pozisyon sınıflandırma</td><td>Role + skor</td></tr>
+    <tr><td><code>/api/v1/calculate-scoring</code></td><td>Puanlama hesaplama</td><td>Kriter bazlı puanlar + toplam</td></tr>
+    </tbody>
+    </table>
+
+
+    <hr>
+
+    <h3>6.3 Pozisyon Gereksinimlerinin Belirlenmesi</h3>
+
+    <strong>İK Portal Üzerinden Pozisyon Oluşturma:</strong>
+
+    <table>
+    <thead><tr><th>Adım</th><th>Açıklama</th><th>UI5 Ekranı</th></tr></thead>
+    <tbody>
+    <tr><td>1</td><td>İK yöneticisi UI5 portal'a giriş yapar</td><td>Login sayfası</td></tr>
+    <tr><td>2</td><td>"Yeni Pozisyon" butonuna tıklar</td><td>Dashboard</td></tr>
+    <tr><td>3</td><td>Pozisyon bilgilerini girer:</td><td>Form</td></tr>
+    <tr><td>• <strong>Pozisyon Adı:</strong> "SAP UI5 Uzmanı"</td><td>Text input</td></tr>
+    <tr><td>• <strong>Departman:</strong> "IT / Yazılım"</td><td>Dropdown</td></tr>
+    <tr><td>• <strong>Gerekli Yetenekler:</strong> ["SAP UI5", "JavaScript", "Fiori", "OData"]</td><td>Multi-select</td></tr>
+    <tr><td>• <strong>Kıdem Seviyesi:</strong> "Senior"</td><td>Radio button</td></tr>
+    <tr><td>• <strong>Eşik Değeri:</strong> 2 (kaç aday bulununca bildirim gönderilecek)</td><td>Number input</td></tr>
+    <tr><td>• <strong>Puanlama Kriterleri:</strong> (İsteğe bağlı)</td><td>Puanlama tablosu</td></tr>
+    <tr><td>- SAP UI5: 3 puan</td><td>Number input</td></tr>
+    <tr><td>- İngilizce: 2 puan</td><td>Number input</td></tr>
+    <tr><td>- Deneyim Yılı: 1 puan/yıl</td><td>Number input</td></tr>
+    <tr><td>- Fiori: 2 puan</td><td>Number input</td></tr>
+    <tr><td>- (İstediği kadar kriter ekleyebilir)</td><td>Add button</td></tr>
+    <tr><td>4</td><td>"Kaydet" butonuna tıklar</td><td>Form submit</td></tr>
+    <tr><td>5</td><td>CAP servisi pozisyonu <code>POSITIONS</code> tablosuna kaydeder</td><td>API: POST /api/positions</td></tr>
+    </tbody>
+    </table>
+
+
+    <strong>Pozisyon Eşleştirme Süreci:</strong>
+
+    <table>
+    <thead><tr><th>Aşama</th><th>İşlem</th><th>Açıklama</th></tr></thead>
+    <tbody>
+    <tr><td>1</td><td>CV İşleme</td><td>Yeni CV geldiğinde Document AI + Python ML ile analiz edilir</td></tr>
+    <tr><td>2</td><td>Embedding Oluşturma</td><td>CV metni 384-dim vektöre dönüştürülür</td></tr>
+    <tr><td>3</td><td>Pozisyon Embedding'leri</td><td>Her aktif pozisyon için <code>requiredSkills</code> vektöre çevrilir</td></tr>
+    <tr><td>4</td><td>Cosine Similarity</td><td>CV embedding'i ile tüm pozisyon embedding'leri karşılaştırılır</td></tr>
+    <tr><td>5</td><td>AI Skor Hesaplama</td><td>En yüksek skorlu pozisyon bulunur (örn: 0.92 → "SAP UI5 Uzmanı")</td></tr>
+    <tr><td>6</td><td>Puanlama Hesaplama</td><td>Eğer pozisyon için puanlama kriterleri tanımlıysa, adayın puanı hesaplanır</td></tr>
+    <tr><td>7</td><td>Toplam Skor</td><td>AI skoru (0-1) + Puanlama skoru (0-N) birleştirilerek toplam skor oluşturulur</td></tr>
+    <tr><td>8</td><td>Eşik Kontrolü</td><td>Aynı pozisyon için bekleyen aday sayısı kontrol edilir</td></tr>
+    <tr><td>9</td><td>Bildirim</td><td>Eşik aşıldıysa İK'ya mail gönderilir</td></tr>
+    </tbody>
+    </table>
+
+
+    <strong>Örnek Pozisyon Tanımı:</strong>
+    <pre><code class="language-json">{
+      "title": "SAP UI5 Uzmanı",
+      "department": "IT",
+      "requiredSkills": ["SAP UI5", "JavaScript", "Fiori", "OData V4"],
+      "seniorityLevel": "Senior",
+      "threshold": 2,
+      "isActive": true,
+      "scoringCriteria": [
+        {
+          "criterion": "SAP UI5",
+          "type": "skill",
+          "points": 3,
+          "description": "SAP UI5 yeteneği puanı"
+        },
+        {
+          "criterion": "İngilizce",
+          "type": "language",
+          "points": 2,
+          "description": "İngilizce dil seviyesi puanı"
+        },
+        {
+          "criterion": "Deneyim Yılı",
+          "type": "experience",
+          "points": 1,
+          "unit": "per_year",
+          "description": "Her yıl deneyim için 1 puan"
+        },
+        {
+          "criterion": "Fiori",
+          "type": "skill",
+          "points": 2,
+          "description": "Fiori yeteneği puanı"
+        }
+      ]
+    }
+    </code></pre>
+
+    <strong>Puanlama Kriteri Tipleri:</strong>
+
+    <table>
+    <thead><tr><th>Tip</th><th>Açıklama</th><th>Örnek</th><th>Puan Hesaplama</th></tr></thead>
+    <tbody>
+    <tr><td><strong>skill</strong></td><td>Yetenek bazlı</td><td>SAP UI5, JavaScript, Fiori</td><td>Adayda varsa tam puan, yoksa 0</td></tr>
+    <tr><td><strong>language</strong></td><td>Dil seviyesi</td><td>İngilizce, Almanca</td><td>Seviyeye göre (A1=0.5p, B2=1p, C1=2p)</td></tr>
+    <tr><td><strong>experience</strong></td><td>Deneyim süresi</td><td>Deneyim yılı, İlgili deneyim</td><td>Yıl başına belirlenen puan</td></tr>
+    <tr><td><strong>education</strong></td><td>Eğitim seviyesi</td><td>Lisans, Yüksek Lisans</td><td>Seviyeye göre (Lisans=1p, YL=2p)</td></tr>
+    <tr><td><strong>certification</strong></td><td>Sertifika</td><td>SAP Sertifikası, AWS Sertifikası</td><td>Her sertifika için belirlenen puan</td></tr>
+    <tr><td><strong>custom</strong></td><td>Özel kriter</td><td>Proje sayısı, Şirket büyüklüğü</td><td>İK tarafından tanımlanan özel hesaplama</td></tr>
+    </tbody>
+    </table>
+
+
+    <h3>6.4 Bildirim Kuralı</h3>
+
+    <table>
+    <thead><tr><th>Koşul</th><th>Değer</th><th>Aksiyon</th></tr></thead>
+    <tbody>
+    <tr><td>Bekleyen aday sayısı</td><td>>= 2</td><td>Bildirim gönder</td></tr>
+    <tr><td>Son bildirimden bu yana</td><td>>= 24 saat</td><td>Tekrar gönder</td></tr>
+    <tr><td>İK maili</td><td>Otomatik</td><td>"X pozisyonu için Y aday bulundu"</td></tr>
+    </tbody>
+    </table>
+
+
+    <hr>
+
+    <a id="7-ui5-kullanıcı-arayüzü"></a>
+
+    <h2>7. UI5 Kullanıcı Arayüzü</h2>
+
+    <h3>7.1 Ana Dashboard Ekranı</h3>
+
+    <strong>Aday Listesi Tablosu:</strong>
+
+    <table>
+    <thead><tr><th>Özellik</th><th>Açıklama</th><th>UI5 Kontrolü</th></tr></thead>
+    <tbody>
+    <tr><td>Tablo Görünümü</td><td>Tüm adaylar listelenir</td><td><code>sap.m.Table</code></td></tr>
+    <tr><td>Sütunlar</td><td>İsim, Pozisyon, AI Skoru, Puanlama, Toplam Skor, Kıdem, Durum, Tarih</td><td><code>sap.m.Column</code></td></tr>
+    <tr><td>Sıralama</td><td>Her sütuna göre sıralama</td><td><code>sap.ui.model.Sorter</code></td></tr>
+    <tr><td>Sayfalama</td><td>20/50/100 kayıt per sayfa</td><td><code>sap.m.Paging</code></td></tr>
+    </tbody>
+    </table>
+
+
+    <strong>Filtreleme Paneli:</strong>
+
+    <table>
+    <thead><tr><th>Filtre Tipi</th><th>Kontrol</th><th>Kullanım Senaryosu</th></tr></thead>
+    <tbody>
+    <tr><td>Pozisyon</td><td><code>sap.m.Select</code></td><td>"SAP UI5 Uzmanı" pozisyonuna göre filtrele</td></tr>
+    <tr><td>Kıdem Seviyesi</td><td><code>sap.m.MultiComboBox</code></td><td>Junior, Mid, Senior seçenekleri</td></tr>
+    <tr><td>Skor Aralığı</td><td><code>sap.m.RangeSlider</code></td><td>0.8-1.0 arası yüksek skorlu adaylar</td></tr>
+    <tr><td>Puanlama Skoru</td><td><code>sap.m.RangeSlider</code></td><td>Puanlama skoru aralığı (örn: 10-15 puan)</td></tr>
+    <tr><td>Yetenek</td><td><code>sap.m.MultiInput</code></td><td>"JavaScript", "Fiori" gibi yetenekler</td></tr>
+    <tr><td>Durum</td><td><code>sap.m.SegmentedButton</code></td><td>new/reviewed/invited</td></tr>
+    <tr><td>Tarih Aralığı</td><td><code>sap.m.DateRangeSelection</code></td><td>Son 7 gün, son ay</td></tr>
+    </tbody>
+    </table>
+
+
+    <strong>CV PDF Viewer:</strong>
+
+    <table>
+    <thead><tr><th>Özellik</th><th>Açıklama</th><th>Teknik Detay</th></tr></thead>
+    <tbody>
+    <tr><td>PDF Görüntüleme</td><td>Her aday satırında "CV Görüntüle" butonu</td><td><code>sap.m.Button</code> → Modal açılır</td></tr>
+    <tr><td>Modal Dialog</td><td>PDF viewer içeren popup</td><td><code>sap.m.Dialog</code></td></tr>
+    <tr><td>PDF Source</td><td>DMS'ten Document ID ile PDF çekilir</td><td>CAP API: <code>/api/cv/preview/{documentId}</code></td></tr>
+    <tr><td>Viewer Kontrolü</td><td>Zoom, download, print özellikleri</td><td><code>sap.ui.core.HTML</code> veya iframe</td></tr>
+    <tr><td>Loading State</td><td>PDF yüklenirken spinner</td><td><code>sap.m.BusyIndicator</code></td></tr>
+    </tbody>
+    </table>
+
+
+    <strong>Aday Detay Sayfası:</strong>
+
+    <table>
+    <thead><tr><th>Bölüm</th><th>İçerik</th><th>Veri Kaynağı</th></tr></thead>
+    <tbody>
+    <tr><td>Kişisel Bilgiler</td><td>İsim, telefon, e-posta, adres</td><td><code>Candidates</code> tablosu</td></tr>
+    <tr><td>CV Özeti</td><td>AI tarafından oluşturulan özet</td><td><code>CVData.aiSummary</code></td></tr>
+    <tr><td>Yetenekler</td><td>Skills listesi (chip formatında)</td><td><code>CVData.skills[]</code></td></tr>
+    <tr><td>Deneyimler</td><td>İş geçmişi timeline görünümü</td><td><code>CVData.experience[]</code></td></tr>
+    <tr><td>Eğitim</td><td>Eğitim bilgileri</td><td><code>CVData.education[]</code></td></tr>
+    <tr><td>AI Analiz</td><td>Önerilen pozisyon, skor, kıdem</td><td><code>CVData.suggestedRole</code>, <code>confidenceScore</code></td></tr>
+    <tr><td>Eşleşen Pozisyonlar</td><td>Hangi pozisyonlara uygun (skorlu liste)</td><td>Vector similarity sonuçları</td></tr>
+    <tr><td>Puanlama Detayı</td><td>Kriter bazlı puanlama sonuçları</td><td><code>CandidateScores.scoreDetails</code></td></tr>
+    </tbody>
+    </table>
+
+
+    <strong>Puanlama Yönetimi Ekranı:</strong>
+
+    <table>
+    <thead><tr><th>Bölüm</th><th>Özellik</th><th>Açıklama</th></tr></thead>
+    <tbody>
+    <tr><td><strong>Pozisyon Seçimi</strong></td><td>Dropdown</td><td>Puanlama kriterleri eklemek için pozisyon seçilir</td></tr>
+    <tr><td><strong>Kriter Listesi</strong></td><td>Tablo</td><td>Mevcut puanlama kriterleri listelenir (kriter adı, tip, puan)</td></tr>
+    <tr><td><strong>Yeni Kriter Ekle</strong></td><td>Form butonu</td><td>Modal dialog açılır, yeni kriter eklenir</td></tr>
+    <tr><td><strong>Kriter Düzenle</strong></td><td>Edit butonu</td><td>Mevcut kriterin puanı veya açıklaması değiştirilir</td></tr>
+    <tr><td><strong>Kriter Sil</strong></td><td>Delete butonu</td><td>İstenmeyen kriter kaldırılır</td></tr>
+    <tr><td><strong>Sıralama</strong></td><td>Drag & Drop</td><td>Kriterlerin sırası değiştirilebilir</td></tr>
+    <tr><td><strong>Önizleme</strong></td><td>Hesaplama butonu</td><td>Örnek aday verisi ile puan hesaplanır ve gösterilir</td></tr>
+    <tr><td><strong>Kaydet</strong></td><td>Submit butonu</td><td>Puanlama kriterleri pozisyona kaydedilir</td></tr>
+    </tbody>
+    </table>
+
+
+    <strong>Puanlama Kriteri Form (Modal Dialog):</strong>
+
+    <table>
+    <thead><tr><th>Alan</th><th>Kontrol</th><th>Açıklama</th><th>Validasyon</th></tr></thead>
+    <tbody>
+    <tr><td>Kriter Adı</td><td><code>sap.m.Input</code></td><td>Kriterin adı (örn: "SAP UI5")</td><td>Zorunlu, min 2 karakter</td></tr>
+    <tr><td>Kriter Tipi</td><td><code>sap.m.Select</code></td><td>skill, language, experience, education, certification, custom</td><td>Zorunlu</td></tr>
+    <tr><td>Puan Değeri</td><td><code>sap.m.Input</code> (type: number)</td><td>Bu kriter için verilecek puan</td><td>Zorunlu, > 0</td></tr>
+    <tr><td>Birim</td><td><code>sap.m.Select</code> (opsiyonel)</td><td>experience tipinde: per_year, per_month</td><td>Sadece experience için</td></tr>
+    <tr><td>Açıklama</td><td><code>sap.m.TextArea</code></td><td>Kriterin detaylı açıklaması</td><td>Opsiyonel</td></tr>
+    </tbody>
+    </table>
+
+
+    <strong>Puanlama Önizleme:</strong>
+
+    <table>
+    <thead><tr><th>Bölüm</th><th>İçerik</th><th>Açıklama</th></tr></thead>
+    <tbody>
+    <tr><td><strong>Örnek Aday</strong></td><td>Simüle edilmiş aday verisi</td><td>Test için kullanılır</td></tr>
+    <tr><td><strong>Kriter Bazlı Hesaplama</strong></td><td>Her kriter için puan</td><td>Hangi kriterden kaç puan alındığı</td></tr>
+    <tr><td><strong>Toplam Puan</strong></td><td>Kazanılan / Maksimum</td><td>12/15 gibi</td></tr>
+    <tr><td><strong>AI Skoru</strong></td><td>0-1 arası</td><td>Vector similarity skoru</td></tr>
+    <tr><td><strong>Birleştirilmiş Skor</strong></td><td>Final skor</td><td>AI + Puanlama birleştirilmiş</td></tr>
+    </tbody>
+    </table>
+
+
+    <strong>Aday Listesinde Puanlama Gösterimi:</strong>
+
+    <table>
+    <thead><tr><th>Sütun</th><th>Gösterim</th><th>Format</th><th>Açıklama</th></tr></thead>
+    <tbody>
+    <tr><td>AI Skoru</td><td>0.92</td><td>Decimal (2 haneli)</td><td>Vector similarity skoru</td></tr>
+    <tr><td>Puanlama</td><td>12/15</td><td>Fraction</td><td>Kazanılan puan / Maksimum puan</td></tr>
+    <tr><td>Toplam Skor</td><td>0.88</td><td>Decimal (2 haneli)</td><td>Birleştirilmiş skor</td></tr>
+    <tr><td>Puan Detayı</td><td>Tooltip</td><td>Hover'da gösterilir</td><td>Hangi kriterden kaç puan alındığı</td></tr>
+    </tbody>
+    </table>
+
+
+    <strong>Puanlama Filtreleme:</strong>
+
+    <table>
+    <thead><tr><th>Filtre</th><th>Kontrol</th><th>Kullanım</th></tr></thead>
+    <tbody>
+    <tr><td>Minimum Puan</td><td><code>sap.m.Slider</code></td><td>Belirli puanın üzerindeki adaylar</td></tr>
+    <tr><td>Puanlama Aktif</td><td><code>sap.m.Switch</code></td><td>Sadece puanlama yapılmış pozisyonlar</td></tr>
+    <tr><td>Kriter Bazlı</td><td><code>sap.m.MultiInput</code></td><td>Belirli kriterlerde yüksek puan alan adaylar</td></tr>
+    </tbody>
+    </table>
+
+
+    <h3>7.2 Aday Karşılaştırma Senaryosu</h3>
+
+    <strong>Kullanım Senaryosu:</strong>
+
+    <strong>Adım 1: Aday Seçimi</strong>
+    <ul>
+    <li>İK yöneticisi dashboard'da 2-4 aday seçer (checkbox ile)</li>
+    </ul>
+    <ul>
+    <li>"Karşılaştır" butonuna tıklar</li>
+    </ul>
+    <ul>
+    <li>Karşılaştırma sayfasına yönlendirilir</li>
+    </ul>
+
+    <strong>Adım 2: Karşılaştırma Ekranı Düzeni</strong>
+
+    <strong>Layout: Split Screen veya Tab View</strong>
+
+    <table>
+    <thead><tr><th>Görünüm Tipi</th><th>Açıklama</th><th>Kullanım</th></tr></thead>
+    <tbody>
+    <tr><td><strong>Yan Yana (Side-by-Side)</strong></td><td>2 aday için ideal</td><td>İki kolon, her kolonda bir aday</td></tr>
+    <tr><td><strong>Grid View</strong></td><td>3-4 aday için</td><td>2x2 grid layout</td></tr>
+    <tr><td><strong>Tab View</strong></td><td>Çok aday için</td><td>Her aday bir tab</td></tr>
+    </tbody>
+    </table>
+
+
+    <strong>Karşılaştırma Kriterleri:</strong>
+
+    <table>
+    <thead><tr><th>Kategori</th><th>Gösterilecek Bilgiler</th><th>Görselleştirme</th></tr></thead>
+    <tbody>
+    <tr><td><strong>Temel Bilgiler</strong></td><td>İsim, e-posta, telefon, yaş</td><td>Side-by-side kartlar</td></tr>
+    <tr><td><strong>Yetenekler</strong></td><td>Skills listesi, ortak/farklı yetenekler</td><td>Venn diagram veya overlap gösterimi</td></tr>
+    <tr><td><strong>Deneyim</strong></td><td>Toplam deneyim süresi, şirket sayısı</td><td>Timeline comparison</td></tr>
+    <tr><td><strong>Eğitim</strong></td><td>Okul, bölüm, mezuniyet yılı</td><td>Liste karşılaştırması</td></tr>
+    <tr><td><strong>AI Skorları</strong></td><td>Confidence score, pozisyon uyumu</td><td>Bar chart karşılaştırması</td></tr>
+    <tr><td><strong>Yetenek Matrisi</strong></td><td>Her yetenek için seviye (1-5)</td><td>Heatmap veya radar chart</td></tr>
+    </tbody>
+    </table>
+
+    <strong>Örnek Karşılaştırma Ekranı Yapısı:</strong>
+
+    <div class="comparison-container">
+      <div class="text-center comparison-title">Aday Karşılaştırması: 2 Aday</div>
+      <div class="flex-row flex-center mb-20">
+        <div class="box box-blue box-margin"><div class="box-title">Aday A</div><div class="box-sub">Ali Yılmaz</div></div>
+        <div class="vs-divider">vs</div>
+        <div class="box box-blue box-margin"><div class="box-title">Aday B</div><div class="box-sub">Ayşe Demir</div></div>
+      </div>
+      
+      <div class="section-spacing">
+        <div class="section-subtitle">Temel Bilgiler</div>
+        <div class="flex-row flex-space-around">
+          <div class="box box-green box-min-width">
+            <div class="box-title">Ali Yılmaz</div>
+            <div class="box-sub">5 yıl deneyim</div>
+            <div class="box-sub">Senior</div>
+          </div>
+          <div class="box box-green box-min-width">
+            <div class="box-title">Ayşe Demir</div>
+            <div class="box-sub">3 yıl deneyim</div>
+            <div class="box-sub">Mid</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="section-spacing">
+        <div class="section-subtitle">Yetenekler</div>
+        <div class="info-box">
+          <div class="info-item"><strong>Ortak:</strong> SAP UI5, JavaScript</div>
+          <div class="info-item"><strong>Aday A'da var:</strong> Fiori, TypeScript</div>
+          <div class="info-item"><strong>Aday B'de var:</strong> OData, ABAP</div>
+        </div>
+      </div>
+      
+      <div class="section-spacing">
+        <div class="section-subtitle">AI Skorları</div>
+        <div class="chart-box">
+          <div class="info-item">Bar Chart: Aday A: 0.92 | Aday B: 0.85</div>
+        </div>
+      </div>
+      
+      <div class="flex-row flex-center mt-20 gap-10">
+        <div class="box box-purple box-sm"><div class="box-title">CV Görüntüle A</div></div>
+        <div class="box box-purple box-sm"><div class="box-title">CV Görüntüle B</div></div>
+        <div class="box box-purple box-sm"><div class="box-title">Toplu Davet</div></div>
+      </div>
+    </div>
+
+    <hr>
+
+    <h3>7.3 Chart/Grafik Görünümü</h3>
+
+    <strong>Kullanıcı Akışı:</strong>
+
+    <table>
+    <thead><tr><th>Adım</th><th>Açıklama</th><th>UI5 Ekranı</th></tr></thead>
+    <tbody>
+    <tr><td>1</td><td>Dashboard'da her adayın yanında "Karşılaştır" butonu görünür</td><td>Aday listesi</td></tr>
+    <tr><td>2</td><td>Kullanıcı 2-4 aday seçer (checkbox veya buton ile)</td><td>Seçim işlemi</td></tr>
+    <tr><td>3</td><td>Seçilen adaylar bir listede toplanır</td><td>Seçim listesi</td></tr>
+    <tr><td>4</td><td>"Grafikleri Görüntüle" butonuna tıklanır</td><td>Buton tıklama</td></tr>
+    <tr><td>5</td><td>Seçilen adayların verileri chart'lara dönüştürülür</td><td>Veri işleme</td></tr>
+    <tr><td>6</td><td>Yeni bir sayfa veya modal açılır</td><td>Chart görünümü</td></tr>
+    <tr><td>7</td><td>Birden fazla chart gösterilir (her kriter için bir chart)</td><td>Chart sayfası</td></tr>
+    <tr><td>8</td><td>Kullanıcı chart'lar arasında gezinir</td><td>Navigasyon</td></tr>
+    </tbody>
+    </table>
+
+
+    <strong>Chart Görünümü Ekran Yapısı:</strong>
+
+    <div class="comparison-container">
+      <div class="text-center comparison-title">Aday Karşılaştırma - Grafik Görünümü</div>
+      
+      <div class="flex-row flex-center flex-wrap-chart">
+        <div class="box box-blue box-sm"><div class="box-title">AI Skorları</div></div>
+        <div class="box box-blue box-sm"><div class="box-title">Yetenekler</div></div>
+        <div class="box box-blue box-sm"><div class="box-title">Deneyim</div></div>
+        <div class="box box-blue box-sm"><div class="box-title">Yetenek Matrisi</div></div>
+        <div class="box box-blue box-sm"><div class="box-title">Kariyer İlerlemesi</div></div>
+      </div>
+      
+      <div class="chart-placeholder">
+        <div class="chart-title">Seçilen Chart Burada Görüntülenir</div>
+        <div class="chart-desc">Bar / Radar / Line / Heatmap Chart</div>
+        <div class="chart-features">İnteraktif: Zoom, Tooltip, Legend</div>
+      </div>
+      
+      <div class="flex-row flex-center mt-20 gap-10">
+        <div class="box box-purple box-sm"><div class="box-title">Geri</div></div>
+        <div class="box box-purple box-sm"><div class="box-title">Export PDF</div></div>
+        <div class="box box-purple box-sm"><div class="box-title">Export Excel</div></div>
+      </div>
+    </div>
+
+    <strong>İnteraktif Özellikler:</strong>
+
+    <table>
+    <thead><tr><th>Özellik</th><th>Açıklama</th><th>Kullanım</th></tr></thead>
+    <tbody>
+    <tr><td>Tooltip (Hover Bilgisi)</td><td>Chart üzerinde hover yapınca detaylı bilgi gösterilir</td><td>"Ali Yılmaz - AI Skoru: 0.92 (Senior, 5 yıl)"</td></tr>
+    <tr><td>Zoom ve Pan</td><td>Chart'ı yakınlaştırma/uzaklaştırma, kaydırma</td><td>Büyük veri setlerinde kullanışlı</td></tr>
+    <tr><td>Legend (Açıklama)</td><td>Her renk neyi temsil ediyor, tıklanınca gizle/göster</td><td>Renk kodlaması açıklaması</td></tr>
+    <tr><td>Data Labels</td><td>Chart üzerinde değerler gösterilir</td><td>Bar üzerinde "0.92" yazısı</td></tr>
+    <tr><td>Chart Switcher</td><td>Butonlarla chart değiştirme</td><td>Tab navigation</td></tr>
+    </tbody>
+    </table>
+
+    <h4>Rapor Oluşturma Detayları</h4>
+
+    <strong>1. Rapor İçeriği:</strong>
+
+    <table>
+    <thead><tr><th>Bölüm</th><th>İçerik</th><th>Kaynak</th></tr></thead>
+    <tbody>
+    <tr><td><strong>Kapak Sayfası</strong></td><td>Rapor başlığı, tarih, hazırlayan kişi, pozisyon bilgisi</td><td>UI5 form verileri</td></tr>
+    <tr><td><strong>Özet</strong></td><td>Karşılaştırılan aday sayısı, önerilen aday, temel bulgular</td><td>AI analiz sonuçları</td></tr>
+    <tr><td><strong>Chart'lar</strong></td><td>AI skorları, yetenek profilleri, deneyim karşılaştırması, yetenek matrisi</td><td>UI5 chart görünümü</td></tr>
+    <tr><td><strong>Aday Detayları</strong></td><td>Her aday için: isim, skorlar, yetenekler, deneyim, eğitim</td><td>Veritabanı (Candidates, CVData)</td></tr>
+    <tr><td><strong>Karşılaştırma Tablosu</strong></td><td>Tüm kriterler için yan yana karşılaştırma</td><td>Hesaplanan skorlar</td></tr>
+    <tr><td><strong>Öneriler</strong></td><td>Hangi adayın neden seçilmesi gerektiği, avantaj/dezavantajlar</td><td>İK yorumları (opsiyonel)</td></tr>
+    <tr><td><strong>Ekler</strong></td><td>CV özetleri, detaylı skor hesaplamaları</td><td>CVData, CandidateScores</td></tr>
+    </tbody>
+    </table>
+
+
+    <strong>2. Rapor Oluşturma Teknolojileri:</strong>
+
+    <table>
+    <thead><tr><th>Yöntem</th><th>Açıklama</th><th>Avantajlar</th></tr></thead>
+    <tbody>
+    <tr><td><strong>Client-Side (UI5)</strong></td><td>UI5'te jsPDF veya PDFKit kullanarak tarayıcıda PDF oluşturma</td><td>Hızlı, sunucu yükü yok, anında indirme</td></tr>
+    <tr><td><strong>Server-Side (CAP)</strong></td><td>CAP servisinde PDF oluşturma (pdfkit, puppeteer, jsPDF)</td><td>Daha profesyonel format, şablon desteği</td></tr>
+    <tr><td><strong>Hybrid (Chart Export + PDF)</strong></td><td>Chart'ları görüntü olarak export edip PDF'e ekleme</td><td>Chart kalitesi korunur, esnek yapı</td></tr>
+    <tr><td><strong>Excel Export</strong></td><td>SheetJS (xlsx) ile Excel dosyası oluşturma</td><td>Veri analizi için uygun, düzenlenebilir</td></tr>
+    </tbody>
+    </table>
+
+
+    <strong>3. Rapor Şablonu Yapısı:</strong>
+
+    <table>
+    <thead><tr><th>Sayfa</th><th>İçerik</th><th>Format</th></tr></thead>
+    <tbody>
+    <tr><td>1. Kapak</td><td>Logo, başlık, tarih, pozisyon bilgisi</td><td>PDF (tek sayfa)</td></tr>
+    <tr><td>2. Özet</td><td>Executive summary, önerilen aday, temel metrikler</td><td>PDF (tek sayfa)</td></tr>
+    <tr><td>3-4. Chart'lar</td><td>AI skorları, radar chart, bar chart, heatmap</td><td>PDF (görüntü olarak gömülü)</td></tr>
+    <tr><td>5-6. Aday Detayları</td><td>Her aday için detaylı bilgiler</td><td>PDF (tablo formatında)</td></tr>
+    <tr><td>7. Karşılaştırma</td><td>Yan yana karşılaştırma tablosu</td><td>PDF (tablo)</td></tr>
+    <tr><td>8. Öneriler</td><td>Sonuç ve öneriler</td><td>PDF (metin)</td></tr>
+    </tbody>
+    </table>
+
+
+    <strong>4. Teknik Implementasyon Örneği (CAP Service):</strong>
+
+    <pre><code class="language-javascript">// CAP Service: /api/reports/generate
+const pdfkit = require('pdfkit');
+const fs = require('fs');
+
+srv.on('POST', '/api/reports/generate', async (req) => {
+  const { candidateIds, positionId, reportType } = req.data;
+  
+  // 1. Aday verilerini çek
+  const candidates = await SELECT.from('Candidates')
+    .where({ ID: { in: candidateIds } });
+  
+  // 2. Chart verilerini hazırla
+  const chartData = await prepareChartData(candidates, positionId);
+  
+  // 3. PDF oluştur
+  const doc = new pdfkit();
+  const stream = fs.createWriteStream('report.pdf');
+  doc.pipe(stream);
+  
+  // Kapak sayfası
+  doc.fontSize(20).text('Aday Karşılaştırma Raporu', { align: 'center' });
+  doc.moveDown();
+  doc.fontSize(12).text(`Tarih: ${new Date().toLocaleDateString('tr-TR')}`);
+  
+  // Chart'ları ekle (görüntü olarak)
+  for (const chart of chartData) {
+    doc.addPage();
+    doc.image(chart.imageBuffer, { fit: [500, 400] });
+  }
+  
+  // Aday detayları
+  doc.addPage();
+  doc.fontSize(16).text('Aday Detayları');
+  // ... tablo formatında aday bilgileri
+  
+  doc.end();
+  
+  // 4. PDF'i DMS'e kaydet veya e-posta ile gönder
+  return { reportUrl: '/api/reports/download/report.pdf' };
+});
+</code></pre>
+
+
+    <strong>5. Rapor İçeriği Örnek Yapısı:</strong>
+
+    <table>
+    <thead><tr><th>Bölüm</th><th>Örnek İçerik</th></tr></thead>
+    <tbody>
+    <tr><td><strong>Özet</strong></td><td>"SAP UI5 Uzmanı pozisyonu için 3 aday karşılaştırıldı. Önerilen aday: Ali Yılmaz (AI Skoru: 0.92, Toplam Skor: 0.88)"</td></tr>
+    <tr><td><strong>AI Skorları</strong></td><td>Bar chart: Aday A (0.92), Aday B (0.85), Aday C (0.78)</td></tr>
+    <tr><td><strong>Yetenek Profili</strong></td><td>Radar chart: Her adayın yetenek seviyeleri</td></tr>
+    <tr><td><strong>Deneyim Karşılaştırması</strong></td><td>Bar chart: Toplam deneyim, ilgili deneyim, şirket sayısı</td></tr>
+    <tr><td><strong>Yetenek Matrisi</strong></td><td>Heatmap: Her yetenek için seviye karşılaştırması</td></tr>
+    <tr><td><strong>Öneriler</strong></td><td>"Ali Yılmaz önerilir çünkü: 1) En yüksek AI skoru, 2) 5 yıl UI5 deneyimi, 3) Fiori ve OData bilgisi mevcut"</td></tr>
+    </tbody>
+    </table>
+
+
+    <strong>6. Otomatik Raporlama Senaryoları:</strong>
+
+    <table>
+    <thead><tr><th>Senaryo</th><th>Tetikleyici</th><th>İçerik</th></tr></thead>
+    <tbody>
+    <tr><td><strong>Haftalık Özet</strong></td><td>Her Pazartesi 09:00</td><td>Geçen hafta gelen adaylar, eşleşen pozisyonlar, önerilen adaylar</td></tr>
+    <tr><td><strong>Aylık Rapor</strong></td><td>Her ayın 1'i</td><td>Aylık istatistikler, pozisyon bazlı özet, trend analizi</td></tr>
+    <tr><td><strong>Pozisyon Kapanış</strong></td><td>Pozisyon doldurulduğunda</td><td>Seçilen aday, reddedilen adaylar, karşılaştırma raporu</td></tr>
+    <tr><td><strong>Eşik Aşımı</strong></td><td>Eşik değeri aşıldığında</td><td>Bekleyen adaylar, öncelikli adaylar, hızlı karar raporu</td></tr>
+    </tbody>
+    </table>
+
+
+    <br>
+
+    <!-- Scroll to Top Button -->
+    <button class="scroll-to-top" id="scrollToTop" onclick="scrollToTop()" aria-label="Yukarı Çık" title="Yukarı Çık">
+      <span style="display: block; transform: rotate(0deg); transition: transform 0.3s;">▲</span>
+    </button>
+
+    <script>
+      // Scroll to Top Button
+      const scrollToTopBtn = document.getElementById('scrollToTop');
+      
+      window.addEventListener('scroll', function() {
+        if (window.pageYOffset > 300) {
+          scrollToTopBtn.classList.add('show');
+        } else {
+          scrollToTopBtn.classList.remove('show');
+        }
+      });
+
+      function scrollToTop() {
+        window.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        });
+      }
+    </script>
+
+  </body>
+</html>

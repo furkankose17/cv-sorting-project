@@ -1,0 +1,72 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:form="sap.ui.layout.form">
+    <Dialog
+        id="statusChangeDialog"
+        title="{i18n>dialogStatusChangeTitle}"
+        type="Message"
+        contentWidth="400px"
+        busy="{dialog>/isLoading}"
+        busyIndicatorDelay="0">
+        <content>
+            <VBox id="statusChangeVBox" class="sapUiSmallMargin">
+                <form:SimpleForm
+                    id="currentStatusForm"
+                    editable="false"
+                    layout="ResponsiveGridLayout"
+                    labelSpanXL="4"
+                    labelSpanL="4"
+                    labelSpanM="4"
+                    labelSpanS="12">
+                    <form:content>
+                        <Label id="currentStatusLabel" text="{i18n>dialogCurrentStatus}" labelFor="currentStatusText"/>
+                        <Text id="currentStatusText" text="{dialog>/currentStatusName}"/>
+                    </form:content>
+                </form:SimpleForm>
+                <form:SimpleForm
+                    id="newStatusForm"
+                    editable="true"
+                    layout="ResponsiveGridLayout"
+                    labelSpanXL="4"
+                    labelSpanL="4"
+                    labelSpanM="4"
+                    labelSpanS="12"
+                    class="sapUiSmallMarginTop">
+                    <form:content>
+                        <Label id="newStatusLabel" text="{i18n>dialogNewStatus}" required="true" labelFor="newStatusSelect"/>
+                        <Select
+                            id="newStatusSelect"
+                            selectedKey="{dialog>/newStatusCode}"
+                            items="{dialog>/CandidateStatuses}"
+                            ariaLabelledBy="newStatusLabel">
+                            <core:Item id="idNameStatusItem" key="{dialog>code}" text="{dialog>name}"/>
+                        </Select>
+                        <Label id="reasonLabel" text="{i18n>dialogReason}" labelFor="reasonTextArea"/>
+                        <TextArea
+                            id="reasonTextArea"
+                            value="{dialog>/reason}"
+                            rows="3"
+                            width="100%"
+                            placeholder="{i18n>dialogReasonPlaceholder}"
+                            ariaLabelledBy="reasonLabel"/>
+                    </form:content>
+                </form:SimpleForm>
+            </VBox>
+        </content>
+        <beginButton>
+            <Button
+                id="confirmStatusChangeBtn"
+                text="{i18n>dialogConfirm}"
+                type="Emphasized"
+                press=".onConfirmStatusChange"
+                enabled="{= !${dialog>/isLoading} }"/>
+        </beginButton>
+        <endButton>
+            <Button
+                id="cancelStatusChangeBtn"
+                text="{i18n>dialogCancel}"
+                press=".onCancelStatusChange"/>
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>

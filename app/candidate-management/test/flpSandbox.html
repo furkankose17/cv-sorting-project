@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candidate Management - FLP Sandbox</title>
+    <script>
+        window["sap-ushell-config"] = {
+            defaultRenderer: "fiori2",
+            applications: {
+                "candidatemanagement-display": {
+                    title: "Manage Candidates",
+                    description: "Manage candidates, review applications, and track hiring pipeline",
+                    additionalInformation: "SAPUI5.Component=cv.sorting.candidatemanagement",
+                    applicationType: "URL",
+                    url: "../webapp",
+                    navigationMode: "embedded"
+                }
+            }
+        };
+    </script>
+    <script
+        id="sap-ushell-bootstrap"
+        src="https://ui5.sap.com/1.120.0/test-resources/sap/ushell/bootstrap/sandbox.js">
+    </script>
+    <script
+        id="sap-ui-bootstrap"
+        src="https://ui5.sap.com/1.120.0/resources/sap-ui-core.js"
+        data-sap-ui-libs="sap.m, sap.ushell, sap.fe.templates"
+        data-sap-ui-compatVersion="edge"
+        data-sap-ui-theme="sap_horizon"
+        data-sap-ui-frameOptions="allow"
+        data-sap-ui-bindingSyntax="complex">
+    </script>
+    <script>
+        sap.ui.getCore().attachInit(function() {
+            sap.ushell.Container.createRenderer().placeAt("content");
+        });
+    </script>
+</head>
+<body class="sapUiBody" id="content">
+</body>
+</html>

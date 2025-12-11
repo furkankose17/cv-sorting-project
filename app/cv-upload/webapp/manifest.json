@@ -10,14 +10,14 @@
         },
         "dataSources": {
             "cvService": {
-                "uri": "/cv/",
+                "uri": "/api/candidates/",
                 "type": "OData",
                 "settings": {
                     "odataVersion": "4.0"
                 }
             },
             "candidateService": {
-                "uri": "/candidate/",
+                "uri": "/api/candidates/",
                 "type": "OData",
                 "settings": {
                     "odataVersion": "4.0"
@@ -33,6 +33,20 @@
                         "parameters": {},
                         "additionalParameters": "allowed"
                     }
+                }
+            },
+            "outbounds": {
+                "displayCandidate": {
+                    "semanticObject": "Candidate",
+                    "action": "manage"
+                },
+                "displayAnalytics": {
+                    "semanticObject": "Analytics",
+                    "action": "display"
+                },
+                "displayJob": {
+                    "semanticObject": "JobPosting",
+                    "action": "display"
                 }
             }
         }

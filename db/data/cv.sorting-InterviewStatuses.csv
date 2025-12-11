@@ -1,0 +1,9 @@
+code;name;descr;criticality;sortOrder;isTerminal
+scheduled;Scheduled;Interview is scheduled;0;1;false
+confirmed;Confirmed;Candidate confirmed attendance;3;2;false
+in_progress;In Progress;Interview is ongoing;0;3;false
+completed;Completed;Interview has been completed;3;4;true
+cancelled;Cancelled;Interview was cancelled;1;5;true
+rescheduled;Rescheduled;Interview needs to be rescheduled;2;6;false
+no_show;No Show;Candidate did not attend;1;7;true
+pending_feedback;Pending Feedback;Awaiting interviewer feedback;2;8;false

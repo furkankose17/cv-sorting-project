@@ -1,0 +1,8 @@
+code;name;descr;icon;defaultDuration;sortOrder
+phone;Phone Screen;Initial phone screening call;sap-icon://phone;30;1
+video;Video Interview;Video conference interview;sap-icon://video;60;2
+onsite;Onsite Interview;In-person interview at office;sap-icon://building;90;3
+technical;Technical Assessment;Technical skills evaluation;sap-icon://developer-settings;120;4
+panel;Panel Interview;Interview with multiple interviewers;sap-icon://group;90;5
+hr;HR Interview;Human resources interview;sap-icon://hr-approval;45;6
+final;Final Interview;Final round interview;sap-icon://complete;60;7

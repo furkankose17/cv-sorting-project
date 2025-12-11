@@ -79,6 +79,7 @@ entity Candidates : cuid, managed, AuditTrail, SoftDelete, Taggable {
     languages             : Composition of many CandidateLanguages on languages.candidate = $self;
     certifications        : Composition of many Certifications on certifications.candidate = $self;
     notes                 : Composition of many CandidateNotes on notes.candidate = $self;
+    interviews            : Composition of many Interviews on interviews.candidate = $self;
 
     // Associations
     matchResults          : Association to many MatchResults on matchResults.candidate = $self;
@@ -87,8 +88,8 @@ entity Candidates : cuid, managed, AuditTrail, SoftDelete, Taggable {
     source                : String(100);
     referredBy            : String(200);
 
-    // Virtual/Calculated fields
-    virtual fullName      : String(201) = firstName || ' ' || lastName;
+    // Virtual/Calculated fields (computed in service layer)
+    virtual fullName      : String(201);
 }
 
 /**
@@ -207,7 +208,7 @@ entity CandidateSkills : cuid, managed {
 /**
  * Candidate Languages
  */
-entity CandidateLanguages : cuid {
+entity CandidateLanguages : cuid, managed {
     candidate             : Association to Candidates not null;
     languageCode          : String(5) not null;
     languageName          : String(50);
@@ -243,6 +244,55 @@ entity CandidateNotes : cuid, managed, AuditTrail {
 
     isPrivate             : Boolean default false;
     isPinned              : Boolean default false;
+}
+
+/**
+ * Interviews - Interview scheduling and tracking
+ */
+entity Interviews : cuid, managed, AuditTrail {
+    candidate             : Association to Candidates not null;
+    jobPosting            : Association to JobPostings;
+
+    // Interview Details
+    title                 : String(200) not null;
+    interviewType         : Association to InterviewTypes @assert.target;
+    status                : Association to InterviewStatuses @assert.target;
+
+    // Scheduling
+    scheduledAt           : DateTime not null;
+    duration              : Integer default 60; // minutes
+    timezone              : String(50);
+    location              : String(500); // Physical location or meeting link
+    meetingLink           : URL;
+
+    // Participants
+    interviewer           : String(200);
+    interviewerEmail      : Email;
+    additionalParticipants: many String(200);
+
+    // Feedback (after interview)
+    overallRating         : Integer; // 1-5
+    technicalRating       : Integer; // 1-5
+    communicationRating   : Integer; // 1-5
+    cultureFitRating      : Integer; // 1-5
+
+    feedback              : LargeString;
+    strengths             : LargeString;
+    areasOfImprovement    : LargeString;
+    recommendation        : String(50); // strongly_hire, hire, no_hire, strong_no_hire
+
+    // Follow-up
+    nextSteps             : LargeString;
+    followUpDate          : Date;
+
+    // Reminders
+    reminderSent          : Boolean default false;
+    feedbackDueDate       : Date;
+
+    // Completion
+    completedAt           : Timestamp;
+    cancelledAt           : Timestamp;
+    cancellationReason    : String(500);
 }
 
 // ============================================
@@ -437,6 +487,26 @@ entity DegreeLevels : CodeList {
     sortOrder             : Integer;
 }
 
+/**
+ * Interview Types
+ */
+entity InterviewTypes : CodeList {
+    key code              : String(50);
+    icon                  : String(50);
+    defaultDuration       : Integer default 60; // minutes
+    sortOrder             : Integer;
+}
+
+/**
+ * Interview Statuses
+ */
+entity InterviewStatuses : CodeList {
+    key code              : String(50);
+    criticality           : Integer; // For UI status colors
+    sortOrder             : Integer;
+    isTerminal            : Boolean default false;
+}
+
 // ============================================
 // CONFIGURATION
 // ============================================
@@ -523,4 +593,49 @@ entity WorkflowInstances : cuid, managed {
     errorMessage          : LargeString;
 
     triggeredBy           : String(100);
+}
+
+// ============================================
+// JOULE AI ENTITIES
+// ============================================
+
+/**
+ * Joule AI Conversations
+ */
+entity JouleConversations : cuid, managed {
+    sessionId             : String(100) not null;
+    userId                : String(100);
+    context               : String(50);  // candidate-search, job-matching, analytics
+    isActive              : Boolean default true;
+    messages              : Composition of many JouleMessages on messages.conversation = $self;
+}
+
+/**
+ * Joule AI Messages
+ */
+entity JouleMessages : cuid, managed {
+    conversation          : Association to JouleConversations not null;
+    role                  : String(20) not null;  // user, assistant
+    content               : LargeString not null;
+    actionType            : String(50);
+    @Core.MediaType: 'application/json'
+    actionPayload         : LargeString;
+    @Core.MediaType: 'application/json'
+    actionResult          : LargeString;
+}
+
+/**
+ * Joule AI Insights
+ */
+entity JouleInsights : cuid, managed {
+    entityType            : String(50) not null;  // candidate, job, match
+    entityId              : UUID not null;
+    insightType           : String(50) not null;
+    priority              : String(20) default 'medium';
+    message               : LargeString not null;
+    @Core.MediaType: 'application/json'
+    details               : LargeString;
+    isAcknowledged        : Boolean default false;
+    acknowledgedAt        : Timestamp;
+    acknowledgedBy        : String(100);
 }

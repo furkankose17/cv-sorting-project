@@ -1,5 +1,6 @@
 const cds = require('@sap/cds');
 const { v4: uuidv4 } = require('uuid');
+const { sanitizeString, validateLength } = require('./lib/validators');
 
 /**
  * Candidate Management Service Implementation
@@ -18,6 +19,8 @@ module.exports = class CandidateService extends cds.ApplicationService {
         this.on('addSkill', this.handleAddSkill);
         this.on('autoLinkSkills', this.handleAutoLinkSkills);
         this.on('verifySkill', this.handleVerifySkill);
+        this.on('markAsDuplicate', this.handleMarkAsDuplicate);
+        this.on('extractSkillsFromText', this.handleExtractSkillsFromText);
 
         // Register function handlers
         this.on('searchCandidates', this.handleSearch);
@@ -380,14 +383,20 @@ module.exports = class CandidateService extends cds.ApplicationService {
             let cqnQuery = SELECT.from(Candidates);
             const conditions = [];
 
-            // Free text search
+            // Free text search with sanitization
             if (query) {
+                // Sanitize query to prevent SQL injection
+                const sanitizedQuery = sanitizeString(query.trim());
+
+                // Validate length (prevent excessively long queries)
+                validateLength(sanitizedQuery, 'Search query', 1, 255);
+
                 conditions.push({
                     or: [
-                        { firstName: { like: `%${query}%` } },
-                        { lastName: { like: `%${query}%` } },
-                        { email: { like: `%${query}%` } },
-                        { headline: { like: `%${query}%` } }
+                        { firstName: { like: `%${sanitizedQuery}%` } },
+                        { lastName: { like: `%${sanitizedQuery}%` } },
+                        { email: { like: `%${sanitizedQuery}%` } },
+                        { headline: { like: `%${sanitizedQuery}%` } }
                     ]
                 });
             }
@@ -400,9 +409,9 @@ module.exports = class CandidateService extends cds.ApplicationService {
                 conditions.push({ totalExperienceYears: { '<=': maxExperience } });
             }
 
-            // Location filter
+            // Location filter (using 'city' field from schema)
             if (locations && locations.length > 0) {
-                conditions.push({ location: { in: locations } });
+                conditions.push({ city: { in: locations } });
             }
 
             // Status filter
@@ -472,10 +481,10 @@ module.exports = class CandidateService extends cds.ApplicationService {
             .columns('status_code', 'count(*) as count')
             .groupBy('status_code');
 
-        // Get location counts
+        // Get location counts (using 'city' field from schema)
         const locationCounts = await SELECT.from(Candidates)
-            .columns('location', 'count(*) as count')
-            .groupBy('location')
+            .columns('city', 'count(*) as count')
+            .groupBy('city')
             .limit(20);
 
         return {
@@ -633,6 +642,216 @@ module.exports = class CandidateService extends cds.ApplicationService {
                 avgMatchScore: 0,
                 topMatchingJobs: '[]'
             };
+        }
+    }
+
+    /**
+     * Mark candidate as duplicate (bound action on Candidates)
+     * Links to a primary candidate and optionally merges data
+     */
+    async handleMarkAsDuplicate(req) {
+        const { primaryCandidateId, mergeStrategy } = req.data;
+        const candidateId = req.params[0]; // Bound action - get candidate ID from path
+        const { Candidates, CandidateNotes, CVDocuments, WorkExperiences, Educations, CandidateSkills } = this.entities;
+
+        try {
+            // Validate primary candidate exists
+            const primaryCandidate = await SELECT.one.from(Candidates).where({ ID: primaryCandidateId });
+            if (!primaryCandidate) {
+                req.error(404, `Primary candidate ${primaryCandidateId} not found`);
+                return false;
+            }
+
+            // Validate this candidate exists and is not the primary
+            const duplicateCandidate = await SELECT.one.from(Candidates).where({ ID: candidateId });
+            if (!duplicateCandidate) {
+                req.error(404, `Candidate ${candidateId} not found`);
+                return false;
+            }
+
+            if (candidateId === primaryCandidateId) {
+                req.error(400, 'Cannot mark a candidate as duplicate of itself');
+                return false;
+            }
+
+            // If merge strategy is provided, merge data to primary
+            if (mergeStrategy === 'merge-all' || mergeStrategy === 'merge-documents') {
+                // Move documents
+                await UPDATE(CVDocuments).where({ candidate_ID: candidateId }).set({
+                    candidate_ID: primaryCandidateId
+                });
+            }
+
+            if (mergeStrategy === 'merge-all') {
+                // Move experiences
+                await UPDATE(WorkExperiences).where({ candidate_ID: candidateId }).set({
+                    candidate_ID: primaryCandidateId
+                });
+
+                // Move education
+                await UPDATE(Educations).where({ candidate_ID: candidateId }).set({
+                    candidate_ID: primaryCandidateId
+                });
+
+                // Move skills (avoid duplicates)
+                const dupSkills = await SELECT.from(CandidateSkills).where({ candidate_ID: candidateId });
+                const primarySkills = await SELECT.from(CandidateSkills).where({ candidate_ID: primaryCandidateId });
+                const primarySkillIds = new Set(primarySkills.map(s => s.skill_ID));
+
+                for (const skill of dupSkills) {
+                    if (!primarySkillIds.has(skill.skill_ID)) {
+                        await UPDATE(CandidateSkills).where({ ID: skill.ID }).set({
+                            candidate_ID: primaryCandidateId
+                        });
+                    } else {
+                        // Delete duplicate skill entry
+                        await DELETE.from(CandidateSkills).where({ ID: skill.ID });
+                    }
+                }
+            }
+
+            // Mark this candidate as duplicate
+            await UPDATE(Candidates).where({ ID: candidateId }).set({
+                status_code: 'duplicate'
+            });
+
+            // Add note to both candidates
+            await INSERT.into(CandidateNotes).entries({
+                ID: uuidv4(),
+                candidate_ID: candidateId,
+                noteText: `Marked as duplicate of candidate ${primaryCandidateId}. Strategy: ${mergeStrategy || 'none'}`,
+                noteType: 'system'
+            });
+
+            await INSERT.into(CandidateNotes).entries({
+                ID: uuidv4(),
+                candidate_ID: primaryCandidateId,
+                noteText: `Candidate ${candidateId} marked as duplicate of this record`,
+                noteType: 'system'
+            });
+
+            // Emit event
+            await this.emit('CandidateMarkedAsDuplicate', {
+                duplicateId: candidateId,
+                primaryId: primaryCandidateId,
+                mergeStrategy: mergeStrategy || 'none',
+                mergedBy: req.user?.id || 'system',
+                timestamp: new Date()
+            });
+
+            return true;
+
+        } catch (error) {
+            console.error('Mark as duplicate error:', error);
+            req.error(500, error.message);
+            return false;
+        }
+    }
+
+    /**
+     * Extract skills from text using NLP and link to candidate
+     * Returns extracted skills with confidence scores
+     */
+    async handleExtractSkillsFromText(req) {
+        const { candidateId, sourceText } = req.data;
+        const { Candidates, CandidateSkills, Skills } = this.entities;
+
+        try {
+            // Validate candidate exists
+            const candidate = await SELECT.one.from(Candidates).where({ ID: candidateId });
+            if (!candidate) {
+                req.error(404, `Candidate ${candidateId} not found`);
+                return { extractedSkills: [], linkedCount: 0 };
+            }
+
+            if (!sourceText || sourceText.trim().length === 0) {
+                req.error(400, 'Source text is required');
+                return { extractedSkills: [], linkedCount: 0 };
+            }
+
+            // Get all skills from catalog
+            const allSkills = await SELECT.from(Skills).columns('ID', 'name', 'normalizedName', 'aliases');
+
+            // Extract skills from text (using basic pattern matching - would use ML in production)
+            const textLower = sourceText.toLowerCase();
+            const extractedSkills = [];
+            const foundSkillIds = new Set();
+
+            for (const skill of allSkills) {
+                // Check main name and normalized name
+                const namesToCheck = [
+                    skill.name.toLowerCase(),
+                    skill.normalizedName?.toLowerCase()
+                ].filter(Boolean);
+
+                // Add aliases
+                if (skill.aliases && Array.isArray(skill.aliases)) {
+                    namesToCheck.push(...skill.aliases.map(a => a.toLowerCase()));
+                }
+
+                for (const name of namesToCheck) {
+                    if (name && textLower.includes(name) && !foundSkillIds.has(skill.ID)) {
+                        // Calculate confidence based on how the skill appears
+                        let confidence = 0.7; // Base confidence
+
+                        // Higher confidence for exact word matches
+                        const wordBoundaryRegex = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+                        if (wordBoundaryRegex.test(sourceText)) {
+                            confidence = 0.9;
+                        }
+
+                        extractedSkills.push({
+                            skillId: skill.ID,
+                            skillName: skill.name,
+                            confidence: confidence
+                        });
+                        foundSkillIds.add(skill.ID);
+                        break;
+                    }
+                }
+            }
+
+            // Get existing skills for the candidate
+            const existingSkills = await SELECT.from(CandidateSkills)
+                .where({ candidate_ID: candidateId });
+            const existingSkillIds = new Set(existingSkills.map(s => s.skill_ID));
+
+            // Link new skills to candidate
+            let linkedCount = 0;
+            for (const extracted of extractedSkills) {
+                if (!existingSkillIds.has(extracted.skillId)) {
+                    await INSERT.into(CandidateSkills).entries({
+                        ID: uuidv4(),
+                        candidate_ID: candidateId,
+                        skill_ID: extracted.skillId,
+                        source: 'extracted',
+                        isVerified: false,
+                        confidenceScore: extracted.confidence * 100 // Store as percentage
+                    });
+                    linkedCount++;
+                }
+            }
+
+            // Emit event
+            if (linkedCount > 0) {
+                await this.emit('CandidateSkillsExtracted', {
+                    candidateId,
+                    extractedCount: extractedSkills.length,
+                    linkedCount,
+                    extractedBy: req.user?.id || 'system',
+                    timestamp: new Date()
+                });
+            }
+
+            return {
+                extractedSkills,
+                linkedCount
+            };
+
+        } catch (error) {
+            console.error('Extract skills error:', error);
+            req.error(500, error.message);
+            return { extractedSkills: [], linkedCount: 0 };
         }
     }
 };

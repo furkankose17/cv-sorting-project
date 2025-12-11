@@ -1,53 +1,53 @@
 /**
- * Service Definitions
- * Following SAP CAP Best Practices
+ * CV Sorting Application - Consolidated Service Definitions
+ *
+ * Architecture: 3 Services
+ * 1. CandidateService - Candidates, CVs, Documents, Skills
+ * 2. JobService - Jobs, Matching, Analytics, Notifications, Admin
+ * 3. AIService - Joule AI, ML Integration, Embeddings, OCR
  *
  * @see https://cap.cloud.sap/docs/guides/providing-services
  */
 using { cv.sorting as db } from '../db/schema';
+using { cuid, managed } from '@sap/cds/common';
 
 // ============================================
 // CANDIDATE SERVICE
 // ============================================
+// Handles: Candidates, CVs, Documents, Skills, Interviews
+// Merged from: CandidateService, CVProcessingService, CVService
 
-/**
- * Candidate Management Service
- * Provides CRUD operations for candidates and related entities
- */
 @path: '/api/candidates'
-@requires: 'authenticated-user'
 service CandidateService {
 
     // ----------------------------------------
-    // ENTITY EXPOSURES
+    // MAIN ENTITIES
     // ----------------------------------------
 
     @odata.draft.enabled
     entity Candidates as projection on db.Candidates
         actions {
-            // Status management
             @cds.odata.bindingparameter.name: '_it'
             action updateStatus(
-                newStatus: String not null @assert.range enum { screening; interviewing; shortlisted; offered; hired; rejected; withdrawn },
+                newStatus: String not null,
                 notes: String,
-                notifyCandidate: Boolean default false
+                notifyCandidate: Boolean
             ) returns Candidates;
 
-            // Skill management
             action addSkill(
                 skillId: UUID not null,
-                proficiencyLevel: String @assert.range enum { beginner; intermediate; advanced; expert },
+                proficiencyLevel: String,
                 yearsOfExperience: Decimal(4,1)
             ) returns CandidateSkills;
 
-            // Duplicate handling
             action markAsDuplicate(
                 primaryCandidateId: UUID not null,
-                mergeStrategy: String default 'keep-primary'
+                mergeStrategy: String
             ) returns Boolean;
         };
 
-    // Nested compositions accessible through Candidates
+    // Nested compositions
+    @cds.redirection.target
     entity CVDocuments as projection on db.CVDocuments;
     entity WorkExperiences as projection on db.WorkExperiences;
     entity Educations as projection on db.Educations;
@@ -56,19 +56,67 @@ service CandidateService {
     entity Certifications as projection on db.Certifications;
     entity CandidateNotes as projection on db.CandidateNotes;
 
+    entity Interviews as projection on db.Interviews
+        actions {
+            @cds.odata.bindingparameter.name: '_it'
+            action confirm() returns Interviews;
+
+            @cds.odata.bindingparameter.name: '_it'
+            action complete(
+                overallRating: Integer,
+                feedback: String,
+                recommendation: String
+            ) returns Interviews;
+
+            @cds.odata.bindingparameter.name: '_it'
+            action cancel(reason: String) returns Interviews;
+
+            @cds.odata.bindingparameter.name: '_it'
+            action reschedule(
+                newDateTime: DateTime not null,
+                reason: String
+            ) returns Interviews;
+
+            @cds.odata.bindingparameter.name: '_it'
+            action recordNoShow() returns Interviews;
+
+            @cds.odata.bindingparameter.name: '_it'
+            action submitFeedback(
+                overallRating: Integer,
+                technicalRating: Integer,
+                communicationRating: Integer,
+                cultureFitRating: Integer,
+                feedback: String,
+                strengths: String,
+                areasOfImprovement: String,
+                recommendation: String,
+                nextSteps: String
+            ) returns Interviews;
+        };
+
+    // Document views
+    @readonly
+    entity Documents as projection on db.CVDocuments {
+        *,
+        candidate.firstName,
+        candidate.lastName,
+        candidate.email
+    } excluding { fileContent };
+
+    entity DocumentUploads as projection on db.CVDocuments;
+
     // Value helps
     @readonly entity CandidateStatuses as projection on db.CandidateStatuses;
     @readonly entity DegreeLevels as projection on db.DegreeLevels;
     @readonly entity Skills as projection on db.Skills;
     @readonly entity SkillCategories as projection on db.SkillCategories;
+    @readonly entity InterviewTypes as projection on db.InterviewTypes;
+    @readonly entity InterviewStatuses as projection on db.InterviewStatuses;
 
     // ----------------------------------------
     // FUNCTIONS (Read operations)
     // ----------------------------------------
 
-    /**
-     * Search candidates with advanced filters
-     */
     function searchCandidates(
         query: String,
         skills: array of UUID,
@@ -76,28 +124,22 @@ service CandidateService {
         maxExperience: Decimal(4,1),
         locations: array of String,
         statuses: array of String,
-        sortBy: String default 'modifiedAt',
-        sortOrder: String default 'desc' @assert.range enum { asc; desc },
-        top: Integer default 50 @assert.range: [1, 500],
-        skip: Integer default 0
+        sortBy: String,
+        sortOrder: String,
+        top: Integer,
+        skip: Integer
     ) returns many Candidates;
 
-    /**
-     * Find similar candidates based on profile
-     */
     function findSimilarCandidates(
         candidateId: UUID not null,
         similarityFactors: array of String,
-        limit: Integer default 10 @assert.range: [1, 50]
+        limit: Integer
     ) returns many {
-        candidate: Candidates;
+        candidateId: UUID;
         similarityScore: Decimal(5,2);
-        matchingFactors: array of String;
+        matchingFactors: String;
     };
 
-    /**
-     * Get candidate timeline/activity history
-     */
     function getCandidateTimeline(
         candidateId: UUID not null
     ) returns many {
@@ -105,16 +147,49 @@ service CandidateService {
         eventType: String;
         description: String;
         userId: String;
-        details: String; // JSON
+        details: String;
+    };
+
+    function getCandidateStats(
+        candidateId: UUID not null
+    ) returns {
+        applicationsCount: Integer;
+        matchesCount: Integer;
+        avgMatchScore: Decimal(5,2);
+        topMatchingJobs: String;
+    };
+
+    function getProcessingStatus(documentId: UUID) returns {
+        status: String;
+        progress: Integer;
+        currentStep: String;
+        estimatedTime: Integer;
+    };
+
+    function getExtractedData(documentId: UUID) returns {
+        personalInfo: String;
+        workExperience: String;
+        education: String;
+        skills: String;
+        certifications: String;
+        languages: String;
+        rawText: String;
+        confidence: Decimal;
+    };
+
+    function previewExtraction(
+        fileContent: LargeBinary not null,
+        mediaType: String not null
+    ) returns {
+        extractedData: String;
+        confidence: Decimal(5,2);
+        warnings: array of String;
     };
 
     // ----------------------------------------
     // ACTIONS (Write operations)
     // ----------------------------------------
 
-    /**
-     * Bulk update candidate status
-     */
     action bulkUpdateStatus(
         candidateIds: array of UUID not null,
         newStatus: String not null,
@@ -125,22 +200,16 @@ service CandidateService {
         errors: array of { candidateId: UUID; error: String };
     };
 
-    /**
-     * Merge duplicate candidates
-     */
     action mergeCandidates(
         primaryId: UUID not null,
         duplicateIds: array of UUID not null,
-        mergeStrategy: String default 'merge-all' @assert.range enum { keep_primary; merge_all; select_best }
+        mergeStrategy: String
     ) returns {
         success: Boolean;
         mergedCandidateId: UUID;
         mergedRecordsCount: Integer;
     };
 
-    /**
-     * Auto-extract skills from text
-     */
     action extractSkillsFromText(
         candidateId: UUID not null,
         sourceText: String not null
@@ -148,116 +217,7 @@ service CandidateService {
         extractedSkills: array of { skillId: UUID; skillName: String; confidence: Decimal(5,2) };
         linkedCount: Integer;
     };
-}
 
-// ============================================
-// JOB SERVICE
-// ============================================
-
-/**
- * Job Posting Management Service
- */
-@path: '/api/jobs'
-@requires: 'authenticated-user'
-service JobService {
-
-    @odata.draft.enabled
-    entity JobPostings as projection on db.JobPostings
-        actions {
-            // Publishing workflow
-            action publish() returns JobPostings;
-            action close() returns JobPostings;
-            action reopen() returns JobPostings;
-
-            // Matching
-            @cds.odata.bindingparameter.name: '_it'
-            action findMatchingCandidates(
-                minScore: Decimal(5,2) default 30,
-                limit: Integer default 100
-            ) returns {
-                matchCount: Integer;
-                topMatches: many MatchResults;
-            };
-        };
-
-    entity JobRequiredSkills as projection on db.JobRequiredSkills;
-    entity MatchResults as projection on db.MatchResults
-        actions {
-            action review(
-                status: String not null @assert.range enum { reviewed; shortlisted; rejected },
-                notes: String
-            ) returns MatchResults;
-        };
-
-    // Value helps
-    @readonly entity Skills as projection on db.Skills;
-    @readonly entity DegreeLevels as projection on db.DegreeLevels;
-
-    // ----------------------------------------
-    // FUNCTIONS
-    // ----------------------------------------
-
-    /**
-     * Get job posting statistics
-     */
-    function getJobStatistics(
-        jobPostingId: UUID not null
-    ) returns {
-        totalApplications: Integer;
-        avgMatchScore: Decimal(5,2);
-        scoreDistribution: String; // JSON
-        topSkillGaps: array of { skillName: String; gapPercentage: Decimal(5,2) };
-    };
-
-    /**
-     * Compare candidates for a job
-     */
-    function compareCandidates(
-        jobPostingId: UUID not null,
-        candidateIds: array of UUID not null
-    ) returns {
-        comparison: String; // JSON matrix
-        recommendation: String;
-    };
-}
-
-// ============================================
-// CV PROCESSING SERVICE
-// ============================================
-
-/**
- * CV Upload and Processing Service
- */
-@path: '/api/cv'
-@requires: 'authenticated-user'
-service CVProcessingService {
-
-    entity Documents as projection on db.CVDocuments excluding { fileContent }
-        actions {
-            // Processing actions
-            @cds.odata.bindingparameter.name: '_it'
-            action process(
-                options: String // JSON extraction options
-            ) returns {
-                success: Boolean;
-                confidence: Decimal(5,2);
-                extractedData: String; // JSON
-                processingTime: Integer;
-            };
-
-            action reprocess() returns Documents;
-        };
-
-    // For file uploads with content
-    entity DocumentUploads as projection on db.CVDocuments;
-
-    // ----------------------------------------
-    // ACTIONS
-    // ----------------------------------------
-
-    /**
-     * Upload and process a new CV document
-     */
     action uploadDocument(
         fileName: String not null,
         fileContent: LargeBinary not null,
@@ -269,48 +229,111 @@ service CVProcessingService {
         message: String;
     };
 
-    /**
-     * Create candidate profile from extracted data
-     */
+    action processDocument(
+        documentId: UUID not null,
+        extractionOptions: String
+    ) returns {
+        success: Boolean;
+        extractedData: String;
+        confidence: Decimal;
+        processingTime: Integer;
+    };
+
+    action batchProcessDocuments(
+        documentIds: array of UUID
+    ) returns {
+        processed: Integer;
+        failed: Integer;
+        results: String;
+    };
+
+    action reprocessDocument(
+        documentId: UUID not null,
+        extractionMethod: String,
+        options: String
+    ) returns {
+        success: Boolean;
+        message: String;
+    };
+
     action createCandidateFromDocument(
         documentId: UUID not null,
-        additionalData: String, // JSON
-        autoLinkSkills: Boolean default true
+        additionalData: String,
+        autoLinkSkills: Boolean
     ) returns {
         candidateId: UUID;
         linkedSkillsCount: Integer;
+        linkedLanguagesCount: Integer;
+        linkedCertificationsCount: Integer;
         warnings: array of String;
     };
 
-    /**
-     * Preview extraction without saving
-     */
-    function previewExtraction(
-        fileContent: LargeBinary not null,
-        mediaType: String not null
-    ) returns {
-        extractedData: String; // JSON
-        confidence: Decimal(5,2);
-        warnings: array of String;
-    };
+    // Events
+    event DocumentUploaded {
+        documentId: UUID;
+        fileName: String;
+        uploadedBy: String;
+        timestamp: Timestamp;
+    }
+
+    event DocumentProcessed {
+        documentId: UUID;
+        success: Boolean;
+        candidateId: UUID;
+        confidence: Decimal;
+        timestamp: Timestamp;
+    }
+
+    event ProcessingFailed {
+        documentId: UUID;
+        errorCode: String;
+        errorMessage: String;
+        timestamp: Timestamp;
+    }
 }
 
 // ============================================
-// MATCHING SERVICE
+// JOB SERVICE
 // ============================================
+// Handles: Jobs, Matching, Analytics, Notifications, Admin
+// Merged from: JobService, MatchingService, AnalyticsService, NotificationService, AdminService
 
-/**
- * Candidate-Job Matching Service
- */
-@path: '/api/matching'
-@requires: 'authenticated-user'
-service MatchingService {
+@path: '/api/jobs'
+service JobService {
 
-    @readonly
+    // ----------------------------------------
+    // JOB ENTITIES
+    // ----------------------------------------
+
+    @odata.draft.enabled
+    @cds.redirection.target
+    entity JobPostings as projection on db.JobPostings
+        actions {
+            action publish() returns JobPostings;
+            action close() returns JobPostings;
+            action reopen() returns JobPostings;
+
+            @cds.odata.bindingparameter.name: '_it'
+            action findMatchingCandidates(
+                minScore: Decimal(5,2),
+                limit: Integer
+            ) returns {
+                matchCount: Integer;
+                topMatches: String;
+            };
+        };
+
+    entity JobRequiredSkills as projection on db.JobRequiredSkills;
+
     entity MatchResults as projection on db.MatchResults {
         *,
         candidate: redirected to CandidateView,
         jobPosting: redirected to JobView
+    } actions {
+        action review(
+            status: String not null,
+            notes: String
+        ) returns MatchResults;
     };
 
     @readonly
@@ -327,34 +350,94 @@ service MatchingService {
     entity SortingConfigurations as projection on db.SortingConfigurations;
     entity SavedFilters as projection on db.SavedFilters;
 
+    // Admin entities
+    @cds.redirection.target
+    entity Skills as projection on db.Skills;
+    entity SkillCategories as projection on db.SkillCategories;
+    entity SkillRelations as projection on db.SkillRelations;
+    entity CandidateStatuses as projection on db.CandidateStatuses;
+    @cds.redirection.target
+    entity DegreeLevels as projection on db.DegreeLevels;
+
+    @readonly entity AuditLogs as projection on db.AuditLogs;
+    @readonly entity WorkflowInstances as projection on db.WorkflowInstances;
+
+    // Notification entities (in-memory)
+    @cds.persistence.skip
+    entity NotificationThresholds {
+        key id: UUID;
+        jobPostingId: UUID;
+        minScoreThreshold: Decimal default 70.0;
+        minCandidatesCount: Integer default 5;
+        notifyEmail: String;
+        isActive: Boolean default true;
+        lastNotifiedAt: Timestamp;
+        createdAt: Timestamp;
+        updatedAt: Timestamp;
+    }
+
+    @cds.persistence.skip
+    entity NotificationHistory {
+        key id: UUID;
+        jobPostingId: UUID;
+        notificationType: String enum { threshold_reached; new_match; candidate_update; system_alert; };
+        recipientEmail: String;
+        subject: String;
+        matchCount: Integer;
+        topScore: Decimal;
+        payload: LargeString;
+        sentAt: Timestamp;
+        deliveryStatus: String enum { pending; sent; failed };
+        errorMessage: String;
+    }
+
+    // Value helps
+    @readonly entity SkillsValueHelp as projection on db.Skills;
+    @readonly entity DegreeLevelsValueHelp as projection on db.DegreeLevels;
+
     // ----------------------------------------
-    // MATCHING ACTIONS
+    // JOB FUNCTIONS
     // ----------------------------------------
 
-    /**
-     * Calculate match score for candidate-job pair
-     */
+    function getJobStatistics(
+        jobPostingId: UUID not null
+    ) returns {
+        totalApplications: Integer;
+        avgMatchScore: Decimal(5,2);
+        scoreDistribution: String;
+        topSkillGaps: array of { skillName: String; gapPercentage: Decimal(5,2) };
+    };
+
+    function compareCandidates(
+        jobPostingId: UUID not null,
+        candidateIds: array of UUID not null
+    ) returns {
+        comparison: String;
+        recommendation: String;
+    };
+
+    // ----------------------------------------
+    // MATCHING FUNCTIONS & ACTIONS
+    // ----------------------------------------
+
     action calculateMatch(
         candidateId: UUID not null,
         jobPostingId: UUID not null,
-        includeBreakdown: Boolean default true
+        includeBreakdown: Boolean
     ) returns {
         overallScore: Decimal(5,2);
         skillScore: Decimal(5,2);
         experienceScore: Decimal(5,2);
         educationScore: Decimal(5,2);
         locationScore: Decimal(5,2);
-        breakdown: String; // JSON
+        breakdown: String;
         recommendations: array of String;
     };
 
-    /**
-     * Batch calculate matches for a job
-     */
     action batchMatch(
         jobPostingId: UUID not null,
         candidateIds: array of UUID,
-        minScore: Decimal(5,2) default 0
+        minScore: Decimal(5,2)
     ) returns {
         totalProcessed: Integer;
         matchesCreated: Integer;
@@ -362,18 +445,12 @@ service MatchingService {
         processingTime: Integer;
     };
 
-    /**
-     * Rank candidates for a job
-     */
     action rankCandidates(
         jobPostingId: UUID not null,
         sortingConfigId: UUID,
-        topN: Integer default 50
+        topN: Integer
     ) returns many MatchResults;
 
-    /**
-     * Sort candidates with custom weights
-     */
     action sortCandidates(
         candidateIds: array of UUID not null,
         weights: {
@@ -389,44 +466,31 @@ service MatchingService {
         breakdown: String;
     };
 
-    /**
-     * Filter candidates with criteria
-     */
     action filterCandidates(
         criteria: {
             skills: array of UUID;
-            skillMatchType: String; // all, any
+            skillMatchType: String;
             minExperience: Decimal(4,1);
             maxExperience: Decimal(4,1);
             locations: array of String;
             statuses: array of String;
             minScore: Decimal(5,2);
         },
-        includeScores: Boolean default false
+        includeScores: Boolean
     ) returns many {
         candidateId: UUID;
         matchScore: Decimal(5,2);
     };
 
-    // ----------------------------------------
-    // ANALYSIS FUNCTIONS
-    // ----------------------------------------
-
-    /**
-     * Get match distribution analytics
-     */
     function getMatchDistribution(
         jobPostingId: UUID not null
     ) returns {
         totalMatches: Integer;
         avgScore: Decimal(5,2);
         medianScore: Decimal(5,2);
-        distribution: String; // JSON buckets
+        distribution: String;
     };
 
-    /**
-     * Skill gap analysis for a job
-     */
     function analyzeSkillGaps(
         jobPostingId: UUID not null
     ) returns {
@@ -440,45 +504,155 @@ service MatchingService {
         recommendations: array of String;
     };
 
-    /**
-     * Explain match score
-     */
     function explainMatch(
         matchResultId: UUID not null
     ) returns {
         explanation: String;
-        factors: String; // JSON
+        factors: String;
         improvementTips: array of String;
     };
-}
 
-// ============================================
-// ADMIN SERVICE
-// ============================================
+    // ----------------------------------------
+    // ANALYTICS FUNCTIONS
+    // ----------------------------------------
 
-/**
- * Administrative Service
- */
-@path: '/api/admin'
-@requires: 'CVAdmin'
-service AdminService {
+    function getPipelineOverview(
+        fromDate: Date,
+        toDate: Date
+    ) returns {
+        totalCandidates: Integer;
+        byStatus: array of { status: String; count: Integer };
+        bySource: array of { source: String; count: Integer };
+        avgTimeToHire: Decimal(6,2);
+        conversionRates: String;
+    };
 
-    entity Skills as projection on db.Skills;
-    entity SkillCategories as projection on db.SkillCategories;
-    entity SkillRelations as projection on db.SkillRelations;
-    entity CandidateStatuses as projection on db.CandidateStatuses;
-    entity DegreeLevels as projection on db.DegreeLevels;
+    function getInterviewAnalytics(
+        fromDate: Date,
+        toDate: Date
+    ) returns {
+        totalScheduled: Integer;
+        completed: Integer;
+        cancelled: Integer;
+        noShow: Integer;
+        avgOverallRating: Decimal(3,2);
+        avgTechnicalRating: Decimal(3,2);
+        avgCommunicationRating: Decimal(3,2);
+        avgCultureFitRating: Decimal(3,2);
+        ratingsByType: array of { type: String; avgRating: Decimal(3,2); count: Integer };
+        upcomingCount: Integer;
+        completionRate: Decimal(5,2);
+    };
 
-    @readonly entity AuditLogs as projection on db.AuditLogs;
-    @readonly entity WorkflowInstances as projection on db.WorkflowInstances;
+    function getUpcomingInterviews(
+        days: Integer,
+        limit: Integer
+    ) returns array of {
+        interviewId: UUID;
+        candidateName: String;
+        candidateId: UUID;
+        jobTitle: String;
+        interviewType: String;
+        scheduledAt: DateTime;
+        interviewer: String;
+        status: String;
+    };
+
+    function getSkillAnalytics(
+        topN: Integer
+    ) returns {
+        topSkills: array of { skillName: String; candidateCount: Integer; demandCount: Integer };
+        emergingSkills: array of { skillName: String; growthRate: Decimal(5,2) };
+        skillGaps: array of { skillName: String; supplyDemandRatio: Decimal(5,2) };
+    };
+
+    function getRecruiterMetrics(
+        recruiterId: String,
+        fromDate: Date,
+        toDate: Date
+    ) returns {
+        candidatesProcessed: Integer;
+        averageTimeInStage: String;
+        hireRate: Decimal(5,2);
+        qualityScore: Decimal(5,2);
+    };
+
+    function getTrends(
+        metric: String not null,
+        period: String,
+        fromDate: Date,
+        toDate: Date
+    ) returns many {
+        periodStart: Date;
+        value: Decimal(12,2);
+        change: Decimal(5,2);
+    };
+
+    // ----------------------------------------
+    // NOTIFICATION ACTIONS & FUNCTIONS
+    // ----------------------------------------
+
+    action setThreshold(
+        jobPostingId: UUID,
+        minScoreThreshold: Decimal,
+        minCandidatesCount: Integer,
+        notifyEmail: String,
+        isActive: Boolean
+    ) returns NotificationThresholds;
+
+    function getThreshold(jobPostingId: UUID) returns NotificationThresholds;
+
+    action deleteThreshold(jobPostingId: UUID) returns { deleted: Boolean };
+
+    action checkAndNotify(
+        jobPostingId: UUID,
+        matchCount: Integer,
+        topCandidates: LargeString
+    ) returns {
+        shouldNotify: Boolean;
+        notificationSent: Boolean;
+        reason: String;
+    };
+
+    action triggerNotification(
+        jobPostingId: UUID,
+        notificationType: String,
+        customMessage: String
+    ) returns {
+        sent: Boolean;
+        notificationId: UUID;
+    };
+
+    function getNotificationHistory(
+        jobPostingId: UUID,
+        limit: Integer
+    ) returns array of NotificationHistory;
+
+    function getLastNotificationTime(jobPostingId: UUID) returns {
+        sentAt: Timestamp;
+        type: String;
+    };
+
+    action recordNotification(
+        jobPostingId: UUID,
+        notificationType: String,
+        matchCount: Integer,
+        sentAt: Timestamp
+    ) returns { recorded: Boolean };
+
+    function getActiveThresholds() returns array of NotificationThresholds;
+
+    action batchCheckThresholds() returns array of {
+        jobPostingId: UUID;
+        shouldNotify: Boolean;
+        matchCount: Integer;
+        threshold: Integer;
+    };
 
     // ----------------------------------------
     // ADMIN ACTIONS
     // ----------------------------------------
 
-    /**
-     * Import skills from external source
-     */
     action importSkills(
         skills: array of { name: String; category: String; aliases: array of String }
     ) returns {
@@ -487,9 +661,6 @@ service AdminService {
         errors: array of String;
     };
 
-    /**
-     * Recalculate all match scores
-     */
     action recalculateAllMatches(
         jobPostingId: UUID
     ) returns {
@@ -497,21 +668,15 @@ service AdminService {
         duration: Integer;
     };
 
-    /**
-     * Clean up old/orphaned data
-     */
     action cleanupData(
-        olderThanDays: Integer default 365,
-        dryRun: Boolean default true
+        olderThanDays: Integer,
+        dryRun: Boolean
     ) returns {
         candidatesArchived: Integer;
         documentsDeleted: Integer;
         auditLogsDeleted: Integer;
     };
 
-    /**
-     * System health check
-     */
     function healthCheck() returns {
         status: String;
         database: String;
@@ -522,59 +687,359 @@ service AdminService {
 }
 
 // ============================================
-// ANALYTICS SERVICE (READ-ONLY)
+// AI SERVICE
 // ============================================
+// Handles: Joule AI, ML Integration, Embeddings, OCR, Scoring Criteria
+// Merged from: JouleService, MLIntegrationService
 
-/**
- * Analytics and Reporting Service
- */
-@path: '/api/analytics'
+@path: '/api/ai'
 @requires: 'authenticated-user'
-@readonly
-service AnalyticsService {
+service AIService {
 
-    // Pipeline overview
-    function getPipelineOverview(
-        fromDate: Date,
-        toDate: Date
+    // ----------------------------------------
+    // ENTITIES
+    // ----------------------------------------
+
+    entity Conversations as projection on db.JouleConversations;
+    entity Messages as projection on db.JouleMessages;
+    entity Insights as projection on db.JouleInsights;
+
+    @cds.persistence.skip
+    entity ScoringCriteria {
+        key id: UUID;
+        jobPostingId: UUID;
+        criteriaType: String enum { skill; language; certification; experience; education; custom; };
+        criteriaValue: String;
+        points: Integer;
+        isRequired: Boolean;
+        weight: Decimal;
+        minValue: Integer;
+        perUnitPoints: Decimal;
+        maxPoints: Integer;
+        sortOrder: Integer;
+    };
+
+    // ----------------------------------------
+    // JOULE CONVERSATIONAL AI
+    // ----------------------------------------
+
+    action chat(
+        sessionId: String,
+        message: String,
+        context: String
     ) returns {
-        totalCandidates: Integer;
-        byStatus: array of { status: String; count: Integer };
-        bySource: array of { source: String; count: Integer };
-        avgTimeToHire: Decimal(6,2);
-        conversionRates: String; // JSON
+        response: String;
+        actions: String;
+        results: String;
+        followUpQuestions: array of String;
     };
 
-    // Skill analytics
-    function getSkillAnalytics(
-        topN: Integer default 20
+    action searchWithNaturalLanguage(
+        query: String,
+        sessionId: String
     ) returns {
-        topSkills: array of { skillName: String; candidateCount: Integer; demandCount: Integer };
-        emergingSkills: array of { skillName: String; growthRate: Decimal(5,2) };
-        skillGaps: array of { skillName: String; supplyDemandRatio: Decimal(5,2) };
+        candidates: String;
+        totalCount: Integer;
+        interpretation: String;
+        refinementSuggestions: array of String;
     };
 
-    // Recruiter performance
-    function getRecruiterMetrics(
-        recruiterId: String,
-        fromDate: Date,
-        toDate: Date
+    action applyNaturalLanguageFilter(
+        query: String,
+        currentResultIds: array of UUID,
+        sessionId: String
     ) returns {
-        candidatesProcessed: Integer;
-        averageTimeInStage: String; // JSON by stage
-        hireRate: Decimal(5,2);
-        qualityScore: Decimal(5,2);
+        filteredCandidates: String;
+        appliedFilter: String;
+        removedCount: Integer;
     };
 
-    // Time-based trends
-    function getTrends(
-        metric: String not null @assert.range enum { applications; hires; time_to_hire; match_scores },
-        period: String default 'monthly' @assert.range enum { daily; weekly; monthly },
-        fromDate: Date,
-        toDate: Date
-    ) returns many {
-        periodStart: Date;
-        value: Decimal(12,2);
-        change: Decimal(5,2);
+    action applyNaturalLanguageSort(
+        query: String,
+        candidateIds: array of UUID,
+        jobPostingId: UUID,
+        sessionId: String
+    ) returns {
+        sortedCandidates: String;
+        sortingLogic: String;
     };
+
+    action generateCandidateSummary(
+        candidateId: UUID,
+        style: String,
+        forJobId: UUID
+    ) returns {
+        summary: String;
+        keyStrengths: array of String;
+        potentialConcerns: array of String;
+        fitAssessment: String;
+    };
+
+    action analyzeJobFit(
+        candidateId: UUID,
+        jobPostingId: UUID
+    ) returns {
+        fitScore: Decimal;
+        analysis: String;
+        strengths: String;
+        gaps: String;
+        recommendations: String;
+    };
+
+    action generateInterviewQuestions(
+        candidateId: UUID,
+        jobPostingId: UUID,
+        focusAreas: array of String,
+        questionCount: Integer
+    ) returns {
+        questions: String;
+        rationale: String;
+    };
+
+    action analyzePool(
+        jobPostingId: UUID
+    ) returns {
+        poolSize: Integer;
+        qualityAssessment: String;
+        skillCoverage: String;
+        recommendations: String;
+        marketInsights: String;
+    };
+
+    action compareWithInsights(
+        candidateIds: array of UUID,
+        jobPostingId: UUID
+    ) returns {
+        comparison: String;
+        recommendation: String;
+        tradeoffs: String;
+    };
+
+    action getProactiveInsights(
+        candidateId: UUID
+    ) returns {
+        insights: String;
+        suggestedActions: String;
+    };
+
+    action getJobInsights(
+        jobPostingId: UUID
+    ) returns {
+        insights: String;
+        marketAnalysis: String;
+        suggestedChanges: String;
+    };
+
+    action detectIssues(
+        entityType: String,
+        entityId: UUID
+    ) returns {
+        issues: String;
+        severity: String;
+        resolutions: String;
+    };
+
+    action provideFeedback(
+        messageId: UUID,
+        rating: Integer,
+        feedbackText: String,
+        wasHelpful: Boolean
+    ) returns {
+        success: Boolean;
+        message: String;
+    };
+
+    action learnFromDecision(
+        candidateId: UUID,
+        jobPostingId: UUID,
+        decision: String,
+        decisionFactors: String
+    ) returns {
+        acknowledged: Boolean;
+        modelImpact: String;
+    };
+
+    function quickStat(query: String) returns {
+        answer: String;
+        value: String;
+        context: String;
+    };
+
+    function getConversationHistory(
+        sessionId: String,
+        limit: Integer
+    ) returns {
+        messages: String;
+    };
+
+    function getSuggestedQueries(
+        context: String,
+        currentEntityType: String,
+        currentEntityId: UUID
+    ) returns {
+        suggestions: array of String;
+    };
+
+    // ----------------------------------------
+    // ML INTEGRATION (Embeddings, OCR, Scoring)
+    // ----------------------------------------
+
+    action generateCandidateEmbedding(
+        candidateId: UUID
+    ) returns {
+        candidateId: UUID;
+        embeddingDimension: Integer;
+        stored: Boolean;
+        contentHash: String;
+    };
+
+    action generateJobEmbedding(
+        jobPostingId: UUID
+    ) returns {
+        jobPostingId: UUID;
+        embeddingDimension: Integer;
+        stored: Boolean;
+        contentHash: String;
+    };
+
+    action bulkGenerateEmbeddings(
+        entityType: String,
+        entityIds: array of UUID
+    ) returns {
+        processed: Integer;
+        failed: Integer;
+        errors: array of { entityId: UUID; error: String; };
+    };
+
+    action findSemanticMatches(
+        jobPostingId: UUID,
+        minScore: Decimal,
+        limit: Integer,
+        includeBreakdown: Boolean,
+        excludeDisqualified: Boolean
+    ) returns array of {
+        candidateId: UUID;
+        jobPostingId: UUID;
+        cosineSimilarity: Decimal;
+        criteriaScore: Decimal;
+        criteriaMaxScore: Decimal;
+        combinedScore: Decimal;
+        rank: Integer;
+        scoreBreakdown: LargeString;
+        matchedCriteria: LargeString;
+        missingCriteria: LargeString;
+        disqualified: Boolean;
+    };
+
+    action calculateSingleMatch(
+        candidateId: UUID,
+        jobPostingId: UUID
+    ) returns {
+        candidateId: UUID;
+        jobPostingId: UUID;
+        cosineSimilarity: Decimal;
+        criteriaScore: Decimal;
+        combinedScore: Decimal;
+        scoreBreakdown: LargeString;
+    };
+
+    action semanticSearch(
+        query: String,
+        limit: Integer,
+        minSimilarity: Decimal
+    ) returns array of {
+        candidateId: UUID;
+        similarity: Decimal;
+    };
+
+    action processDocumentOCR(
+        documentId: UUID,
+        language: String
+    ) returns {
+        documentId: UUID;
+        text: LargeString;
+        confidence: Decimal;
+        pages: Integer;
+        structuredData: LargeString;
+    };
+
+    function getScoringCriteria(
+        jobPostingId: UUID
+    ) returns array of ScoringCriteria;
+
+    action setScoringCriteria(
+        jobPostingId: UUID,
+        criteria: array of {
+            criteriaType: String;
+            criteriaValue: String;
+            points: Integer;
+            isRequired: Boolean;
+            weight: Decimal;
+            minValue: Integer;
+            perUnitPoints: Decimal;
+            maxPoints: Integer;
+            sortOrder: Integer;
+        },
+        replaceExisting: Boolean
+    ) returns {
+        success: Boolean;
+        criteriaCount: Integer;
+    };
+
+    action addCriterion(
+        jobPostingId: UUID,
+        criteriaType: String,
+        criteriaValue: String,
+        points: Integer,
+        isRequired: Boolean,
+        weight: Decimal
+    ) returns ScoringCriteria;
+
+    action deleteCriterion(
+        jobPostingId: UUID,
+        criterionId: UUID
+    ) returns { deleted: Boolean };
+
+    action calculateCriteriaScore(
+        jobPostingId: UUID,
+        candidateData: LargeString
+    ) returns {
+        totalPoints: Integer;
+        maxPoints: Integer;
+        percentage: Decimal;
+        matchedCriteria: LargeString;
+        missingCriteria: LargeString;
+        disqualified: Boolean;
+        disqualificationReason: String;
+    };
+
+    function getCriteriaTemplates() returns LargeString;
+
+    function getMLServiceHealth() returns {
+        status: String;
+        embeddingModel: {
+            name: String;
+            dimension: Integer;
+            loaded: Boolean;
+        };
+        database: Boolean;
+        ocr: Boolean;
+    };
+
+    // Events
+    event JouleQueryProcessed {
+        sessionId: String;
+        queryType: String;
+        processingTime: Integer;
+        resultCount: Integer;
+        timestamp: Timestamp;
+    }
+
+    event InsightGenerated {
+        entityType: String;
+        entityId: UUID;
+        insightType: String;
+        confidence: Decimal;
+        timestamp: Timestamp;
+    }
 }

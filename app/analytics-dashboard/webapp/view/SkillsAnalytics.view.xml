@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mvc:View
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:f="sap.f"
+    xmlns:core="sap.ui.core"
+    controllerName="cv.sorting.analytics.controller.SkillsAnalytics">
+
+    <f:DynamicPage id="skillsPage" busy="{skills>/isLoading}">
+        <f:title>
+            <f:DynamicPageTitle id="skillsPageTitle">
+                <f:heading>
+                    <Title id="skillsTitle" text="{i18n>skillsAnalyticsTitle}" />
+                </f:heading>
+                <f:snappedContent>
+                    <ObjectNumber
+                        id="skillsSummarySnapped"
+                        number="{skills>/summary/totalSkillsTracked}"
+                        unit="skills tracked" />
+                </f:snappedContent>
+                <f:actions>
+                    <Button id="btnRefreshSkills" icon="sap-icon://refresh" press="onRefresh" tooltip="{i18n>btnRefresh}" />
+                </f:actions>
+                <f:navigationActions>
+                    <Button id="btnBackSkills" icon="sap-icon://nav-back" press="onNavBack" tooltip="{i18n>btnBack}" />
+                </f:navigationActions>
+            </f:DynamicPageTitle>
+        </f:title>
+        <f:header>
+            <f:DynamicPageHeader id="skillsPageHeader" pinnable="true">
+                <f:content>
+                    <HBox id="skillsSummaryBox" justifyContent="SpaceAround" width="100%">
+                        <VBox id="totalSkillsBox" alignItems="Center" class="sapUiSmallMargin">
+                            <ObjectNumber id="totalSkillsNum" number="{skills>/summary/totalSkillsTracked}" emphasized="true" />
+                            <Label id="totalSkillsLabel" text="{i18n>skillsTracked}" />
+                        </VBox>
+                        <VBox id="skillGapsBox" alignItems="Center" class="sapUiSmallMargin">
+                            <ObjectNumber id="skillGapsNum" number="{skills>/summary/skillsInDemand}" state="Warning" />
+                            <Label id="skillGapsLabel" text="{i18n>skillGaps}" />
+                        </VBox>
+                        <VBox id="emergingBox" alignItems="Center" class="sapUiSmallMargin">
+                            <ObjectNumber id="emergingNum" number="{skills>/summary/emergingCount}" state="Success" />
+                            <Label id="emergingLabel" text="{i18n>emergingSkills}" />
+                        </VBox>
+                    </HBox>
+                </f:content>
+            </f:DynamicPageHeader>
+        </f:header>
+        <f:content>
+            <IconTabBar id="skillsTabBar" select="onViewSelect" class="sapUiResponsiveContentPadding">
+                <items>
+                    <IconTabFilter id="topSkillsTab" key="topSkills" text="{i18n>topSkills}" icon="sap-icon://bar-chart">
+                        <Table id="topSkillsTable" items="{skills>/topSkills}" growing="true" growingThreshold="10">
+                            <headerToolbar>
+                                <OverflowToolbar id="topSkillsToolbar">
+                                    <Title id="topSkillsTableTitle" text="{i18n>topSkillsBySupply}" />
+                                </OverflowToolbar>
+                            </headerToolbar>
+                            <columns>
+                                <Column id="colRank" width="4rem"><Text id="colRankText" text="#" /></Column>
+                                <Column id="colSkillName"><Text id="colSkillNameText" text="{i18n>skillName}" /></Column>
+                                <Column id="colCandidates" hAlign="End"><Text id="colCandidatesText" text="{i18n>candidates}" /></Column>
+                                <Column id="colDemand" hAlign="End"><Text id="colDemandText" text="{i18n>demand}" /></Column>
+                                <Column id="colRatio" hAlign="End"><Text id="colRatioText" text="{i18n>supplyDemandRatio}" /></Column>
+                            </columns>
+                            <items>
+                                <ColumnListItem id="skillListItem">
+                                    <cells>
+                                        <ObjectNumber id="cellRank" number="{skills>rank}" />
+                                        <Text id="cellSkillName" text="{skills>skillName}" />
+                                        <ObjectNumber id="cellCandidates" number="{skills>candidateCount}" />
+                                        <ObjectNumber id="cellDemand" number="{skills>demandCount}" />
+                                        <ObjectStatus id="cellRatio" text="{skills>supplyDemandRatio}" state="{skills>ratioState}" />
+                                    </cells>
+                                </ColumnListItem>
+                            </items>
+                        </Table>
+                    </IconTabFilter>
+                    <IconTabFilter id="skillGapsTab" key="skillGaps" text="{i18n>skillGaps}" icon="sap-icon://alert" iconColor="Critical">
+                        <List id="skillGapsList" items="{skills>/skillGaps}" noDataText="{i18n>noSkillGaps}">
+                            <headerToolbar>
+                                <OverflowToolbar id="skillGapsToolbar">
+                                    <Title id="skillGapsTableTitle" text="{i18n>skillsInHighDemand}" />
+                                </OverflowToolbar>
+                            </headerToolbar>
+                            <items>
+                                <StandardListItem
+                                    id="skillGapItem"
+                                    title="{skills>skillName}"
+                                    description="Supply/Demand: {skills>supplyDemandRatio}"
+                                    info="{skills>gapSeverity}"
+                                    infoState="{skills>gapState}"
+                                    icon="sap-icon://trend-down" />
+                            </items>
+                        </List>
+                    </IconTabFilter>
+                    <IconTabFilter id="emergingTab" key="emerging" text="{i18n>emergingSkills}" icon="sap-icon://trend-up" iconColor="Positive">
+                        <List id="emergingSkillsList" items="{skills>/emergingSkills}" noDataText="{i18n>noEmergingSkills}">
+                            <headerToolbar>
+                                <OverflowToolbar id="emergingToolbar">
+                                    <Title id="emergingTableTitle" text="{i18n>fastestGrowingSkills}" />
+                                </OverflowToolbar>
+                            </headerToolbar>
+                            <items>
+                                <StandardListItem
+                                    id="emergingItem"
+                                    title="{skills>skillName}"
+                                    description="Growth: {skills>growthRate}"
+                                    info="{skills>trend}"
+                                    infoState="Success"
+                                    icon="sap-icon://trend-up" />
+                            </items>
+                        </List>
+                    </IconTabFilter>
+                </items>
+            </IconTabBar>
+        </f:content>
+    </f:DynamicPage>
+</mvc:View>

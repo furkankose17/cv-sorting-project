@@ -1,0 +1,26 @@
+ID;candidate_ID;jobPosting_ID;overallScore;skillScore;experienceScore;educationScore;locationScore;rank;reviewStatus;aiRecommendation
+h1b2c3d4-e5f6-7890-abcd-ef1234567801;a1b2c3d4-e5f6-7890-abcd-ef1234567801;f1b2c3d4-e5f6-7890-abcd-ef1234567801;92;95;88;90;95;1;approved;Excellent match. Strong JavaScript and React expertise. 8 years experience exceeds requirements.
+h1b2c3d4-e5f6-7890-abcd-ef1234567802;a1b2c3d4-e5f6-7890-abcd-ef1234567803;f1b2c3d4-e5f6-7890-abcd-ef1234567801;78;72;85;88;80;3;pending;Good experience but skills lean more toward backend/cloud. Consider for architecture role instead.
+h1b2c3d4-e5f6-7890-abcd-ef1234567803;a1b2c3d4-e5f6-7890-abcd-ef1234567804;f1b2c3d4-e5f6-7890-abcd-ef1234567801;75;80;65;82;70;4;pending;Strong frontend skills with React. Less experience than preferred but shows potential.
+h1b2c3d4-e5f6-7890-abcd-ef1234567804;a1b2c3d4-e5f6-7890-abcd-ef1234567807;f1b2c3d4-e5f6-7890-abcd-ef1234567801;68;65;70;75;90;5;rejected;Backend focused. Missing required frontend experience with React.
+h1b2c3d4-e5f6-7890-abcd-ef1234567805;a1b2c3d4-e5f6-7890-abcd-ef1234567802;f1b2c3d4-e5f6-7890-abcd-ef1234567802;95;98;90;92;100;1;approved;Perfect match for SAP BTP role. Expert in CAP, Fiori, and S/4HANA. Highly recommended.
+h1b2c3d4-e5f6-7890-abcd-ef1234567806;a1b2c3d4-e5f6-7890-abcd-ef1234567801;f1b2c3d4-e5f6-7890-abcd-ef1234567802;72;70;80;85;75;3;pending;Has SAP CAP experience. Could transition to BTP role with training.
+h1b2c3d4-e5f6-7890-abcd-ef1234567807;a1b2c3d4-e5f6-7890-abcd-ef1234567810;f1b2c3d4-e5f6-7890-abcd-ef1234567802;65;60;65;78;80;4;pending;SuccessFactors experience but lacks BTP technical skills.
+h1b2c3d4-e5f6-7890-abcd-ef1234567808;a1b2c3d4-e5f6-7890-abcd-ef1234567803;f1b2c3d4-e5f6-7890-abcd-ef1234567803;98;96;100;95;100;1;approved;Exceptional match. 10 years cloud architecture experience. AWS/Azure certified. Top candidate.
+h1b2c3d4-e5f6-7890-abcd-ef1234567809;a1b2c3d4-e5f6-7890-abcd-ef1234567809;f1b2c3d4-e5f6-7890-abcd-ef1234567803;75;78;72;80;100;2;pending;Strong DevOps but needs more architecture experience. Consider for senior DevOps instead.
+h1b2c3d4-e5f6-7890-abcd-ef1234567810;a1b2c3d4-e5f6-7890-abcd-ef1234567801;f1b2c3d4-e5f6-7890-abcd-ef1234567803;70;68;75;80;95;3;pending;Development experience but lacks cloud architecture focus.
+h1b2c3d4-e5f6-7890-abcd-ef1234567811;a1b2c3d4-e5f6-7890-abcd-ef1234567809;f1b2c3d4-e5f6-7890-abcd-ef1234567804;94;96;88;92;100;1;approved;Ideal DevOps candidate. Expert in Kubernetes, Docker, CI/CD. Highly recommended.
+h1b2c3d4-e5f6-7890-abcd-ef1234567812;a1b2c3d4-e5f6-7890-abcd-ef1234567803;f1b2c3d4-e5f6-7890-abcd-ef1234567804;82;85;90;88;75;2;pending;Strong DevOps skills. Overqualified - consider for architect role.
+h1b2c3d4-e5f6-7890-abcd-ef1234567813;a1b2c3d4-e5f6-7890-abcd-ef1234567801;f1b2c3d4-e5f6-7890-abcd-ef1234567804;65;60;75;80;95;4;rejected;Full-stack developer. Limited DevOps experience.
+h1b2c3d4-e5f6-7890-abcd-ef1234567814;a1b2c3d4-e5f6-7890-abcd-ef1234567806;f1b2c3d4-e5f6-7890-abcd-ef1234567805;90;88;95;85;100;1;approved;Excellent PM candidate. PMP certified with SAP project experience.
+h1b2c3d4-e5f6-7890-abcd-ef1234567815;a1b2c3d4-e5f6-7890-abcd-ef1234567802;f1b2c3d4-e5f6-7890-abcd-ef1234567805;72;75;72;78;60;2;pending;SAP technical background could help but needs PM experience.
+h1b2c3d4-e5f6-7890-abcd-ef1234567816;a1b2c3d4-e5f6-7890-abcd-ef1234567010;f1b2c3d4-e5f6-7890-abcd-ef1234567805;68;55;70;75;80;3;pending;Business analyst background. Less PM experience than required.
+h1b2c3d4-e5f6-7890-abcd-ef1234567817;a1b2c3d4-e5f6-7890-abcd-ef1234567802;f1b2c3d4-e5f6-7890-abcd-ef1234567801;58;55;65;80;60;6;rejected;SAP focused. Missing full-stack web development skills.
+h1b2c3d4-e5f6-7890-abcd-ef1234567818;a1b2c3d4-e5f6-7890-abcd-ef1234567005;f1b2c3d4-e5f6-7890-abcd-ef1234567801;62;58;72;85;65;5;rejected;Data engineering focus. Not aligned with full-stack role.
+h1b2c3d4-e5f6-7890-abcd-ef1234567819;a1b2c3d4-e5f6-7890-abcd-ef1234567804;f1b2c3d4-e5f6-7890-abcd-ef1234567802;78;82;60;75;70;2;pending;Strong SAPUI5 skills. Junior but shows potential for BTP development.
+h1b2c3d4-e5f6-7890-abcd-ef1234567820;a1b2c3d4-e5f6-7890-abcd-ef1234567005;f1b2c3d4-e5f6-7890-abcd-ef1234567804;72;68;78;85;65;3;pending;SAP HANA experience. Could adapt to DevOps with training.
+h1b2c3d4-e5f6-7890-abcd-ef1234567821;a1b2c3d4-e5f6-7890-abcd-ef1234567001;f1b2c3d4-e5f6-7890-abcd-ef1234567803;68;70;75;80;95;4;pending;Strong developer but needs more architecture-level experience.
+h1b2c3d4-e5f6-7890-abcd-ef1234567822;a1b2c3d4-e5f6-7890-abcd-ef1234567006;f1b2c3d4-e5f6-7890-abcd-ef1234567804;55;45;75;70;100;5;rejected;PM background. Not technical enough for DevOps role.
+h1b2c3d4-e5f6-7890-abcd-ef1234567823;a1b2c3d4-e5f6-7890-abcd-ef1234567008;f1b2c3d4-e5f6-7890-abcd-ef1234567802;60;65;50;72;55;5;rejected;UX focus. Missing BTP technical development skills.
+h1b2c3d4-e5f6-7890-abcd-ef1234567824;a1b2c3d4-e5f6-7890-abcd-ef1234567007;f1b2c3d4-e5f6-7890-abcd-ef1234567801;72;75;68;75;90;4;pending;Backend skills present but needs more frontend experience.
+h1b2c3d4-e5f6-7890-abcd-ef1234567825;a1b2c3d4-e5f6-7890-abcd-ef1234567005;f1b2c3d4-e5f6-7890-abcd-ef1234567003;68;70;78;85;65;4;pending;Data expertise valuable. Less cloud architecture experience.

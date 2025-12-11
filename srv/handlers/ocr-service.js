@@ -3,6 +3,9 @@
 const cds = require('@sap/cds');
 const { createLogger } = require('../lib/logger');
 const { ValidationError, ProcessingError, ExternalServiceError } = require('../lib/errors');
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
+const Tesseract = require('tesseract.js');
 
 const LOG = createLogger('ocr-service');
 
@@ -224,53 +227,225 @@ class OCRService {
     // PRIVATE EXTRACTION METHODS
     // ============================================
 
+    /**
+     * Extract text from PDF using pdf-parse library
+     * Handles both text-based and scanned PDFs
+     */
     async _extractFromPDF(content) {
-        // In production: use pdf-parse or pdf.js
-        // For now, simulate extraction
-        LOG.debug('Extracting text from PDF');
+        LOG.debug('Extracting text from PDF using pdf-parse');
 
-        // Simulate PDF text extraction
-        const text = content.toString('utf-8').replace(/[^\x20-\x7E\n\r\t]/g, ' ');
+        try {
+            const options = {
+                max: 0, // Parse all pages
+                version: 'default'
+            };
 
-        return {
-            text: text.trim() || '[PDF content - requires pdf-parse library]',
-            pages: 1,
-            confidence: 0.85
-        };
+            const data = await pdfParse(content, options);
+
+            const extractedText = data.text.trim();
+            const pageCount = data.numpages || 1;
+
+            // If no text was extracted, PDF might be scanned (image-based)
+            if (!extractedText || extractedText.length < 50) {
+                LOG.warn('PDF appears to be scanned or has minimal text. OCR may be needed.');
+
+                return {
+                    text: extractedText || '[PDF contains no extractable text - may require OCR]',
+                    pages: pageCount,
+                    confidence: 0.5,
+                    isScanned: true,
+                    metadata: {
+                        info: data.info,
+                        version: data.version
+                    }
+                };
+            }
+
+            LOG.info('PDF text extraction successful', {
+                pages: pageCount,
+                textLength: extractedText.length
+            });
+
+            return {
+                text: extractedText,
+                pages: pageCount,
+                confidence: 0.95, // High confidence for text-based PDFs
+                isScanned: false,
+                metadata: {
+                    info: data.info,
+                    version: data.version,
+                    title: data.info?.Title,
+                    author: data.info?.Author,
+                    creationDate: data.info?.CreationDate
+                }
+            };
+
+        } catch (error) {
+            LOG.error('PDF extraction failed', error);
+
+            // Try fallback: basic text extraction
+            try {
+                const fallbackText = content.toString('utf-8')
+                    .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
+                    .trim();
+
+                if (fallbackText.length > 50) {
+                    LOG.warn('Using fallback text extraction for PDF');
+                    return {
+                        text: fallbackText,
+                        pages: 1,
+                        confidence: 0.6,
+                        usedFallback: true
+                    };
+                }
+            } catch (fallbackError) {
+                LOG.error('Fallback extraction also failed', fallbackError);
+            }
+
+            throw new ProcessingError(
+                `Failed to extract text from PDF: ${error.message}`,
+                'PDF_EXTRACTION_FAILED'
+            );
+        }
     }
 
+    /**
+     * Extract text from image using Tesseract.js OCR
+     * Supports PNG, JPG, TIFF formats
+     */
     async _extractFromImage(content) {
-        // In production: use Tesseract.js
-        LOG.debug('Extracting text from image using OCR');
+        LOG.debug('Extracting text from image using Tesseract.js OCR');
 
-        // Simulate OCR extraction
-        return {
-            text: '[Image content - requires tesseract.js library]',
-            pages: 1,
-            confidence: 0.75
-        };
+        try {
+            const startTime = Date.now();
+
+            // Create Tesseract worker
+            const worker = await Tesseract.createWorker('eng', 1, {
+                logger: (m) => {
+                    if (m.status === 'recognizing text') {
+                        LOG.debug(`OCR progress: ${Math.round(m.progress * 100)}%`);
+                    }
+                }
+            });
+
+            // Perform OCR
+            const { data } = await worker.recognize(content);
+
+            await worker.terminate();
+
+            const processingTime = Date.now() - startTime;
+            const extractedText = data.text.trim();
+
+            LOG.info('Image OCR completed', {
+                textLength: extractedText.length,
+                confidence: data.confidence,
+                processingTime: `${processingTime}ms`
+            });
+
+            return {
+                text: extractedText,
+                pages: 1,
+                confidence: data.confidence / 100, // Convert 0-100 to 0-1
+                metadata: {
+                    processingTime,
+                    words: data.words?.length || 0,
+                    lines: data.lines?.length || 0
+                }
+            };
+
+        } catch (error) {
+            LOG.error('Image OCR failed', error);
+
+            throw new ProcessingError(
+                `Failed to perform OCR on image: ${error.message}`,
+                'IMAGE_OCR_FAILED'
+            );
+        }
     }
 
+    /**
+     * Extract text from DOCX using mammoth library
+     * Converts Word document to plain text
+     */
     async _extractFromDOCX(content) {
-        // In production: use mammoth or docx library
-        LOG.debug('Extracting text from DOCX');
+        LOG.debug('Extracting text from DOCX using mammoth');
 
-        return {
-            text: '[DOCX content - requires mammoth library]',
-            pages: 1,
-            confidence: 0.95
-        };
+        try {
+            const result = await mammoth.extractRawText({ buffer: content });
+
+            const extractedText = result.value.trim();
+
+            if (result.messages && result.messages.length > 0) {
+                LOG.debug('DOCX extraction messages', { messages: result.messages });
+            }
+
+            LOG.info('DOCX text extraction successful', {
+                textLength: extractedText.length,
+                messageCount: result.messages?.length || 0
+            });
+
+            return {
+                text: extractedText,
+                pages: 1, // DOCX doesn't have distinct pages in extracted text
+                confidence: 0.98, // High confidence for DOCX
+                metadata: {
+                    messages: result.messages,
+                    hasWarnings: result.messages?.some(m => m.type === 'warning')
+                }
+            };
+
+        } catch (error) {
+            LOG.error('DOCX extraction failed', error);
+
+            throw new ProcessingError(
+                `Failed to extract text from DOCX: ${error.message}`,
+                'DOCX_EXTRACTION_FAILED'
+            );
+        }
     }
 
+    /**
+     * Extract text from legacy DOC format
+     * Note: This format is complex and may require additional libraries
+     * Recommend users convert to DOCX for better results
+     */
     async _extractFromDOC(content) {
-        // In production: use word-extractor
-        LOG.debug('Extracting text from DOC');
+        LOG.warn('Legacy DOC format detected. Recommend converting to DOCX for better results.');
 
-        return {
-            text: '[DOC content - requires word-extractor library]',
-            pages: 1,
-            confidence: 0.90
-        };
+        // Note: The word-extractor library could be added for DOC support
+        // For now, we'll attempt basic extraction or recommend conversion
+
+        try {
+            // Attempt basic text extraction (may not work well for complex DOC files)
+            const text = content.toString('utf-8')
+                .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            if (text.length > 100) {
+                LOG.info('Basic DOC extraction successful', { textLength: text.length });
+                return {
+                    text,
+                    pages: 1,
+                    confidence: 0.5, // Low confidence due to basic extraction
+                    warning: 'Legacy DOC format. For better results, please convert to DOCX.'
+                };
+            }
+
+            // If basic extraction failed, return helpful message
+            throw new ProcessingError(
+                'Legacy DOC format requires conversion to DOCX. Please save your document as .docx format for optimal text extraction.',
+                'DOC_FORMAT_NOT_SUPPORTED'
+            );
+
+        } catch (error) {
+            LOG.error('DOC extraction failed', error);
+
+            throw new ProcessingError(
+                'Failed to extract text from DOC file. Please convert to DOCX format and try again.',
+                'DOC_EXTRACTION_FAILED'
+            );
+        }
     }
 
     async _extractFromText(content) {
@@ -443,56 +618,303 @@ class OCRService {
         return Array.from(skills);
     }
 
+    /**
+     * Language code mapping for common languages
+     */
+    static LANGUAGE_CODES = {
+        'english': { code: 'en', name: 'English' },
+        'german': { code: 'de', name: 'German' },
+        'french': { code: 'fr', name: 'French' },
+        'spanish': { code: 'es', name: 'Spanish' },
+        'chinese': { code: 'zh', name: 'Chinese (Mandarin)' },
+        'mandarin': { code: 'zh', name: 'Chinese (Mandarin)' },
+        'cantonese': { code: 'yue', name: 'Chinese (Cantonese)' },
+        'japanese': { code: 'ja', name: 'Japanese' },
+        'korean': { code: 'ko', name: 'Korean' },
+        'arabic': { code: 'ar', name: 'Arabic' },
+        'portuguese': { code: 'pt', name: 'Portuguese' },
+        'italian': { code: 'it', name: 'Italian' },
+        'russian': { code: 'ru', name: 'Russian' },
+        'dutch': { code: 'nl', name: 'Dutch' },
+        'turkish': { code: 'tr', name: 'Turkish' },
+        'hindi': { code: 'hi', name: 'Hindi' },
+        'polish': { code: 'pl', name: 'Polish' },
+        'swedish': { code: 'sv', name: 'Swedish' },
+        'danish': { code: 'da', name: 'Danish' },
+        'norwegian': { code: 'no', name: 'Norwegian' },
+        'finnish': { code: 'fi', name: 'Finnish' },
+        'greek': { code: 'el', name: 'Greek' },
+        'hebrew': { code: 'he', name: 'Hebrew' },
+        'thai': { code: 'th', name: 'Thai' },
+        'vietnamese': { code: 'vi', name: 'Vietnamese' },
+        'indonesian': { code: 'id', name: 'Indonesian' },
+        'malay': { code: 'ms', name: 'Malay' },
+        'catalan': { code: 'ca', name: 'Catalan' },
+        'czech': { code: 'cs', name: 'Czech' },
+        'hungarian': { code: 'hu', name: 'Hungarian' },
+        'romanian': { code: 'ro', name: 'Romanian' },
+        'ukrainian': { code: 'uk', name: 'Ukrainian' }
+    };
+
+    /**
+     * Proficiency level mapping
+     */
+    static PROFICIENCY_MAP = {
+        'native': 'native',
+        'mother tongue': 'native',
+        'native speaker': 'native',
+        'fluent': 'fluent',
+        'c2': 'fluent',
+        'c1': 'fluent',
+        'advanced': 'professional',
+        'b2': 'professional',
+        'professional': 'professional',
+        'proficient': 'professional',
+        'intermediate': 'professional',
+        'b1': 'professional',
+        'basic': 'basic',
+        'a2': 'basic',
+        'a1': 'basic',
+        'beginner': 'basic',
+        'elementary': 'basic'
+    };
+
     _extractLanguages(text) {
         const languages = [];
         const languageSection = this._extractSection(text, 'languages');
+        const textToSearch = languageSection || text;
 
-        if (!languageSection) return languages;
+        // Enhanced patterns for language extraction
+        const languageNames = Object.keys(OCRService.LANGUAGE_CODES).join('|');
+        const proficiencyTerms = 'native|mother\\s*tongue|fluent|advanced|intermediate|basic|beginner|professional|proficient|c1|c2|b1|b2|a1|a2';
 
-        // Common language pattern
-        const langPattern = /\b(English|German|French|Spanish|Chinese|Mandarin|Japanese|Korean|Arabic|Portuguese|Italian|Russian|Dutch|Turkish|Hindi|Polish)\b\s*[-–:]?\s*(Native|Fluent|Advanced|Intermediate|Basic|C1|C2|B1|B2|A1|A2)?/gi;
+        // Pattern 1: Language with proficiency after (e.g., "English - Native", "German: Fluent")
+        const pattern1 = new RegExp(
+            `\\b(${languageNames})\\b\\s*[-–:,]?\\s*(${proficiencyTerms})?`,
+            'gi'
+        );
 
-        let match;
-        while ((match = langPattern.exec(languageSection)) !== null) {
-            languages.push({
-                language: match[1],
-                level: match[2] || 'Not specified'
-            });
+        // Pattern 2: Proficiency before language (e.g., "Native English", "Fluent in German")
+        const pattern2 = new RegExp(
+            `\\b(${proficiencyTerms})\\s+(?:in\\s+)?(${languageNames})\\b`,
+            'gi'
+        );
+
+        // Pattern 3: Parenthetical (e.g., "English (Native)", "German (C1)")
+        const pattern3 = new RegExp(
+            `\\b(${languageNames})\\s*\\(\\s*(${proficiencyTerms})\\s*\\)`,
+            'gi'
+        );
+
+        const foundLanguages = new Map();
+
+        // Extract with all patterns
+        const patterns = [
+            { regex: pattern1, langGroup: 1, profGroup: 2 },
+            { regex: pattern2, langGroup: 2, profGroup: 1 },
+            { regex: pattern3, langGroup: 1, profGroup: 2 }
+        ];
+
+        for (const { regex, langGroup, profGroup } of patterns) {
+            let match;
+            while ((match = regex.exec(textToSearch)) !== null) {
+                const langKey = match[langGroup].toLowerCase();
+                const proficiencyRaw = match[profGroup]?.toLowerCase();
+
+                if (OCRService.LANGUAGE_CODES[langKey] && !foundLanguages.has(langKey)) {
+                    const langInfo = OCRService.LANGUAGE_CODES[langKey];
+                    const proficiency = OCRService.PROFICIENCY_MAP[proficiencyRaw] || 'professional';
+
+                    foundLanguages.set(langKey, {
+                        languageCode: langInfo.code,
+                        languageName: langInfo.name,
+                        proficiency: proficiency,
+                        isNative: proficiency === 'native'
+                    });
+                }
+            }
         }
 
-        return languages;
+        return Array.from(foundLanguages.values());
     }
+
+    /**
+     * Certification issuer mapping for common certifications
+     */
+    static CERTIFICATION_ISSUERS = {
+        'aws': 'Amazon Web Services',
+        'amazon': 'Amazon Web Services',
+        'azure': 'Microsoft',
+        'microsoft': 'Microsoft',
+        'google': 'Google Cloud',
+        'gcp': 'Google Cloud',
+        'sap': 'SAP',
+        'pmp': 'Project Management Institute',
+        'prince2': 'AXELOS',
+        'scrum': 'Scrum Alliance',
+        'itil': 'AXELOS',
+        'cissp': 'ISC2',
+        'cism': 'ISACA',
+        'ceh': 'EC-Council',
+        'comptia': 'CompTIA',
+        'security+': 'CompTIA',
+        'network+': 'CompTIA',
+        'kubernetes': 'Cloud Native Computing Foundation',
+        'cka': 'Cloud Native Computing Foundation',
+        'ckad': 'Cloud Native Computing Foundation',
+        'cks': 'Cloud Native Computing Foundation',
+        'terraform': 'HashiCorp',
+        'hashicorp': 'HashiCorp',
+        'red hat': 'Red Hat',
+        'rhcsa': 'Red Hat',
+        'rhce': 'Red Hat',
+        'oracle': 'Oracle',
+        'cisco': 'Cisco',
+        'ccna': 'Cisco',
+        'ccnp': 'Cisco'
+    };
 
     _extractCertifications(text) {
         const certifications = [];
         const certSection = this._extractSection(text, 'certifications');
+        const textToSearch = certSection || text;
 
-        if (!certSection) return certifications;
-
-        // Common certification patterns
+        // Enhanced certification patterns with capturing groups for details
         const certPatterns = [
-            /(?:AWS|Amazon).+?(?:Certified|Certificate)/gi,
-            /(?:Azure|Microsoft).+?(?:Certified|Certificate)/gi,
-            /(?:Google|GCP).+?(?:Certified|Certificate)/gi,
-            /SAP.+?(?:Certified|Certificate)/gi,
-            /PMP|PRINCE2|Scrum Master|ITIL/gi,
-            /CISSP|CISM|CEH|Security\+/gi
+            // AWS Certifications
+            {
+                pattern: /(?:AWS|Amazon)\s+(?:Certified)?\s*(Solutions?\s*Architect|Developer|SysOps|DevOps|Machine Learning|Data Analytics|Database|Security|Cloud Practitioner)[\s-]*(Associate|Professional|Specialty)?/gi,
+                issuer: 'Amazon Web Services'
+            },
+            // Microsoft/Azure Certifications
+            {
+                pattern: /(?:Microsoft|Azure)\s+(?:Certified)?:?\s*(Azure?\s*(?:Administrator|Developer|Solutions?\s*Architect|DevOps|Security|Data|AI)(?:\s*(?:Associate|Expert))?|[\w\s]+)/gi,
+                issuer: 'Microsoft'
+            },
+            // Google Cloud Certifications
+            {
+                pattern: /(?:Google\s*Cloud|GCP)\s+(?:Certified)?\s*(Professional\s*(?:Cloud\s*)?(?:Architect|Developer|Data Engineer|DevOps Engineer|Network Engineer|Security Engineer)|Associate\s*Cloud\s*Engineer|Cloud\s*Digital\s*Leader)/gi,
+                issuer: 'Google Cloud'
+            },
+            // SAP Certifications
+            {
+                pattern: /SAP\s+(?:Certified)?\s*(Development|Application|Technology|Integration)?\s*(?:Associate|Specialist|Professional)?\s*[-–:]?\s*(SAP\s*(?:BTP|S\/4HANA|SuccessFactors|Fiori|HANA|Cloud Platform|Integration Suite|CAP|ABAP)[\w\s]*)/gi,
+                issuer: 'SAP'
+            },
+            // Project Management
+            {
+                pattern: /\b(PMP|Project\s*Management\s*Professional|PRINCE2(?:\s*Foundation|\s*Practitioner)?|CAPM|PMI-ACP)\b/gi,
+                issuer: 'Project Management Institute'
+            },
+            // Agile/Scrum
+            {
+                pattern: /\b(Certified\s*Scrum\s*Master|CSM|CSPO|Certified\s*Scrum\s*Product\s*Owner|SAFe\s*Agilist|Professional\s*Scrum\s*Master|PSM)\b/gi,
+                issuer: 'Scrum Alliance'
+            },
+            // Kubernetes
+            {
+                pattern: /\b(Certified\s*Kubernetes\s*(?:Administrator|Application\s*Developer|Security\s*Specialist)|CKA|CKAD|CKS)\b/gi,
+                issuer: 'Cloud Native Computing Foundation'
+            },
+            // Security Certifications
+            {
+                pattern: /\b(CISSP|CISM|CISA|CEH|CompTIA\s*Security\+|OSCP|GIAC[\w\s]*)\b/gi,
+                issuer: null // Will be determined by keyword
+            },
+            // HashiCorp
+            {
+                pattern: /(?:HashiCorp\s+)?(?:Certified)?:?\s*(Terraform\s*(?:Associate|Professional)?|Vault\s*(?:Associate|Professional)?|Consul\s*(?:Associate)?)/gi,
+                issuer: 'HashiCorp'
+            },
+            // Red Hat
+            {
+                pattern: /\b(Red\s*Hat\s*Certified\s*(?:System\s*Administrator|Engineer|Architect)|RHCSA|RHCE|RHCA)\b/gi,
+                issuer: 'Red Hat'
+            },
+            // Generic certification pattern with dates
+            {
+                pattern: /(?:Certified|Certificate|Certification)[\s:-]+([A-Z][\w\s&-]+?)(?:\s*[-–]\s*|\s+)(?:issued\s*)?(\d{4}|\w+\s+\d{4})?/gi,
+                issuer: null
+            }
         ];
 
-        certPatterns.forEach(pattern => {
-            const matches = certSection.match(pattern);
-            if (matches) {
-                matches.forEach(cert => {
-                    certifications.push({
-                        name: cert.trim(),
-                        issuer: null,
-                        date: null
-                    });
-                });
-            }
-        });
+        const foundCerts = new Map();
 
-        return certifications;
+        for (const { pattern, issuer: defaultIssuer } of certPatterns) {
+            let match;
+            while ((match = pattern.exec(textToSearch)) !== null) {
+                const fullMatch = match[0].trim();
+                const certName = this._normalizeCertName(fullMatch);
+
+                if (certName.length > 3 && !foundCerts.has(certName.toLowerCase())) {
+                    // Determine issuer
+                    let issuer = defaultIssuer;
+                    if (!issuer) {
+                        for (const [keyword, issuerName] of Object.entries(OCRService.CERTIFICATION_ISSUERS)) {
+                            if (fullMatch.toLowerCase().includes(keyword)) {
+                                issuer = issuerName;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Extract date if present (pattern: 2023 or January 2023)
+                    const dateMatch = textToSearch.slice(match.index, match.index + 100)
+                        .match(/(?:issued|obtained|earned)?[\s:-]*(\d{4}|\w+\s+\d{4})/i);
+
+                    foundCerts.set(certName.toLowerCase(), {
+                        name: certName,
+                        issuingOrganization: issuer || 'Unknown',
+                        issueDate: dateMatch ? this._parseDate(dateMatch[1]) : null,
+                        expirationDate: null,
+                        credentialId: null,
+                        credentialUrl: null,
+                        isValid: true
+                    });
+                }
+            }
+        }
+
+        return Array.from(foundCerts.values());
+    }
+
+    /**
+     * Normalize certification name
+     */
+    _normalizeCertName(name) {
+        return name
+            .replace(/\s+/g, ' ')
+            .replace(/[-–]\s*$/, '')
+            .replace(/^\s*[-–:]\s*/, '')
+            .trim();
+    }
+
+    /**
+     * Parse date string to ISO format
+     */
+    _parseDate(dateStr) {
+        if (!dateStr) return null;
+
+        // Handle year-only format
+        if (/^\d{4}$/.test(dateStr)) {
+            return `${dateStr}-01-01`;
+        }
+
+        // Handle month year format
+        const monthMatch = dateStr.match(/(\w+)\s+(\d{4})/);
+        if (monthMatch) {
+            const months = {
+                january: '01', february: '02', march: '03', april: '04',
+                may: '05', june: '06', july: '07', august: '08',
+                september: '09', october: '10', november: '11', december: '12',
+                jan: '01', feb: '02', mar: '03', apr: '04', jun: '06',
+                jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+            };
+            const month = months[monthMatch[1].toLowerCase()] || '01';
+            return `${monthMatch[2]}-${month}-01`;
+        }
+
+        return null;
     }
 
     async _enrichSkills(skills) {
@@ -735,9 +1157,64 @@ module.exports = function(srv) {
             }
         }
 
+        // Create language records from extracted languages
+        let linkedLanguagesCount = 0;
+        if (extractedData.languages?.length > 0) {
+            for (const lang of extractedData.languages) {
+                try {
+                    await tx.run(
+                        INSERT.into('cv.sorting.CandidateLanguages').entries({
+                            ID: cds.utils.uuid(),
+                            candidate_ID: candidateId,
+                            languageCode: lang.languageCode,
+                            languageName: lang.languageName,
+                            proficiency: lang.proficiency,
+                            isNative: lang.isNative || false
+                        })
+                    );
+                    linkedLanguagesCount++;
+                } catch (err) {
+                    LOG.warn('Failed to create language record', { lang, error: err.message });
+                    warnings.push(`Failed to add language: ${lang.languageName}`);
+                }
+            }
+            LOG.info('Created language records', { count: linkedLanguagesCount });
+        }
+
+        // Create certification records from extracted certifications
+        let linkedCertificationsCount = 0;
+        if (extractedData.certifications?.length > 0) {
+            for (const cert of extractedData.certifications) {
+                try {
+                    await tx.run(
+                        INSERT.into('cv.sorting.Certifications').entries({
+                            ID: cds.utils.uuid(),
+                            candidate_ID: candidateId,
+                            name: cert.name,
+                            issuingOrganization: cert.issuingOrganization,
+                            issueDate: cert.issueDate,
+                            expirationDate: cert.expirationDate,
+                            credentialId: cert.credentialId,
+                            credentialUrl: cert.credentialUrl,
+                            isValid: cert.isValid !== false,
+                            createdAt: new Date().toISOString(),
+                            createdBy: req.user?.id
+                        })
+                    );
+                    linkedCertificationsCount++;
+                } catch (err) {
+                    LOG.warn('Failed to create certification record', { cert, error: err.message });
+                    warnings.push(`Failed to add certification: ${cert.name}`);
+                }
+            }
+            LOG.info('Created certification records', { count: linkedCertificationsCount });
+        }
+
         return {
             candidateId,
             linkedSkillsCount,
+            linkedLanguagesCount,
+            linkedCertificationsCount,
             warnings
         };
     });

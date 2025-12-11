@@ -39,6 +39,12 @@ modules:
       - name: cv-sorting-auth
       - name: cv-sorting-destination
       - name: cv-sorting-logging
+      - name: ml-service-api
+        group: destinations
+        properties:
+          name: ml-service
+          url: ~{ml-url}
+          forwardAuthToken: false
 
   # ===========================================
   # HANA Database Module
@@ -119,6 +125,50 @@ modules:
         - npm ci
         - npm run build
       supported-platforms: []
+
+  # ===========================================
+  # Python ML Service
+  # ===========================================
+  - name: cv-sorting-ml-service
+    type: python
+    path: python-ml-service
+    parameters:
+      buildpack: python_buildpack
+      memory: 2048M
+      disk-quota: 2048M
+      command: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    build-parameters:
+      builder: custom
+      commands:
+        - pip install --target vendor -r requirements.txt
+    provides:
+      - name: ml-service-api
+        properties:
+          ml-url: ${default-url}
+    requires:
+      - name: cv-sorting-postgresql
+      - name: cv-sorting-logging
+
+  # ===========================================
+  # n8n Automation Service (Optional - can be deployed separately)
+  # ===========================================
+  - name: cv-sorting-n8n
+    type: application
+    path: infrastructure/n8n
+    optional: true
+    parameters:
+      docker:
+        image: n8nio/n8n:latest
+      memory: 1024M
+      disk-quota: 2048M
+    build-parameters:
+      no-source: true
+    provides:
+      - name: n8n-api
+        properties:
+          n8n-url: ${default-url}
+    requires:
+      - name: cv-sorting-postgresql
 
   # ===========================================
   # HTML5 App Deployer
@@ -236,8 +286,21 @@ resources:
                 Authentication: OAuth2ClientCredentials
                 Type: HTTP
                 ProxyType: Internet
+              - Name: ml-service-destination
+                URL: ~{ml-service-api/ml-url}
+                Authentication: NoAuthentication
+                Type: HTTP
+                ProxyType: Internet
+              - Name: n8n-destination
+                URL: ~{n8n-api/n8n-url}
+                Authentication: NoAuthentication
+                Type: HTTP
+                ProxyType: Internet
     requires:
       - name: srv-api
+      - name: ml-service-api
+      - name: n8n-api
+        optional: true
 
   # ===========================================
   # HTML5 Application Repository - Host
@@ -266,3 +329,14 @@ resources:
       service: application-logs
       service-plan: lite
     optional: true
+
+  # ===========================================
+  # PostgreSQL Database (for pgvector embeddings)
+  # ===========================================
+  - name: cv-sorting-postgresql
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: postgresql-db
+      service-plan: standard
+    properties:
+      postgresql-service-name: ${service-name}

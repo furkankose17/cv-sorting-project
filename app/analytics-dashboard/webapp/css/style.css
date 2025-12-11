@@ -1,0 +1,44 @@
+/* Analytics Dashboard Styles */
+
+.sapUiSmallMargin {
+    margin: 0.5rem;
+}
+
+.sapUiMediumMarginBottom {
+    margin-bottom: 1rem;
+}
+
+/* Card Styling */
+.sapFCard {
+    box-shadow: 0 0 0.25rem rgba(0, 0, 0, 0.1);
+}
+
+/* KPI Cards Row */
+.kpiCardContainer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+    .sapFCard {
+        width: 100% !important;
+        margin-right: 0 !important;
+    }
+}
+
+/* Table enhancements */
+.sapMTable .sapMListTblRow {
+    border-bottom: 1px solid #e5e5e5;
+}
+
+/* Progress indicator in tables */
+.sapMPI {
+    height: 1rem;
+}
+
+/* Panel headers */
+.sapMPanelHdr {
+    font-weight: 600;
+}

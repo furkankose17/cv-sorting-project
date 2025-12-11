@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:form="sap.ui.layout.form">
+
+    <Dialog
+        id="addCriterionDialog"
+        title="{i18n>addCriterion}"
+        contentWidth="400px">
+        <form:SimpleForm
+            editable="true"
+            layout="ResponsiveGridLayout"
+            labelSpanL="4"
+            labelSpanM="4"
+            columnsL="1"
+            columnsM="1">
+            <form:content>
+                <Label text="{i18n>criteriaType}"/>
+                <Select
+                    id="criteriaTypeSelect"
+                    selectedKey="{dialog>/criteriaType}"
+                    enabled="false">
+                    <core:Item key="skill" text="{i18n>skill}"/>
+                    <core:Item key="language" text="{i18n>language}"/>
+                    <core:Item key="certification" text="{i18n>certification}"/>
+                    <core:Item key="experience" text="{i18n>experience}"/>
+                    <core:Item key="education" text="{i18n>education}"/>
+                </Select>
+
+                <Label text="{i18n>value}" required="true"/>
+                <Input
+                    id="criteriaValueInput"
+                    value="{dialog>/criteriaValue}"
+                    placeholder="{i18n>enterValue}"/>
+
+                <Label text="{i18n>points}" required="true"/>
+                <Input
+                    id="pointsInput"
+                    value="{dialog>/points}"
+                    type="Number"
+                    placeholder="10"/>
+
+                <Label text="{i18n>weight}"/>
+                <Input
+                    id="weightInput"
+                    value="{dialog>/weight}"
+                    type="Number"
+                    placeholder="1.0"/>
+
+                <Label text="{i18n>required}"/>
+                <Switch
+                    id="requiredSwitch"
+                    state="{dialog>/isRequired}"/>
+            </form:content>
+        </form:SimpleForm>
+
+        <beginButton>
+            <Button
+                text="{i18n>add}"
+                type="Emphasized"
+                press="onAddCriterionConfirm"/>
+        </beginButton>
+        <endButton>
+            <Button
+                text="{i18n>cancel}"
+                press="onAddCriterionCancel"/>
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>

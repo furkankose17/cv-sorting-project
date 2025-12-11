@@ -1,0 +1,26 @@
+ID;candidate_ID;languageCode;languageName;proficiency;isNative
+d1b2c3d4-e5f6-7890-abcd-ef1234567901;a1b2c3d4-e5f6-7890-abcd-ef1234567801;en;English;native;true
+d1b2c3d4-e5f6-7890-abcd-ef1234567902;a1b2c3d4-e5f6-7890-abcd-ef1234567801;es;Spanish;professional;false
+d1b2c3d4-e5f6-7890-abcd-ef1234567903;a1b2c3d4-e5f6-7890-abcd-ef1234567801;fr;French;basic;false
+d1b2c3d4-e5f6-7890-abcd-ef1234567904;a1b2c3d4-e5f6-7890-abcd-ef1234567802;en;English;fluent;false
+d1b2c3d4-e5f6-7890-abcd-ef1234567905;a1b2c3d4-e5f6-7890-abcd-ef1234567802;de;German;professional;false
+d1b2c3d4-e5f6-7890-abcd-ef1234567906;a1b2c3d4-e5f6-7890-abcd-ef1234567802;zh;Chinese (Mandarin);native;true
+d1b2c3d4-e5f6-7890-abcd-ef1234567907;a1b2c3d4-e5f6-7890-abcd-ef1234567803;en;English;native;true
+d1b2c3d4-e5f6-7890-abcd-ef1234567908;a1b2c3d4-e5f6-7890-abcd-ef1234567803;zh;Chinese (Mandarin);fluent;false
+d1b2c3d4-e5f6-7890-abcd-ef1234567909;a1b2c3d4-e5f6-7890-abcd-ef1234567803;ja;Japanese;basic;false
+d1b2c3d4-e5f6-7890-abcd-ef1234567910;a1b2c3d4-e5f6-7890-abcd-ef1234567804;de;German;native;true
+d1b2c3d4-e5f6-7890-abcd-ef1234567911;a1b2c3d4-e5f6-7890-abcd-ef1234567804;en;English;fluent;false
+d1b2c3d4-e5f6-7890-abcd-ef1234567912;a1b2c3d4-e5f6-7890-abcd-ef1234567804;fr;French;professional;false
+d1b2c3d4-e5f6-7890-abcd-ef1234567913;a1b2c3d4-e5f6-7890-abcd-ef1234567805;en;English;native;true
+d1b2c3d4-e5f6-7890-abcd-ef1234567914;a1b2c3d4-e5f6-7890-abcd-ef1234567805;de;German;fluent;false
+d1b2c3d4-e5f6-7890-abcd-ef1234567915;a1b2c3d4-e5f6-7890-abcd-ef1234567806;en;English;native;true
+d1b2c3d4-e5f6-7890-abcd-ef1234567916;a1b2c3d4-e5f6-7890-abcd-ef1234567806;es;Spanish;professional;false
+d1b2c3d4-e5f6-7890-abcd-ef1234567917;a1b2c3d4-e5f6-7890-abcd-ef1234567806;pt;Portuguese;basic;false
+d1b2c3d4-e5f6-7890-abcd-ef1234567918;a1b2c3d4-e5f6-7890-abcd-ef1234567807;en;English;native;true
+d1b2c3d4-e5f6-7890-abcd-ef1234567919;a1b2c3d4-e5f6-7890-abcd-ef1234567807;it;Italian;basic;false
+d1b2c3d4-e5f6-7890-abcd-ef1234567920;a1b2c3d4-e5f6-7890-abcd-ef1234567808;es;Spanish;native;true
+d1b2c3d4-e5f6-7890-abcd-ef1234567921;a1b2c3d4-e5f6-7890-abcd-ef1234567808;en;English;fluent;false
+d1b2c3d4-e5f6-7890-abcd-ef1234567922;a1b2c3d4-e5f6-7890-abcd-ef1234567808;ca;Catalan;professional;false
+d1b2c3d4-e5f6-7890-abcd-ef1234567923;a1b2c3d4-e5f6-7890-abcd-ef1234567809;en;English;native;true
+d1b2c3d4-e5f6-7890-abcd-ef1234567924;a1b2c3d4-e5f6-7890-abcd-ef1234567810;en;English;native;true
+d1b2c3d4-e5f6-7890-abcd-ef1234567925;a1b2c3d4-e5f6-7890-abcd-ef1234567810;ko;Korean;fluent;false

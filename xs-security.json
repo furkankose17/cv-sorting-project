@@ -172,9 +172,14 @@
     "token-validity": 43200,
     "refresh-token-validity": 604800,
     "redirect-uris": [
-      "https://*.cfapps.*.hana.ondemand.com/**",
-      "https://*.hana.ondemand.com/**",
-      "http://localhost:*/**"
+      "https://cv-sorting-project.cfapps.eu10.hana.ondemand.com/**",
+      "https://cv-sorting-project.cfapps.us10.hana.ondemand.com/**",
+      "http://localhost:4200/**",
+      "http://localhost:5000/**"
+    ],
+    "autoapprove": false,
+    "system-attributes": [
+      "rolecollections"
     ]
   }
 }

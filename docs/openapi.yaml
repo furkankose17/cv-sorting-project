@@ -1,0 +1,1048 @@
+openapi: 3.0.3
+info:
+  title: CV Sorting Project API
+  description: |
+    SAP BTP CV Sorting and Candidate Management System
+
+    This API provides comprehensive functionality for managing candidates, CVs, job postings, and intelligent matching.
+
+    ## Features
+    - **CV Processing**: Upload and extract data from PDF, DOCX, and image files using OCR
+    - **Candidate Management**: Full CRUD operations for candidates, skills, and work history
+    - **Job Matching**: Intelligent candidate-job matching with customizable weights
+    - **AI Integration**: SAP Joule AI for candidate insights and recommendations
+    - **Security**: Rate limiting, file validation, and OWASP Top 10 compliance
+
+    ## Authentication
+    - **Development**: Mock authentication with predefined users
+    - **Production**: SAP XSUAA OAuth 2.0
+
+    ## Rate Limits
+    - General API: 100 requests/minute
+    - File uploads: 10 uploads/minute
+    - Exceeding limits returns HTTP 429 with Retry-After header
+
+  version: 1.0.0
+  contact:
+    name: CV Sorting Project Team
+    url: https://github.com/furkankose17/cv-sorting-project
+  license:
+    name: UNLICENSED
+
+servers:
+  - url: https://cv-sorting-project.cfapps.eu10.hana.ondemand.com
+    description: Production (EU10)
+  - url: https://cv-sorting-project.cfapps.us10.hana.ondemand.com
+    description: Production (US10)
+  - url: http://localhost:4004
+    description: Local Development
+
+tags:
+  - name: CV Management
+    description: CV document upload and processing
+  - name: Candidates
+    description: Candidate profile management
+  - name: Job Postings
+    description: Job posting management
+  - name: Matching
+    description: Candidate-job matching and ranking
+  - name: Skills
+    description: Skills catalog and management
+  - name: AI Services
+    description: SAP Joule AI integration
+
+security:
+  - BearerAuth: []
+  - OAuth2: [CVAdmin, Recruiter, HRManager, Viewer]
+
+paths:
+  # ===========================================
+  # CV MANAGEMENT
+  # ===========================================
+
+  /cv/uploadDocument:
+    post:
+      tags:
+        - CV Management
+      summary: Upload a CV document
+      description: |
+        Upload a CV document for processing. Supports PDF, DOCX, PNG, JPG, and TXT formats.
+
+        **File Validation:**
+        - Maximum size: 50MB
+        - Magic byte verification
+        - MIME type validation
+        - Malware detection heuristics
+
+        **Rate Limit:** 10 uploads per minute
+      operationId: uploadDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fileName
+                - fileContent
+                - fileType
+              properties:
+                fileName:
+                  type: string
+                  description: Name of the file
+                  example: john_doe_resume.pdf
+                fileContent:
+                  type: string
+                  format: byte
+                  description: Base64-encoded file content
+                fileType:
+                  type: string
+                  description: MIME type
+                  enum:
+                    - application/pdf
+                    - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+                    - image/png
+                    - image/jpeg
+                    - text/plain
+                  example: application/pdf
+                candidateId:
+                  type: string
+                  format: uuid
+                  description: Optional candidate ID to link document
+      responses:
+        '200':
+          description: Document uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documentId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [uploaded, error]
+                  message:
+                    type: string
+                  fileName:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '413':
+          description: File too large
+        '415':
+          description: Unsupported media type
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /cv/processDocument:
+    post:
+      tags:
+        - CV Management
+      summary: Process uploaded CV document
+      description: |
+        Extract text and structured data from an uploaded CV document.
+
+        **Extraction includes:**
+        - Personal information (name, email, phone, LinkedIn, GitHub)
+        - Work experience
+        - Education history
+        - Skills (with auto-categorization)
+        - Languages
+        - Certifications
+
+        **OCR Technologies:**
+        - PDF: pdf-parse
+        - DOCX: mammoth
+        - Images: Tesseract.js
+      operationId: processDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - documentId
+              properties:
+                documentId:
+                  type: string
+                  format: uuid
+                extractionOptions:
+                  type: string
+                  description: JSON-encoded extraction options
+                  example: '{"enrichSkills": true}'
+      responses:
+        '200':
+          description: Document processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  extractedData:
+                    $ref: '#/components/schemas/ExtractedCVData'
+                  metadata:
+                    type: object
+                    properties:
+                      pageCount:
+                        type: integer
+                      textConfidence:
+                        type: number
+                        format: float
+                      dataConfidence:
+                        type: integer
+                      processingTime:
+                        type: string
+                      mediaType:
+                        type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /cv/previewExtraction:
+    post:
+      tags:
+        - CV Management
+      summary: Preview CV extraction without saving
+      description: Extract and preview CV data without storing in database
+      operationId: previewExtraction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fileContent
+                - mediaType
+              properties:
+                fileContent:
+                  type: string
+                  format: byte
+                mediaType:
+                  type: string
+      responses:
+        '200':
+          description: Preview generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  extractedData:
+                    $ref: '#/components/schemas/ExtractedCVData'
+                  confidence:
+                    type: integer
+                  warnings:
+                    type: array
+                    items:
+                      type: string
+
+  /cv/createCandidateFromDocument:
+    post:
+      tags:
+        - CV Management
+      summary: Create candidate from processed document
+      description: Create a new candidate profile from extracted CV data
+      operationId: createCandidateFromDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - documentId
+              properties:
+                documentId:
+                  type: string
+                  format: uuid
+                additionalData:
+                  type: string
+                  description: JSON-encoded additional candidate data
+                autoLinkSkills:
+                  type: boolean
+                  default: true
+      responses:
+        '200':
+          description: Candidate created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  candidateId:
+                    type: string
+                    format: uuid
+                  linkedSkillsCount:
+                    type: integer
+                  warnings:
+                    type: array
+                    items:
+                      type: string
+
+  # ===========================================
+  # CANDIDATES
+  # ===========================================
+
+  /candidate/Candidates:
+    get:
+      tags:
+        - Candidates
+      summary: List all candidates
+      description: Retrieve list of candidates with optional filtering
+      operationId: listCandidates
+      parameters:
+        - name: $top
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: $skip
+          in: query
+          schema:
+            type: integer
+        - name: $filter
+          in: query
+          description: OData filter expression
+          schema:
+            type: string
+        - name: $orderby
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of candidates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  value:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Candidate'
+
+    post:
+      tags:
+        - Candidates
+      summary: Create a new candidate
+      operationId: createCandidate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CandidateInput'
+      responses:
+        '201':
+          description: Candidate created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Candidate'
+
+  /candidate/Candidates({ID}):
+    parameters:
+      - name: ID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags:
+        - Candidates
+      summary: Get candidate by ID
+      operationId: getCandidate
+      responses:
+        '200':
+          description: Candidate details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Candidate'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Candidates
+      summary: Update candidate
+      operationId: updateCandidate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CandidateInput'
+      responses:
+        '200':
+          description: Candidate updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Candidate'
+
+    delete:
+      tags:
+        - Candidates
+      summary: Delete candidate
+      operationId: deleteCandidate
+      responses:
+        '204':
+          description: Candidate deleted
+
+  /candidate/searchCandidates:
+    post:
+      tags:
+        - Candidates
+      summary: Search candidates
+      description: |
+        Advanced candidate search with filters
+
+        **Security:** Input sanitization to prevent SQL injection
+      operationId: searchCandidates
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                  description: Search query (sanitized)
+                options:
+                  type: string
+                  description: JSON-encoded search options
+                  example: '{"status": "active", "experienceMin": 3}'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  candidates:
+                    type: string
+                    description: JSON-encoded array of candidates
+                  resultCount:
+                    type: integer
+                  facets:
+                    type: string
+
+  # ===========================================
+  # JOB POSTINGS
+  # ===========================================
+
+  /job/JobPostings:
+    get:
+      tags:
+        - Job Postings
+      summary: List job postings
+      operationId: listJobPostings
+      parameters:
+        - name: $top
+          in: query
+          schema:
+            type: integer
+        - name: $filter
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of job postings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  value:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/JobPosting'
+
+    post:
+      tags:
+        - Job Postings
+      summary: Create job posting
+      operationId: createJobPosting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobPostingInput'
+      responses:
+        '201':
+          description: Job posting created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobPosting'
+
+  # ===========================================
+  # MATCHING
+  # ===========================================
+
+  /matching/findMatches:
+    post:
+      tags:
+        - Matching
+      summary: Find matching candidates for a job
+      description: |
+        Find and rank candidates matching a job posting
+
+        **Algorithm:**
+        - Skill matching (weighted)
+        - Experience scoring
+        - Education matching
+        - Location compatibility
+        - Overall weighted score
+      operationId: findMatches
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - jobPostingId
+              properties:
+                jobPostingId:
+                  type: string
+                  format: uuid
+                options:
+                  type: string
+                  description: JSON-encoded matching options
+                  example: '{"minScore": 70, "filters": {"status": "active"}}'
+      responses:
+        '200':
+          description: Matching results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  matchCount:
+                    type: integer
+                  topMatches:
+                    type: string
+                    description: JSON-encoded top matches
+                  processingTime:
+                    type: integer
+                  message:
+                    type: string
+
+  /matching/calculateMatchScore:
+    post:
+      tags:
+        - Matching
+      summary: Calculate match score for candidate-job pair
+      description: Calculate detailed match score between a specific candidate and job
+      operationId: calculateMatchScore
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - candidateId
+                - jobPostingId
+              properties:
+                candidateId:
+                  type: string
+                  format: uuid
+                jobPostingId:
+                  type: string
+                  format: uuid
+                detailedBreakdown:
+                  type: boolean
+                  default: false
+      responses:
+        '200':
+          description: Match score
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchScore'
+
+  /matching/sortCandidates:
+    post:
+      tags:
+        - Matching
+      summary: Sort candidates by custom criteria
+      operationId: sortCandidates
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                candidateIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                sortingConfigId:
+                  type: string
+                  format: uuid
+                customWeights:
+                  type: string
+                  description: JSON-encoded weights
+                filters:
+                  type: string
+      responses:
+        '200':
+          description: Sorted candidates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sortedCandidates:
+                    type: string
+                  appliedWeights:
+                    type: string
+
+  # ===========================================
+  # AI SERVICES
+  # ===========================================
+
+  /joule/analyzeCandidate:
+    post:
+      tags:
+        - AI Services
+      summary: AI-powered candidate analysis
+      description: Get AI insights about a candidate using SAP Joule
+      operationId: analyzeCandidate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - candidateId
+              properties:
+                candidateId:
+                  type: string
+                  format: uuid
+                analysisType:
+                  type: string
+                  enum: [comprehensive, skills, experience, summary]
+                  default: comprehensive
+      responses:
+        '200':
+          description: AI analysis results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  insights:
+                    type: string
+                  recommendations:
+                    type: string
+                  strengths:
+                    type: string
+                  areasForImprovement:
+                    type: string
+
+# ===========================================
+# COMPONENTS
+# ===========================================
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+    OAuth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://authentication.eu10.hana.ondemand.com/oauth/authorize
+          tokenUrl: https://authentication.eu10.hana.ondemand.com/oauth/token
+          scopes:
+            CVAdmin: Full administrative access
+            Recruiter: Manage candidates and job postings
+            HRManager: View and review matches
+            Viewer: Read-only access
+
+  schemas:
+    Candidate:
+      type: object
+      properties:
+        ID:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        location:
+          type: string
+        totalExperienceYears:
+          type: integer
+        educationLevel:
+          type: string
+          enum: [high_school, associate, bachelor, master, doctorate]
+        currentTitle:
+          type: string
+        status:
+          type: object
+          properties:
+            code:
+              type: string
+              enum: [active, passive, not_looking, archived, merged, rejected]
+        linkedInProfile:
+          type: string
+        githubProfile:
+          type: string
+        portfolioUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        modifiedAt:
+          type: string
+          format: date-time
+
+    CandidateInput:
+      type: object
+      required:
+        - firstName
+        - lastName
+        - email
+      properties:
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        location:
+          type: string
+        totalExperienceYears:
+          type: integer
+          minimum: 0
+        educationLevel:
+          type: string
+        currentTitle:
+          type: string
+
+    JobPosting:
+      type: object
+      properties:
+        ID:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        department:
+          type: string
+        location:
+          type: string
+        locationType:
+          type: string
+          enum: [onsite, remote, hybrid]
+        minimumExperience:
+          type: integer
+        preferredExperience:
+          type: integer
+        requiredEducation:
+          type: object
+          properties:
+            code:
+              type: string
+        status:
+          type: object
+          properties:
+            code:
+              type: string
+              enum: [draft, open, closed, filled]
+        skillWeight:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        experienceWeight:
+          type: number
+          format: float
+        educationWeight:
+          type: number
+          format: float
+        locationWeight:
+          type: number
+          format: float
+
+    JobPostingInput:
+      type: object
+      required:
+        - title
+        - description
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        department:
+          type: string
+        location:
+          type: string
+        locationType:
+          type: string
+        minimumExperience:
+          type: integer
+        preferredExperience:
+          type: integer
+
+    ExtractedCVData:
+      type: object
+      properties:
+        personalInfo:
+          type: object
+          properties:
+            name:
+              type: string
+            email:
+              type: string
+            phone:
+              type: string
+            linkedin:
+              type: string
+            github:
+              type: string
+            location:
+              type: string
+        summary:
+          type: string
+        experience:
+          type: array
+          items:
+            type: object
+            properties:
+              title:
+                type: string
+              company:
+                type: string
+              startDate:
+                type: string
+              endDate:
+                type: string
+              description:
+                type: string
+        education:
+          type: array
+          items:
+            type: object
+            properties:
+              degree:
+                type: string
+              field:
+                type: string
+              institution:
+                type: string
+              year:
+                type: string
+        skills:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              category:
+                type: string
+              confidence:
+                type: number
+        languages:
+          type: array
+          items:
+            type: object
+            properties:
+              language:
+                type: string
+              level:
+                type: string
+        certifications:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              issuer:
+                type: string
+              date:
+                type: string
+        extractionConfidence:
+          type: integer
+        extractedAt:
+          type: string
+          format: date-time
+
+    MatchScore:
+      type: object
+      properties:
+        overallScore:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+        skillScore:
+          type: number
+          format: float
+        experienceScore:
+          type: number
+          format: float
+        educationScore:
+          type: number
+          format: float
+        locationScore:
+          type: number
+          format: float
+        breakdown:
+          type: string
+          description: JSON-encoded detailed breakdown
+        recommendations:
+          type: string
+          description: JSON-encoded improvement recommendations
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            target:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: BAD_REQUEST
+              message: Invalid input parameters
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: NOT_FOUND
+              message: Resource not found
+
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Request limit per window
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Remaining requests in current window
+        X-RateLimit-Reset:
+          schema:
+            type: string
+            format: date-time
+          description: Time when rate limit resets
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds to wait before retrying
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: RATE_LIMIT_EXCEEDED
+              message: Too many requests. Please try again in 45 seconds.
+              retryAfter: 45
+
+    InternalServerError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: INTERNAL_SERVER_ERROR
+              message: An unexpected error occurred
+
+  examples:
+    CandidateExample:
+      value:
+        firstName: John
+        lastName: Doe
+        email: john.doe@example.com
+        phone: +1-555-0123
+        location: San Francisco, CA
+        totalExperienceYears: 5
+        educationLevel: bachelor
+        currentTitle: Senior Software Engineer
+
+    JobPostingExample:
+      value:
+        title: Senior JavaScript Developer
+        description: Looking for experienced JavaScript developer
+        department: Engineering
+        location: San Francisco
+        locationType: hybrid
+        minimumExperience: 3
+        preferredExperience: 7
+        skillWeight: 0.50
+        experienceWeight: 0.30
+        educationWeight: 0.10
+        locationWeight: 0.10
