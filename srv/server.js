@@ -23,21 +23,38 @@ cds.on('bootstrap', (app) => {
 
     // Ready check endpoint
     app.get('/ready', async (req, res) => {
+        const { createMLClient } = require('./lib/ml-client');
+        const mlClient = createMLClient();
+
+        const status = {
+            status: 'READY',
+            timestamp: new Date().toISOString(),
+            components: {
+                database: 'unknown',
+                mlService: 'unknown'
+            }
+        };
+
+        // Check database
         try {
-            // Check database connectivity
             await cds.db.run('SELECT 1 FROM DUMMY');
-            res.json({
-                status: 'READY',
-                database: 'connected',
-                timestamp: new Date().toISOString()
-            });
+            status.components.database = 'connected';
         } catch (error) {
-            res.status(503).json({
-                status: 'NOT_READY',
-                database: 'disconnected',
-                error: error.message
-            });
+            status.components.database = 'disconnected';
+            status.status = 'DEGRADED';
         }
+
+        // Check ML service
+        try {
+            const mlHealth = await mlClient.ping();
+            status.components.mlService = mlHealth.status || 'connected';
+        } catch (error) {
+            status.components.mlService = 'unavailable';
+            // ML service is optional, don't mark as degraded
+        }
+
+        const httpStatus = status.status === 'READY' ? 200 : 503;
+        res.status(httpStatus).json(status);
     });
 });
 
