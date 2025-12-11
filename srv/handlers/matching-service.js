@@ -8,6 +8,7 @@ const cds = require('@sap/cds');
 const { createLogger, startTimer } = require('../lib/logger');
 const { ValidationError, NotFoundError, BusinessRuleError } = require('../lib/errors');
 const { validateUUID, validateRange } = require('../lib/validators');
+const { createMLClient } = require('../lib/ml-client');
 
 const LOG = createLogger('matching-service');
 
@@ -44,6 +45,10 @@ module.exports = class MatchingService extends cds.ApplicationService {
             SortingConfigurations,
             SavedFilters
         } = this.entities;
+
+        // Initialize ML client
+        this.mlClient = createMLClient();
+        LOG.info('ML Client initialized', { baseUrl: process.env.ML_SERVICE_URL || 'http://localhost:8000' });
 
         // ===========================================
         // Matching Algorithm Core
