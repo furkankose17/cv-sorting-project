@@ -10,6 +10,7 @@ const cds = require('@sap/cds');
 const { createLogger, startTimer } = require('../lib/logger');
 const { ValidationError, NotFoundError, BusinessRuleError, ConflictError } = require('../lib/errors');
 const { validateCandidate, validateUUID, validateEnum } = require('../lib/validators');
+const { createMLClient } = require('../lib/ml-client');
 
 const LOG = createLogger('candidate-service');
 
@@ -31,6 +32,9 @@ module.exports = class CandidateService extends cds.ApplicationService {
 
     async init() {
         const { Candidates, CandidateSkills, CandidateNotes, CVDocuments } = this.entities;
+
+        // Initialize ML client for embedding generation
+        this.mlClient = createMLClient();
 
         // ===========================================
         // BEFORE Handlers - Validation
@@ -107,6 +111,58 @@ module.exports = class CandidateService extends cds.ApplicationService {
                 }
             }
             return results;
+        });
+
+        // Generate embedding after document is processed
+        this.after('UPDATE', 'CVDocuments', async (result, req) => {
+            // Only trigger when processing completes
+            if (result.processingStatus === 'completed' && result.extractedText) {
+                LOG.info('Document processed, generating embedding', { documentId: result.ID });
+
+                try {
+                    // Get the linked candidate
+                    if (result.candidate_ID) {
+                        const candidate = await SELECT.one.from(Candidates)
+                            .where({ ID: result.candidate_ID });
+
+                        if (candidate) {
+                            // Build text content for embedding
+                            const textContent = result.extractedText;
+                            const extractedData = result.extractedData ? JSON.parse(result.extractedData) : {};
+
+                            const skillsText = extractedData.skills
+                                ? extractedData.skills.map(s => s.name || s).join(', ')
+                                : '';
+
+                            const experienceText = extractedData.workExperience
+                                ? extractedData.workExperience.map(e => `${e.title} at ${e.company}`).join('; ')
+                                : '';
+
+                            // Generate embedding asynchronously (don't wait)
+                            this.mlClient.generateEmbedding({
+                                entityType: 'candidate',
+                                entityId: result.candidate_ID,
+                                textContent,
+                                skillsText,
+                                experienceText
+                            }).then(embResult => {
+                                LOG.info('Embedding generated for candidate', {
+                                    candidateId: result.candidate_ID,
+                                    dimension: embResult.embedding_dimension,
+                                    stored: embResult.stored
+                                });
+                            }).catch(err => {
+                                LOG.warn('Failed to generate embedding', {
+                                    candidateId: result.candidate_ID,
+                                    error: err.message
+                                });
+                            });
+                        }
+                    }
+                } catch (error) {
+                    LOG.warn('Embedding generation setup failed', { error: error.message });
+                }
+            }
         });
 
         // ===========================================
