@@ -488,51 +488,6 @@ module.exports = class MatchingService extends cds.ApplicationService {
             return matches;
         });
 
-        // Generate job embedding when published
-        this.on('publish', 'JobPostings', async (req) => {
-            const jobId = req.params[0];
-            LOG.info('Publishing job and generating embedding', { jobId });
-
-            // Update status to published
-            await UPDATE(JobPostings)
-                .where({ ID: jobId })
-                .set({
-                    status: 'published',
-                    publishedAt: new Date().toISOString()
-                });
-
-            // Get job details for embedding
-            const job = await SELECT.one.from(JobPostings).where({ ID: jobId });
-
-            if (job) {
-                // Build text content
-                const description = [
-                    job.title,
-                    job.description,
-                    job.responsibilities,
-                    job.qualifications
-                ].filter(Boolean).join('\n\n');
-
-                const requirements = job.qualifications || '';
-
-                // Generate embedding (async, don't block)
-                this.mlClient.generateEmbedding({
-                    entityType: 'job',
-                    entityId: jobId,
-                    textContent: description,
-                    requirementsText: requirements
-                }).then(result => {
-                    LOG.info('Job embedding generated', {
-                        jobId,
-                        dimension: result.embedding_dimension
-                    });
-                }).catch(err => {
-                    LOG.warn('Failed to generate job embedding', { jobId, error: err.message });
-                });
-            }
-
-            return SELECT.one.from(JobPostings).where({ ID: jobId });
-        });
 
         this.on('sortCandidates', async (req) => {
             const { candidateIds, weights, jobPostingId } = req.data;

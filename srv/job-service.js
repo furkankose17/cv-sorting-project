@@ -9,12 +9,17 @@
  */
 const cds = require('@sap/cds');
 const { v4: uuidv4 } = require('uuid');
+const { createMLClient } = require('./lib/ml-client');
 
 const LOG = cds.log('job-service');
 
 module.exports = class JobService extends cds.ApplicationService {
 
     async init() {
+        // Initialize ML client
+        this.mlClient = createMLClient();
+        LOG.info('ML Client initialized for job service');
+
         // Configuration for notifications
         this.n8nWebhookUrl = process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/match-notification';
         this.cooldownHours = parseInt(process.env.NOTIFICATION_COOLDOWN_HOURS) || 24;
@@ -40,7 +45,7 @@ module.exports = class JobService extends cds.ApplicationService {
                 req.error(404, 'Job posting not found');
                 return;
             }
-            if (jobPosting.status === 'published') {
+            if (jobPosting.status === 'open') {
                 req.error(400, 'Job posting is already published');
                 return;
             }
@@ -49,9 +54,37 @@ module.exports = class JobService extends cds.ApplicationService {
                 return;
             }
 
+            // Update status to open (published)
             await UPDATE(JobPostings).where({ ID: jobPostingId }).set({
-                status: 'published',
+                status: 'open',
                 publishedAt: new Date().toISOString()
+            });
+
+            // Generate embedding asynchronously (don't block)
+            const description = [
+                jobPosting.title,
+                jobPosting.description,
+                jobPosting.responsibilities,
+                jobPosting.qualifications
+            ].filter(Boolean).join('\n\n');
+
+            const requirements = jobPosting.qualifications || '';
+
+            this.mlClient.generateEmbedding({
+                entityType: 'job',
+                entityId: jobPostingId,
+                textContent: description,
+                requirementsText: requirements
+            }).then(result => {
+                LOG.info('Job embedding generated', {
+                    jobId: jobPostingId,
+                    dimension: result.embedding_dimension
+                });
+            }).catch(err => {
+                LOG.warn('Failed to generate job embedding', {
+                    jobId: jobPostingId,
+                    error: err.message
+                });
             });
 
             return SELECT.one.from(JobPostings).where({ ID: jobPostingId });
@@ -88,7 +121,7 @@ module.exports = class JobService extends cds.ApplicationService {
             }
 
             await UPDATE(JobPostings).where({ ID: jobPostingId }).set({
-                status: 'published',
+                status: 'open',
                 publishedAt: new Date().toISOString()
             });
             return SELECT.one.from(JobPostings).where({ ID: jobPostingId });
@@ -1127,7 +1160,7 @@ module.exports = class JobService extends cds.ApplicationService {
                     const result = await this.send('batchMatch', { jobPostingId, minScore: 0 });
                     processedCount = result?.matchesCreated || 0;
                 } else {
-                    const activeJobs = await SELECT.from(JobPostings).where({ status: 'published' });
+                    const activeJobs = await SELECT.from(JobPostings).where({ status: 'open' });
                     for (const job of activeJobs) {
                         try {
                             const result = await this.send('batchMatch', { jobPostingId: job.ID, minScore: 0 });
