@@ -131,37 +131,31 @@ cf scale cv-sorting-srv -i 3
 
 ### Project Root Documentation
 
-Located in the project root directory:
-
 #### [README.md](../README.md)
-- Project overview
-- Architecture overview
+- Project overview and architecture
 - Quick start guide
 - Technology stack
 
-#### [SECURITY_FIXES.md](../SECURITY_FIXES.md)
+### Documentation in this folder
+
+#### [SECURITY.md](SECURITY.md)
 - Security vulnerability fixes
 - OWASP Top 10 compliance
-- Before/after comparisons
 - Security best practices
 
-#### [OCR_IMPLEMENTATION.md](../OCR_IMPLEMENTATION.md)
+#### [OCR_IMPLEMENTATION.md](OCR_IMPLEMENTATION.md)
 - OCR functionality details
 - Supported formats (PDF, DOCX, PNG, JPG)
 - CV data extraction
-- Skill pattern matching
 
-#### [CHANGES_SUMMARY.md](../CHANGES_SUMMARY.md)
+#### [CHANGELOG.md](CHANGELOG.md)
 - Complete change log
-- Phase 1: Security fixes
-- Phase 2: OCR implementation
-- Phase 3: Testing suite
+- Development phases
 
-#### [TESTING.md](../TESTING.md)
+#### [TESTING.md](TESTING.md)
 - Test suite documentation
 - Running tests
 - Coverage reports
-- Writing new tests
 
 ---
 
@@ -171,8 +165,8 @@ Located in the project root directory:
 
 1. Start with: [README.md](../README.md)
 2. API Reference: [openapi.yaml](openapi.yaml)
-3. Testing: [TESTING.md](../TESTING.md)
-4. Security: [SECURITY_FIXES.md](../SECURITY_FIXES.md)
+3. Testing: [TESTING.md](TESTING.md)
+4. Security: [SECURITY.md](SECURITY.md)
 
 ### For DevOps
 
@@ -184,7 +178,7 @@ Located in the project root directory:
 
 1. Overview: [README.md](../README.md)
 2. API Capabilities: [openapi.yaml](openapi.yaml)
-3. Changes Log: [CHANGES_SUMMARY.md](../CHANGES_SUMMARY.md)
+3. Changes Log: [CHANGELOG.md](CHANGELOG.md)
 
 ### For Support Teams
 
@@ -295,7 +289,7 @@ See: [OPERATIONS_RUNBOOK.md#troubleshooting](OPERATIONS_RUNBOOK.md#troubleshooti
 - ✅ HTTPS only
 - ✅ Security headers (HSTS, CSP)
 
-**See**: [SECURITY_FIXES.md](../SECURITY_FIXES.md)
+**See**: [SECURITY.md](SECURITY.md)
 
 ---
 
@@ -335,7 +329,7 @@ npm test -- --coverage      # With coverage
 npm test -- test/file-validator.test.js  # Specific suite
 ```
 
-**See**: [TESTING.md](../TESTING.md)
+**See**: [TESTING.md](TESTING.md)
 
 ---
 
@@ -489,12 +483,6 @@ UNLICENSED - Private/Internal Use
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2025-12-03
+**Document Version**: 1.1
+**Last Updated**: 2025-12-11
 **Maintained by**: Development Team
-**Next Review**: 2025-03-03
-
----
-
-*For the latest updates and announcements, check the project repository:*
-*https://github.com/furkankose17/cv-sorting-project*

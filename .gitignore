@@ -54,5 +54,20 @@ resources/
 *.bak
 *.backup
 *~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+.venv/
+.Python
+pip-log.txt
+.eggs/
+*.egg-info/
+*.egg
+
+# Claude Code
 .claude
 .claude-plugin
