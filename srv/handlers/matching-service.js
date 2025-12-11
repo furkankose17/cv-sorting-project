@@ -330,8 +330,27 @@ module.exports = class MatchingService extends cds.ApplicationService {
                         usedSemanticMatching = true;
                         LOG.info('ML semantic matching succeeded', { matchCount: mlResult.matches.length });
 
+                        // Filter ML results by candidateIds if provided
+                        let filteredMatches = mlResult.matches;
+                        if (candidateIds && candidateIds.length > 0) {
+                            const candidateIdSet = new Set(candidateIds);
+                            filteredMatches = mlResult.matches.filter(match =>
+                                match.candidate_id && candidateIdSet.has(match.candidate_id)
+                            );
+                            LOG.info('Filtered ML results by candidateIds', {
+                                original: mlResult.matches.length,
+                                filtered: filteredMatches.length
+                            });
+                        }
+
                         // Store ML results in HANA
-                        for (const match of mlResult.matches) {
+                        for (const match of filteredMatches) {
+                            // Defensive null checks - skip matches missing required fields
+                            if (!match.candidate_id || match.combined_score === null || match.combined_score === undefined) {
+                                LOG.warn('Skipping ML match with missing required fields', { match });
+                                continue;
+                            }
+
                             const existing = await SELECT.one.from(MatchResults)
                                 .where({ candidate_ID: match.candidate_id, jobPosting_ID: jobPostingId });
 
@@ -346,7 +365,7 @@ module.exports = class MatchingService extends cds.ApplicationService {
                                 scoreBreakdown: JSON.stringify(match.score_breakdown || {}),
                                 matchedSkills: JSON.stringify(match.matched_criteria || []),
                                 missingSkills: JSON.stringify(match.missing_criteria || []),
-                                aiRecommendation: `Semantic similarity: ${(match.cosine_similarity * 100).toFixed(1)}%`,
+                                aiRecommendation: `Semantic similarity: ${((match.cosine_similarity || 0) * 100).toFixed(1)}%`,
                                 reviewStatus: 'pending'
                             };
 
