@@ -71,3 +71,20 @@ def test_extract_work_history_tier2(client: TestClient):
     assert "tier2" in data
     assert "workHistory" in data["tier2"]
     assert len(data["tier2"]["workHistory"]) >= 1
+
+
+def test_empty_extraction_returns_422(client: TestClient):
+    """Test that empty extraction results return 422 error."""
+    # Provide text with no extractable personal information (single word or empty)
+    sample_text = "a"
+
+    response = client.post(
+        "/api/ocr/extract-structured",
+        json={"text": sample_text, "language": "en"}
+    )
+
+    assert response.status_code == 422
+    data = response.json()
+    # Error handler converts detail to error
+    assert "error" in data
+    assert "personal information" in data["error"].lower()

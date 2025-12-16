@@ -234,7 +234,11 @@ def client():
     try:
         from fastapi.testclient import TestClient
         from app.main import app
-        return TestClient(app)
+
+        # Create TestClient - it handles lifespan events automatically
+        client = TestClient(app)
+        yield client
+        client.close()
     except ImportError:
         pytest.skip("FastAPI app not available")
 

@@ -59,11 +59,18 @@ async def extract_structured_data(request: ExtractStructuredRequest) -> Dict[str
         # Extract raw sections
         raw_sections = extract_raw_sections(request.text)
 
+        # Validate that at least one tier1 field was extracted
+        if not tier1:
+            raise HTTPException(
+                status_code=422,
+                detail="No personal information could be extracted from the provided text"
+            )
+
         # Calculate overall confidence
         confidences = []
         for field_data in tier1.values():
-            if isinstance(field_data, dict) and "confidence" in field_data:
-                confidences.append(field_data["confidence"])
+            if isinstance(field_data, FieldExtraction):
+                confidences.append(field_data.confidence)
 
         overall_confidence = sum(confidences) / len(confidences) if confidences else 0
 
@@ -75,6 +82,9 @@ async def extract_structured_data(request: ExtractStructuredRequest) -> Dict[str
             "raw_sections": raw_sections
         }
 
+    except HTTPException:
+        # Re-raise HTTP exceptions (validation errors, etc.)
+        raise
     except Exception as e:
         logger.error(f"Structured extraction failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -91,47 +101,47 @@ def extract_tier1_personal_info(text: str) -> Dict[str, FieldExtraction]:
         if line and len(line.split()) >= 2:
             # Assume first line with 2+ words is name
             words = line.split()
-            tier1["firstName"] = {
-                "value": words[0],
-                "confidence": 98,
-                "source": f"line_{i+1}"
-            }
-            tier1["lastName"] = {
-                "value": words[-1],
-                "confidence": 95,
-                "source": f"line_{i+1}"
-            }
+            tier1["firstName"] = FieldExtraction(
+                value=words[0],
+                confidence=98,
+                source=f"line_{i+1}"
+            )
+            tier1["lastName"] = FieldExtraction(
+                value=words[-1],
+                confidence=95,
+                source=f"line_{i+1}"
+            )
             break
 
     # Extract email
     email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
     email_match = re.search(email_pattern, text, re.IGNORECASE)
     if email_match:
-        tier1["email"] = {
-            "value": email_match.group(),
-            "confidence": 95,
-            "source": "regex_match"
-        }
+        tier1["email"] = FieldExtraction(
+            value=email_match.group(),
+            confidence=95,
+            source="regex_match"
+        )
 
-    # Extract phone
-    phone_pattern = r'[\+\(]?[1-9][0-9 .\-\(\)]{8,}[0-9]'
+    # Extract phone with word boundaries to prevent false positives
+    phone_pattern = r'\b[\+\(]?[1-9][0-9 .\-\(\)]{8,}[0-9]\b'
     phone_match = re.search(phone_pattern, text)
     if phone_match:
-        tier1["phone"] = {
-            "value": phone_match.group().strip(),
-            "confidence": 88,
-            "source": "regex_match"
-        }
+        tier1["phone"] = FieldExtraction(
+            value=phone_match.group().strip(),
+            confidence=88,
+            source="regex_match"
+        )
 
     # Extract location (simple version - look for City, State/Country patterns)
     location_pattern = r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?),\s*([A-Z]{2}|[A-Z][a-z]+)'
     location_match = re.search(location_pattern, text)
     if location_match:
-        tier1["location"] = {
-            "value": location_match.group(),
-            "confidence": 85,
-            "source": "regex_match"
-        }
+        tier1["location"] = FieldExtraction(
+            value=location_match.group(),
+            confidence=85,
+            source="regex_match"
+        )
 
     return tier1
 
