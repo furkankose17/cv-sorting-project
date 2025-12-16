@@ -8,16 +8,14 @@ const cds = require('@sap/cds');
 
 describe('Integration Tests', () => {
 
-    let CVService, CandidateService, MatchingService;
+    let CVSortingService;
     let db;
 
     beforeAll(async () => {
         // Connect to in-memory database for testing
         cds.test.in(__dirname, '..');
 
-        CVService = await cds.connect.to('CVService');
-        CandidateService = await cds.connect.to('CandidateService');
-        MatchingService = await cds.connect.to('MatchingService');
+        CVSortingService = await cds.connect.to('CVSortingService');
 
         db = await cds.connect.to('db');
     });
@@ -53,7 +51,7 @@ describe('Integration Tests', () => {
                 JavaScript, React, Node.js, Python, AWS, Docker
             `;
 
-            const uploadResult = await CVService.send({
+            const uploadResult = await CVSortingService.send({
                 event: 'uploadDocument',
                 data: {
                     fileName: 'john_doe_cv.txt',
@@ -67,7 +65,7 @@ describe('Integration Tests', () => {
             expect(uploadResult.status).toBe('uploaded');
 
             // Step 2: Process document
-            const processResult = await CVService.send({
+            const processResult = await CVSortingService.send({
                 event: 'processDocument',
                 data: {
                     documentId: uploadResult.documentId,
@@ -80,7 +78,7 @@ describe('Integration Tests', () => {
             expect(processResult.extractedData.personalInfo.email).toBe('john.doe@example.com');
 
             // Step 3: Verify document is stored
-            const { Documents } = CVService.entities;
+            const { Documents } = CVSortingService.entities;
             const document = await SELECT.one.from(Documents).where({ ID: uploadResult.documentId });
 
             expect(document).toBeDefined();
@@ -90,7 +88,7 @@ describe('Integration Tests', () => {
         it('should handle invalid file upload gracefully', async () => {
             const invalidContent = Buffer.from('Not a valid CV').toString('base64');
 
-            const result = await CVService.send({
+            const result = await CVSortingService.send({
                 event: 'uploadDocument',
                 data: {
                     fileName: 'invalid.exe',
@@ -108,7 +106,7 @@ describe('Integration Tests', () => {
             const largeBuffer = Buffer.alloc(60 * 1024 * 1024);
             const largeContent = largeBuffer.toString('base64');
 
-            const result = await CVService.send({
+            const result = await CVSortingService.send({
                 event: 'uploadDocument',
                 data: {
                     fileName: 'large_file.pdf',
@@ -143,7 +141,7 @@ describe('Integration Tests', () => {
                 Tech Lead at Innovation Inc (2018-2023)
             `;
 
-            const uploadResult = await CVService.send({
+            const uploadResult = await CVSortingService.send({
                 event: 'uploadDocument',
                 data: {
                     fileName: 'jane_smith_cv.txt',
@@ -152,7 +150,7 @@ describe('Integration Tests', () => {
                 }
             });
 
-            await CVService.send({
+            await CVSortingService.send({
                 event: 'processDocument',
                 data: {
                     documentId: uploadResult.documentId,
@@ -161,7 +159,7 @@ describe('Integration Tests', () => {
             });
 
             // Step 2: Create candidate from document
-            const createResult = await CVService.send({
+            const createResult = await CVSortingService.send({
                 event: 'createCandidateFromDocument',
                 data: {
                     documentId: uploadResult.documentId,
@@ -177,7 +175,7 @@ describe('Integration Tests', () => {
             expect(createResult.linkedSkillsCount).toBeGreaterThan(0);
 
             // Step 3: Verify candidate exists
-            const { Candidates } = CandidateService.entities;
+            const { Candidates } = CVSortingService.entities;
             const candidate = await SELECT.one.from(Candidates)
                 .where({ ID: createResult.candidateId });
 
@@ -195,7 +193,7 @@ describe('Integration Tests', () => {
                 SKILLS: Python, Django, PostgreSQL, Redis, Docker
             `;
 
-            const uploadResult = await CVService.send({
+            const uploadResult = await CVSortingService.send({
                 event: 'uploadDocument',
                 data: {
                     fileName: 'bob_johnson_cv.txt',
@@ -204,12 +202,12 @@ describe('Integration Tests', () => {
                 }
             });
 
-            await CVService.send({
+            await CVSortingService.send({
                 event: 'processDocument',
                 data: { documentId: uploadResult.documentId, extractionOptions: '{}' }
             });
 
-            const createResult = await CVService.send({
+            const createResult = await CVSortingService.send({
                 event: 'createCandidateFromDocument',
                 data: {
                     documentId: uploadResult.documentId,
@@ -219,7 +217,7 @@ describe('Integration Tests', () => {
             });
 
             // Verify skills are linked
-            const { CandidateSkills } = CandidateService.entities;
+            const { CandidateSkills } = CVSortingService.entities;
             const skills = await SELECT.from(CandidateSkills)
                 .where({ candidate_ID: createResult.candidateId });
 
@@ -237,7 +235,7 @@ describe('Integration Tests', () => {
 
         beforeEach(async () => {
             // Create test candidate
-            const { Candidates, Skills, CandidateSkills } = CandidateService.entities;
+            const { Candidates, Skills, CandidateSkills } = CVSortingService.entities;
 
             const candidate = await INSERT.into(Candidates).entries({
                 ID: cds.utils.uuid(),
@@ -270,7 +268,7 @@ describe('Integration Tests', () => {
             });
 
             // Create test job posting
-            const { JobPostings, JobRequiredSkills } = MatchingService.entities;
+            const { JobPostings, JobRequiredSkills } = CVSortingService.entities;
 
             const job = await INSERT.into(JobPostings).entries({
                 ID: cds.utils.uuid(),
@@ -301,7 +299,7 @@ describe('Integration Tests', () => {
         });
 
         it('should find matches for a job posting', async () => {
-            const result = await MatchingService.send({
+            const result = await CVSortingService.send({
                 event: 'findMatches',
                 data: {
                     jobPostingId,
@@ -318,7 +316,7 @@ describe('Integration Tests', () => {
         });
 
         it('should calculate match score for specific candidate-job pair', async () => {
-            const result = await MatchingService.send({
+            const result = await CVSortingService.send({
                 event: 'calculateMatchScore',
                 data: {
                     candidateId,
@@ -338,7 +336,7 @@ describe('Integration Tests', () => {
         });
 
         it('should store match results in database', async () => {
-            await MatchingService.send({
+            await CVSortingService.send({
                 event: 'findMatches',
                 data: {
                     jobPostingId,
@@ -346,7 +344,7 @@ describe('Integration Tests', () => {
                 }
             });
 
-            const { MatchResults } = MatchingService.entities;
+            const { MatchResults } = CVSortingService.entities;
             const matches = await SELECT.from(MatchResults)
                 .where({ jobPosting_ID: jobPostingId });
 
@@ -363,7 +361,7 @@ describe('Integration Tests', () => {
 
         beforeEach(async () => {
             // Create test candidates
-            const { Candidates } = CandidateService.entities;
+            const { Candidates } = CVSortingService.entities;
 
             await INSERT.into(Candidates).entries([
                 {
@@ -397,7 +395,7 @@ describe('Integration Tests', () => {
         });
 
         it('should search candidates by name', async () => {
-            const result = await CandidateService.send({
+            const result = await CVSortingService.send({
                 event: 'searchCandidates',
                 data: {
                     query: 'John',
@@ -411,7 +409,7 @@ describe('Integration Tests', () => {
         });
 
         it('should filter candidates by experience', async () => {
-            const result = await CandidateService.send({
+            const result = await CVSortingService.send({
                 event: 'searchCandidates',
                 data: {
                     query: '',
@@ -430,7 +428,7 @@ describe('Integration Tests', () => {
         });
 
         it('should exclude archived candidates by default', async () => {
-            const result = await CandidateService.send({
+            const result = await CVSortingService.send({
                 event: 'searchCandidates',
                 data: {
                     query: '',
@@ -444,7 +442,7 @@ describe('Integration Tests', () => {
 
         it('should sanitize search queries', async () => {
             // Attempt SQL injection
-            const result = await CandidateService.send({
+            const result = await CVSortingService.send({
                 event: 'searchCandidates',
                 data: {
                     query: "'; DROP TABLE Candidates; --",
@@ -457,7 +455,7 @@ describe('Integration Tests', () => {
             expect(result.resultCount).toBeGreaterThanOrEqual(0);
 
             // Verify table still exists
-            const { Candidates } = CandidateService.entities;
+            const { Candidates } = CVSortingService.entities;
             const candidates = await SELECT.from(Candidates);
             expect(candidates).toBeDefined();
         });
@@ -471,7 +469,7 @@ describe('Integration Tests', () => {
 
         it('should create, update, and archive candidate', async () => {
             // Step 1: Create candidate
-            const createResult = await CandidateService.send({
+            const createResult = await CVSortingService.send({
                 event: 'createCandidate',
                 data: {
                     firstName: 'Test',
@@ -486,7 +484,7 @@ describe('Integration Tests', () => {
             const candidateId = createResult.candidateId;
 
             // Step 2: Update candidate
-            const { Candidates } = CandidateService.entities;
+            const { Candidates } = CVSortingService.entities;
             await UPDATE(Candidates)
                 .where({ ID: candidateId })
                 .set({
@@ -508,7 +506,7 @@ describe('Integration Tests', () => {
         });
 
         it('should add skills to candidate', async () => {
-            const { Candidates, Skills, CandidateSkills } = CandidateService.entities;
+            const { Candidates, Skills, CandidateSkills } = CVSortingService.entities;
 
             // Create candidate
             const candidate = await INSERT.into(Candidates).entries({
@@ -558,7 +556,7 @@ describe('Integration Tests', () => {
             // Try to upload 15 documents (limit is 10 per minute)
             for (let i = 0; i < 15; i++) {
                 uploadPromises.push(
-                    CVService.send({
+                    CVSortingService.send({
                         event: 'uploadDocument',
                         data: {
                             fileName: `cv_${i}.txt`,
@@ -593,7 +591,7 @@ describe('Integration Tests', () => {
             // Upload document with corrupted content
             const corruptedContent = Buffer.from('Corrupted PDF content %PDF-').toString('base64');
 
-            const uploadResult = await CVService.send({
+            const uploadResult = await CVSortingService.send({
                 event: 'uploadDocument',
                 data: {
                     fileName: 'corrupted.pdf',
@@ -602,7 +600,7 @@ describe('Integration Tests', () => {
                 }
             });
 
-            const processResult = await CVService.send({
+            const processResult = await CVSortingService.send({
                 event: 'processDocument',
                 data: {
                     documentId: uploadResult.documentId,
@@ -616,7 +614,7 @@ describe('Integration Tests', () => {
         });
 
         it('should handle database constraint violations', async () => {
-            const { Candidates } = CandidateService.entities;
+            const { Candidates } = CVSortingService.entities;
 
             // Create candidate
             const candidate1 = await INSERT.into(Candidates).entries({
@@ -650,7 +648,7 @@ describe('Integration Tests', () => {
     describe('Performance Tests', () => {
 
         it('should handle bulk candidate creation efficiently', async () => {
-            const { Candidates } = CandidateService.entities;
+            const { Candidates } = CVSortingService.entities;
             const startTime = Date.now();
 
             const candidates = Array.from({ length: 50 }, (_, i) => ({
@@ -681,7 +679,7 @@ describe('Integration Tests', () => {
     describe('Data Consistency Tests', () => {
 
         it('should maintain referential integrity when deleting candidates', async () => {
-            const { Candidates, CandidateSkills, Documents } = CandidateService.entities;
+            const { Candidates, CandidateSkills, Documents } = CVSortingService.entities;
 
             // Create candidate with related data
             const candidate = await INSERT.into(Candidates).entries({

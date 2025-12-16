@@ -25,7 +25,7 @@ const { createMLClient } = require('./lib/ml-client');
 const { sanitizeString, validateLength } = require('./lib/validators');
 const RuleEngine = require('./lib/rule-engine');
 const cache = require('./lib/cache');
-const rateLimiter = require('./lib/rate-limiter');
+const rateLimiter = require('./middleware/rate-limiter');
 
 const LOG = cds.log('cv-sorting-service');
 

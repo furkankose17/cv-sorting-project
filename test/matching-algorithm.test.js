@@ -4,7 +4,7 @@
  */
 'use strict';
 
-const MatchingService = require('../srv/matching-service');
+const MatchingService = require('../srv/handlers/matching-service');
 
 describe('Matching Algorithm', () => {
 

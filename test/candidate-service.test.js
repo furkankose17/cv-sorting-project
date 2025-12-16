@@ -11,10 +11,10 @@ const cds = require('@sap/cds');
 describe('CandidateService', () => {
     const { expect } = cds.test(__dirname + '/..');
 
-    let CandidateService;
+    let CVSortingService;
 
     beforeAll(async () => {
-        CandidateService = await cds.connect.to('CandidateService');
+        CVSortingService = await cds.connect.to('CVSortingService');
     });
 
     describe('Candidates CRUD', () => {
@@ -31,7 +31,7 @@ describe('CandidateService', () => {
                 totalExperienceYears: 5.5
             };
 
-            const result = await CandidateService.run(
+            const result = await CVSortingService.run(
                 INSERT.into('Candidates').entries(candidate)
             );
 
@@ -41,7 +41,7 @@ describe('CandidateService', () => {
         });
 
         it('should read candidate by ID', async () => {
-            const candidate = await CandidateService.run(
+            const candidate = await CVSortingService.run(
                 SELECT.one.from('Candidates').where({ ID: testCandidateId })
             );
 
@@ -52,13 +52,13 @@ describe('CandidateService', () => {
         });
 
         it('should update candidate', async () => {
-            await CandidateService.run(
+            await CVSortingService.run(
                 UPDATE('Candidates')
                     .where({ ID: testCandidateId })
                     .set({ headline: 'Senior Developer' })
             );
 
-            const updated = await CandidateService.run(
+            const updated = await CVSortingService.run(
                 SELECT.one.from('Candidates').where({ ID: testCandidateId })
             );
 
@@ -73,7 +73,7 @@ describe('CandidateService', () => {
             };
 
             try {
-                await CandidateService.run(
+                await CVSortingService.run(
                     INSERT.into('Candidates').entries(duplicate)
                 );
                 expect.fail('Should have thrown error');
@@ -83,7 +83,7 @@ describe('CandidateService', () => {
         });
 
         it('should soft delete candidate', async () => {
-            await CandidateService.run(
+            await CVSortingService.run(
                 DELETE.from('Candidates').where({ ID: testCandidateId })
             );
 
@@ -100,7 +100,7 @@ describe('CandidateService', () => {
         let candidateId;
 
         beforeAll(async () => {
-            const result = await CandidateService.run(
+            const result = await CVSortingService.run(
                 INSERT.into('Candidates').entries({
                     firstName: 'Test',
                     lastName: 'Candidate',
@@ -146,7 +146,7 @@ describe('CandidateService', () => {
 
         beforeAll(async () => {
             // Create test candidate
-            const candidate = await CandidateService.run(
+            const candidate = await CVSortingService.run(
                 INSERT.into('Candidates').entries({
                     firstName: 'Skill',
                     lastName: 'Test',
@@ -156,7 +156,7 @@ describe('CandidateService', () => {
             candidateId = candidate.ID;
 
             // Get a skill ID
-            const skills = await CandidateService.run(
+            const skills = await CVSortingService.run(
                 SELECT.from('Skills').limit(1)
             );
             skillId = skills[0]?.ID;
@@ -192,7 +192,7 @@ describe('CandidateService', () => {
             expect(result.yearsOfExperience).to.equal(5);
 
             // Verify no duplicate
-            const skills = await CandidateService.run(
+            const skills = await CVSortingService.run(
                 SELECT.from('CandidateSkills')
                     .where({ candidate_ID: candidateId, skill_ID: skillId })
             );
@@ -203,7 +203,7 @@ describe('CandidateService', () => {
     describe('Search Functionality', () => {
         beforeAll(async () => {
             // Create test candidates for search
-            await CandidateService.run(
+            await CVSortingService.run(
                 INSERT.into('Candidates').entries([
                     {
                         firstName: 'Search',
@@ -267,16 +267,15 @@ describe('CandidateService', () => {
 describe('MatchingService', () => {
     const { expect } = cds.test(__dirname + '/..');
 
-    let MatchingService;
+    let CVSortingService;
     let testCandidateId;
     let testJobId;
 
     beforeAll(async () => {
-        MatchingService = await cds.connect.to('MatchingService');
+        CVSortingService = await cds.connect.to('CVSortingService');
 
         // Create test candidate
-        const CandidateService = await cds.connect.to('CandidateService');
-        const candidate = await CandidateService.run(
+        const candidate = await CVSortingService.run(
             INSERT.into('Candidates').entries({
                 firstName: 'Match',
                 lastName: 'Test',
@@ -289,8 +288,8 @@ describe('MatchingService', () => {
         testCandidateId = candidate.ID;
 
         // Create test job
-        const JobService = await cds.connect.to('JobService');
-        const job = await JobService.run(
+        // Job functionality now in CVSortingService;
+        const job = await CVSortingService.run(
             INSERT.into('JobPostings').entries({
                 title: 'Test Developer Position',
                 department: 'Engineering',

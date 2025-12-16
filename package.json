@@ -6,29 +6,32 @@
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
+    "@sap-ai-sdk/ai-api": "^1",
+    "@sap-ai-sdk/foundation-models": "^1",
+    "@sap-cloud-sdk/connectivity": "^3",
+    "@sap-cloud-sdk/http-client": "^3",
+    "@sap-cloud-sdk/resilience": "^3",
     "@sap/cds": "^7",
     "@sap/cds-hana": "^2",
     "@sap/xssec": "^3",
-    "@sap-cloud-sdk/http-client": "^3",
-    "@sap-cloud-sdk/connectivity": "^3",
-    "@sap-cloud-sdk/resilience": "^3",
-    "@sap-ai-sdk/foundation-models": "^1",
-    "@sap-ai-sdk/ai-api": "^1",
     "express": "^4",
+    "mammoth": "^1.6",
     "passport": "^0.7",
     "pdf-parse": "^1.1.1",
     "tesseract.js": "^5",
-    "mammoth": "^1.6",
     "uuid": "^9"
   },
   "devDependencies": {
     "@cap-js/sqlite": "^1",
     "@sap/cds-dk": "^7",
-    "@sap/ux-specification": "^1",
     "@sap/cds-lsp": "^7",
-    "axios": "^1",
-    "jest": "^29",
+    "@sap/ux-specification": "^1",
     "@types/jest": "^29",
+    "axios": "^1",
+    "chai": "^4.5.0",
+    "chai-as-promised": "^7.1.2",
+    "chai-subset": "^1.6.0",
+    "jest": "^29",
     "rimraf": "^5"
   },
   "scripts": {
@@ -65,19 +68,33 @@
           "users": {
             "admin": {
               "password": "admin",
-              "roles": ["CVAdmin", "Recruiter", "HRManager", "JobManager", "Viewer"]
+              "roles": [
+                "CVAdmin",
+                "Recruiter",
+                "HRManager",
+                "JobManager",
+                "Viewer"
+              ]
             },
             "recruiter": {
               "password": "recruiter",
-              "roles": ["Recruiter", "Viewer"]
+              "roles": [
+                "Recruiter",
+                "Viewer"
+              ]
             },
             "manager": {
               "password": "manager",
-              "roles": ["HRManager", "Viewer"]
+              "roles": [
+                "HRManager",
+                "Viewer"
+              ]
             },
             "viewer": {
               "password": "viewer",
-              "roles": ["Viewer"]
+              "roles": [
+                "Viewer"
+              ]
             }
           }
         }
@@ -130,7 +147,11 @@
     },
     "i18n": {
       "default_language": "en",
-      "languages": ["en", "de", "tr"]
+      "languages": [
+        "en",
+        "de",
+        "tr"
+      ]
     }
   },
   "sapux": [

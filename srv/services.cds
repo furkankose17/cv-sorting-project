@@ -859,7 +859,7 @@ service CVSortingService {
         fileName: String not null,
         fileContent: LargeBinary not null,
         mediaType: String not null,
-        autoCreate: Boolean default false
+        autoCreate: Boolean
     ) returns {
         documentId: UUID;
         ocrStatus: String;
@@ -878,7 +878,7 @@ service CVSortingService {
             fileContent: LargeBinary;
             mediaType: String;
         },
-        autoCreateThreshold: Decimal default 85.0
+        autoCreateThreshold: Decimal
     ) returns {
         queueId: UUID;
         totalFiles: Integer;
