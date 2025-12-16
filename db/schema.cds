@@ -350,6 +350,9 @@ entity Interviews : cuid, managed, AuditTrail {
     completedAt           : Timestamp;
     cancelledAt           : Timestamp;
     cancellationReason    : String(500);
+
+    // Compositions
+    calendarEvents        : Composition of many InterviewCalendarEvents on calendarEvents.interview = $self;
 }
 
 // ============================================
@@ -815,4 +818,27 @@ entity CandidateStatusHistory : cuid, managed, AuditTrail {
     changedBy: String(255);  // User who performed status change (may differ from createdByUser)
     reason: String(1000);
     notes: String(2000);
+}
+
+/**
+ * Interview Calendar Events
+ * Tracks calendar invites sent for interviews with .ics files and RSVP status
+ */
+entity InterviewCalendarEvents : cuid, managed, AuditTrail {
+    interview: Association to Interviews not null @assert.target;
+    eventId: String(255);  // External calendar event ID (e.g., Google Calendar event ID)
+    icsFileContent: LargeString;  // The actual .ics file content in RFC 5545 format
+    sentAt: Timestamp;  // When the calendar invite was sent
+    acceptedAt: Timestamp;  // When attendee accepted
+    declinedAt: Timestamp;  // When attendee declined
+    tentativeAt: Timestamp;  // When attendee marked tentative
+    status: String(20) enum {
+        pending;
+        sent;
+        accepted;
+        declined;
+        tentative;
+        cancelled;
+    } default 'pending';
+    reminderSentAt: Timestamp;  // When reminder was sent
 }

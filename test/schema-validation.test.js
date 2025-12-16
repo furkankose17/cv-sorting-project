@@ -244,4 +244,143 @@ describe('Email Automation Entities', () => {
             expect(candidate.lastName).toBe('Doe');
         });
     });
+
+    describe('InterviewCalendarEvents', () => {
+        it('should create InterviewCalendarEvents record', async () => {
+            const { InterviewCalendarEvents, Interviews, Candidates } = db.entities('cv.sorting');
+
+            // Create a candidate first
+            const candidateId = cds.utils.uuid();
+            await INSERT.into(Candidates).entries({
+                ID: candidateId,
+                firstName: 'Alice',
+                lastName: 'Johnson',
+                email: 'alice.johnson@example.com'
+            });
+
+            // Create an interview
+            const interviewId = cds.utils.uuid();
+            await INSERT.into(Interviews).entries({
+                ID: interviewId,
+                candidate_ID: candidateId,
+                title: 'Technical Interview',
+                scheduledAt: new Date(Date.now() + 86400000).toISOString() // Tomorrow
+            });
+
+            // Create calendar event record
+            const eventId = cds.utils.uuid();
+            const sentAt = new Date().toISOString();
+            const icsContent = 'BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR';
+
+            await INSERT.into(InterviewCalendarEvents).entries({
+                ID: eventId,
+                interview_ID: interviewId,
+                eventId: 'google-cal-event-123',
+                icsFileContent: icsContent,
+                sentAt: sentAt,
+                status: 'sent'
+            });
+
+            // Verify record was created
+            const calendarEvent = await SELECT.one.from(InterviewCalendarEvents).where({ ID: eventId });
+            expect(calendarEvent).toBeDefined();
+            expect(calendarEvent.ID).toBe(eventId);
+            expect(calendarEvent.interview_ID).toBe(interviewId);
+            expect(calendarEvent.eventId).toBe('google-cal-event-123');
+            expect(calendarEvent.icsFileContent).toBe(icsContent);
+            expect(calendarEvent.status).toBe('sent');
+        });
+
+        it('should have InterviewCalendarEvents entity with required fields', async () => {
+            const { InterviewCalendarEvents } = db.entities('cv.sorting');
+            const metadata = InterviewCalendarEvents.elements;
+
+            expect(metadata.ID).toBeDefined();
+            expect(metadata.interview).toBeDefined();
+            expect(metadata.eventId).toBeDefined();
+            expect(metadata.icsFileContent).toBeDefined();
+            expect(metadata.sentAt).toBeDefined();
+            expect(metadata.acceptedAt).toBeDefined();
+            expect(metadata.declinedAt).toBeDefined();
+            expect(metadata.tentativeAt).toBeDefined();
+            expect(metadata.status).toBeDefined();
+            expect(metadata.reminderSentAt).toBeDefined();
+        });
+
+        it('should default status to pending when not specified', async () => {
+            const { InterviewCalendarEvents, Interviews, Candidates } = db.entities('cv.sorting');
+
+            // Create a candidate first
+            const candidateId = cds.utils.uuid();
+            await INSERT.into(Candidates).entries({
+                ID: candidateId,
+                firstName: 'Bob',
+                lastName: 'Williams',
+                email: 'bob.williams@example.com'
+            });
+
+            // Create an interview
+            const interviewId = cds.utils.uuid();
+            await INSERT.into(Interviews).entries({
+                ID: interviewId,
+                candidate_ID: candidateId,
+                title: 'HR Interview',
+                scheduledAt: new Date(Date.now() + 86400000).toISOString()
+            });
+
+            // Create calendar event without status
+            const eventId = cds.utils.uuid();
+            await INSERT.into(InterviewCalendarEvents).entries({
+                ID: eventId,
+                interview_ID: interviewId,
+                eventId: 'google-cal-event-456'
+                // status not specified
+            });
+
+            const calendarEvent = await SELECT.one.from(InterviewCalendarEvents).where({ ID: eventId });
+            expect(calendarEvent.status).toBe('pending');
+        });
+
+        it('should allow association to interview', async () => {
+            const { InterviewCalendarEvents, Interviews, Candidates } = db.entities('cv.sorting');
+
+            // Create a candidate
+            const candidateId = cds.utils.uuid();
+            await INSERT.into(Candidates).entries({
+                ID: candidateId,
+                firstName: 'Charlie',
+                lastName: 'Brown',
+                email: 'charlie.brown@example.com'
+            });
+
+            // Create an interview
+            const interviewId = cds.utils.uuid();
+            await INSERT.into(Interviews).entries({
+                ID: interviewId,
+                candidate_ID: candidateId,
+                title: 'Final Interview',
+                scheduledAt: new Date(Date.now() + 86400000).toISOString()
+            });
+
+            // Create calendar event with interview association
+            const eventId = cds.utils.uuid();
+            await INSERT.into(InterviewCalendarEvents).entries({
+                ID: eventId,
+                interview_ID: interviewId,
+                eventId: 'google-cal-event-789',
+                status: 'accepted',
+                acceptedAt: new Date().toISOString()
+            });
+
+            // Verify association works
+            const calendarEvent = await SELECT.one.from(InterviewCalendarEvents).where({ ID: eventId });
+            expect(calendarEvent).toBeDefined();
+            expect(calendarEvent.interview_ID).toBe(interviewId);
+
+            // Verify interview exists
+            const interview = await SELECT.one.from(Interviews).where({ ID: interviewId });
+            expect(interview).toBeDefined();
+            expect(interview.title).toBe('Final Interview');
+        });
+    });
 });
