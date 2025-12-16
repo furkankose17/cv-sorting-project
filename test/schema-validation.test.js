@@ -60,3 +60,48 @@ describe('CVDocuments Schema', () => {
         expect(metadata.autoCreateThreshold).toBeDefined();
     });
 });
+
+describe('Email Automation Entities', () => {
+    let db;
+
+    beforeAll(async () => {
+        await cds.deploy(__dirname + '/../db/schema');
+        db = await cds.connect.to('db');
+    });
+
+    describe('EmailNotifications', () => {
+        it('should create EmailNotifications record', async () => {
+            const { EmailNotifications } = db.entities('cv.sorting');
+
+            const notificationId = cds.utils.uuid();
+            await INSERT.into(EmailNotifications).entries({
+                ID: notificationId,
+                notificationType: 'cv_received',
+                recipientEmail: 'test@example.com',
+                subject: 'Test Subject',
+                sentAt: new Date().toISOString(),
+                deliveryStatus: 'sent'
+            });
+
+            // Verify record was created
+            const notification = await SELECT.one.from(EmailNotifications).where({ ID: notificationId });
+            expect(notification).toBeDefined();
+            expect(notification.ID).toBe(notificationId);
+            expect(notification.notificationType).toBe('cv_received');
+            expect(notification.recipientEmail).toBe('test@example.com');
+        });
+
+        it('should have EmailNotifications entity with required fields', async () => {
+            const { EmailNotifications } = db.entities('cv.sorting');
+            const metadata = EmailNotifications.elements;
+
+            expect(metadata.ID).toBeDefined();
+            expect(metadata.notificationType).toBeDefined();
+            expect(metadata.recipientEmail).toBeDefined();
+            expect(metadata.subject).toBeDefined();
+            expect(metadata.sentAt).toBeDefined();
+            expect(metadata.deliveryStatus).toBeDefined();
+            expect(metadata.n8nExecutionId).toBeDefined();
+        });
+    });
+});

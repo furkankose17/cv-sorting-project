@@ -764,3 +764,41 @@ entity JouleInsights : cuid, managed {
     acknowledgedAt        : Timestamp;
     acknowledgedBy        : String(100);
 }
+
+// ============================================
+// EMAIL AUTOMATION ENTITIES
+// ============================================
+
+/**
+ * Email Notification Tracking
+ * Tracks all automated emails sent to candidates
+ */
+entity EmailNotifications {
+    key ID: UUID;
+    candidate: Association to Candidates;
+    jobPosting: Association to JobPostings;
+    notificationType: String(50) enum {
+        cv_received;
+        status_changed;
+        interview_invitation;
+        interview_reminder;
+        interview_confirmed;
+        offer_extended;
+        application_rejected;
+        general_update;
+    } not null;
+    recipientEmail: String(255) not null;
+    subject: String(500);
+    templateUsed: String(100);
+    sentAt: Timestamp;
+    deliveryStatus: String(20) enum {
+        queued;
+        sent;
+        failed;
+        bounced;
+    } default 'queued';
+    openedAt: Timestamp;
+    clickedAt: Timestamp;
+    errorMessage: String(1000);
+    n8nExecutionId: String(100);
+}
