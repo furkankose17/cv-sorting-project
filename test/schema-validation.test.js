@@ -22,4 +22,26 @@ describe('CVDocuments Schema', () => {
         expect(metadata.reviewedBy).toBeDefined();
         expect(metadata.reviewedAt).toBeDefined();
     });
+
+    test('ocrStatus should have correct enum values', async () => {
+        const { CVDocuments } = db.entities('cv.sorting');
+        const ocrStatusElement = CVDocuments.elements.ocrStatus;
+
+        expect(ocrStatusElement.enum).toBeDefined();
+        expect(ocrStatusElement.enum).toEqual({
+            pending: {},
+            processing: {},
+            completed: {},
+            failed: {},
+            review_required: {}
+        });
+    });
+
+    test('ocrStatus should have default value of pending', async () => {
+        const { CVDocuments } = db.entities('cv.sorting');
+        const ocrStatusElement = CVDocuments.elements.ocrStatus;
+
+        expect(ocrStatusElement.default).toBeDefined();
+        expect(ocrStatusElement.default.val).toBe('pending');
+    });
 });

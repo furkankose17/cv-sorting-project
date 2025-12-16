@@ -112,12 +112,16 @@ entity CVDocuments : cuid, managed {
     processedAt           : Timestamp;
 
     // Extracted Data
+    // Note: extractedText is reused by OCR processing workflow
+    // Initial CV extraction populates this field, OCR may enhance it
     @Core.MediaType: 'text/plain'
     extractedText         : LargeString;
     @Core.MediaType: 'application/json'
     extractedData         : LargeString;
 
     // AI Processing Metrics
+    // Note: ocrConfidence is reused by OCR processing workflow
+    // Represents confidence level of OCR text extraction (0.0-1.0)
     ocrConfidence         : Percentage;
     extractionMethod      : String(50);
     processingDuration    : Integer; // milliseconds
@@ -129,6 +133,12 @@ entity CVDocuments : cuid, managed {
     previousVersion       : Association to CVDocuments;
 
     // OCR Processing Fields
+    // OCR workflow states: pending → processing → completed/failed/review_required
+    // - pending: Initial state, awaiting OCR processing
+    // - processing: OCR extraction in progress
+    // - completed: OCR successfully extracted and validated
+    // - failed: OCR processing encountered an error
+    // - review_required: OCR confidence below threshold, needs human review
     ocrStatus             : String enum {
         pending;
         processing;
@@ -136,11 +146,17 @@ entity CVDocuments : cuid, managed {
         failed;
         review_required;
     } default 'pending';
+    // Structured JSON data extracted by OCR (skills, experience, education, etc.)
     structuredData        : LargeString;
+    // OCR extraction method used (e.g., 'tesseract', 'azure', 'aws-textract')
     ocrMethod             : String(50);
+    // Timestamp when OCR processing completed
     ocrProcessedAt        : Timestamp;
+    // OCR processing duration in milliseconds
     ocrProcessingTime     : Integer;
+    // User who reviewed OCR results (when ocrStatus = 'review_required')
     reviewedBy            : String(255);
+    // Timestamp when OCR results were reviewed
     reviewedAt            : Timestamp;
 }
 
