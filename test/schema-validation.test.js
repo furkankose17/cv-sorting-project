@@ -305,6 +305,14 @@ describe('Email Automation Entities', () => {
             expect(metadata.tentativeAt).toBeDefined();
             expect(metadata.status).toBeDefined();
             expect(metadata.reminderSentAt).toBeDefined();
+
+            // Inherited from cuid, managed
+            expect(metadata.createdAt).toBeDefined();
+            expect(metadata.modifiedAt).toBeDefined();
+
+            // Inherited from AuditTrail
+            expect(metadata.createdByUser).toBeDefined();
+            expect(metadata.modifiedByUser).toBeDefined();
         });
 
         it('should default status to pending when not specified', async () => {
@@ -381,6 +389,21 @@ describe('Email Automation Entities', () => {
             const interview = await SELECT.one.from(Interviews).where({ ID: interviewId });
             expect(interview).toBeDefined();
             expect(interview.title).toBe('Final Interview');
+        });
+
+        it('should have correct enum values for status', async () => {
+            const { InterviewCalendarEvents } = db.entities('cv.sorting');
+            const statusElement = InterviewCalendarEvents.elements.status;
+
+            expect(statusElement.enum).toBeDefined();
+            expect(statusElement.enum).toEqual({
+                pending: {},
+                sent: {},
+                accepted: {},
+                declined: {},
+                tentative: {},
+                cancelled: {}
+            });
         });
     });
 });
