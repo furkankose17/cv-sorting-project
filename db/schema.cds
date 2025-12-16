@@ -127,6 +127,21 @@ entity CVDocuments : cuid, managed {
     isLatest              : Boolean default true;
     version               : Integer default 1;
     previousVersion       : Association to CVDocuments;
+
+    // OCR Processing Fields
+    ocrStatus             : String enum {
+        pending;
+        processing;
+        completed;
+        failed;
+        review_required;
+    } default 'pending';
+    structuredData        : LargeString;
+    ocrMethod             : String(50);
+    ocrProcessedAt        : Timestamp;
+    ocrProcessingTime     : Integer;
+    reviewedBy            : String(255);
+    reviewedAt            : Timestamp;
 }
 
 /**
@@ -400,6 +415,12 @@ entity JobPostings : cuid, managed, AuditTrail, Taggable {
     educationWeight       : Decimal(3,2) default 0.20;
     locationWeight        : Decimal(3,2) default 0.10;
 
+    // Advanced Scoring Configuration
+    scoringTemplate       : Association to ScoringRuleTemplates;
+    customRules           : Composition of many ScoringRules on customRules.jobPosting = $self;
+    scoringStrategy       : String(50) default 'PRIORITY';  // 'SEQUENTIAL', 'PRIORITY', 'GROUPED', 'CUSTOM'
+    mlWeight              : Decimal(3,2) default 0.60;      // Dynamic ML vs rule-based weight (0.0-1.0)
+
     // Relations
     matchResults          : Association to many MatchResults on matchResults.jobPosting = $self;
 
@@ -449,6 +470,11 @@ entity MatchResults : cuid, managed {
     @Core.MediaType: 'application/json'
     missingSkills         : LargeString;
 
+    // ML Semantic Matching
+    semanticScore         : Score;                    // Score from ML vector similarity
+    @Core.MediaType: 'application/json'
+    mlAnalysis            : LargeString;              // ML matching details (cosine similarity, criteria)
+
     // AI Insights
     aiRecommendation      : LargeString;
     strengthsAnalysis     : LargeString;
@@ -459,6 +485,64 @@ entity MatchResults : cuid, managed {
     reviewedBy            : String(100);
     reviewedAt            : Timestamp;
     reviewNotes           : LargeString;
+
+    // Rule Engine Audit Trail
+    rulesApplied          : LargeString;              // JSON array of applied rules with before/after scores
+    preFilterPassed       : Boolean default true;
+    disqualifiedBy        : String(200);              // Rule name if disqualified
+}
+
+// ============================================
+// SCORING RULE ENGINE
+// ============================================
+
+/**
+ * Scoring Rule Templates - Reusable rule sets
+ */
+entity ScoringRuleTemplates : cuid, managed {
+    name                  : String(200) not null;
+    description           : String(500);
+    category              : String(100);              // 'Technical', 'Management', 'Sales', etc.
+    isGlobal              : Boolean default true;
+    isActive              : Boolean default true;
+
+    // Relations
+    rules                 : Composition of many ScoringRules on rules.template = $self;
+    usedByJobs            : Association to many JobPostings on usedByJobs.scoringTemplate = $self;
+}
+
+/**
+ * Scoring Rules - Individual rule definitions with conditions and actions
+ */
+entity ScoringRules : cuid, managed {
+    name                  : String(200) not null;
+    description           : String(500);
+
+    // Ownership - rules can belong to template, job, or be global
+    template              : Association to ScoringRuleTemplates;
+    jobPosting            : Association to JobPostings;
+    isGlobal              : Boolean default false;
+
+    // Rule definition
+    ruleType              : String(50) not null;      // 'PRE_FILTER', 'CATEGORY_BOOST', 'OVERALL_MODIFIER', 'WEIGHT_ADJUSTER', 'DISQUALIFY'
+    priority              : Integer default 50;        // 1-100, higher executes first
+    isActive              : Boolean default true;
+
+    // Condition (stored as JSON DSL)
+    @Core.MediaType: 'application/json'
+    conditions            : LargeString not null;     // JSON: {operator: 'AND', conditions: [{field: 'yearsExperience', op: '>', value: 5}]}
+
+    // Action (stored as JSON DSL)
+    @Core.MediaType: 'application/json'
+    actions               : LargeString not null;     // JSON: {type: 'BOOST_CATEGORY', category: 'skills', modifier: {type: 'PERCENTAGE', value: 20}}
+
+    // Execution metadata
+    executionOrder        : Integer;                   // For sequential execution
+    stopOnMatch           : Boolean default false;     // Stop processing further rules if this matches
+
+    // Usage tracking
+    executionCount        : Integer default 0;
+    lastExecutedAt        : Timestamp;
 }
 
 // ============================================
