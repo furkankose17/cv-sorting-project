@@ -44,4 +44,19 @@ describe('CVDocuments Schema', () => {
         expect(ocrStatusElement.default).toBeDefined();
         expect(ocrStatusElement.default.val).toBe('pending');
     });
+
+    test('ProcessingQueue entity should exist with required fields', async () => {
+        const { ProcessingQueue } = db.entities('cv.sorting');
+        const metadata = ProcessingQueue.elements;
+
+        expect(metadata.userId).toBeDefined();
+        expect(metadata.status).toBeDefined();
+        expect(metadata.totalFiles).toBeDefined();
+        expect(metadata.processedCount).toBeDefined();
+        expect(metadata.autoCreatedCount).toBeDefined();
+        expect(metadata.reviewRequiredCount).toBeDefined();
+        expect(metadata.failedCount).toBeDefined();
+        expect(metadata.currentFile).toBeDefined();
+        expect(metadata.autoCreateThreshold).toBeDefined();
+    });
 });

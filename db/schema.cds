@@ -161,6 +161,31 @@ entity CVDocuments : cuid, managed {
 }
 
 /**
+ * Batch CV Processing Queue
+ * Tracks batch upload jobs with progress and results
+ */
+entity ProcessingQueue : cuid, managed {
+    userId                 : String(255) not null;
+    status                 : String enum {
+        queued;
+        processing;
+        completed;
+        partial;
+        failed;
+    } default 'queued';
+    totalFiles             : Integer default 0;
+    processedCount         : Integer default 0;
+    autoCreatedCount       : Integer default 0;
+    reviewRequiredCount    : Integer default 0;
+    failedCount            : Integer default 0;
+    currentFile            : String(500);
+    autoCreateThreshold    : Decimal(5,2) default 85.0;
+    startedAt              : Timestamp;
+    completedAt            : Timestamp;
+    estimatedTimeRemaining : Integer;
+}
+
+/**
  * Work Experience entries
  */
 entity WorkExperiences : cuid, managed {
