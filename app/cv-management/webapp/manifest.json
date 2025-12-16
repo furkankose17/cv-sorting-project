@@ -1,0 +1,169 @@
+{
+  "_version": "1.76.0",
+  "sap.app": {
+    "id": "cvmanagement",
+    "type": "application",
+    "i18n": "i18n/i18n.properties",
+    "applicationVersion": {
+      "version": "0.0.2"
+    },
+    "title": "{{appTitle}}",
+    "description": "{{appDescription}}",
+    "resources": "resources.json",
+    "sourceTemplate": {
+      "id": "@sap/generator-fiori:basic",
+      "version": "1.20.0",
+      "toolsId": "b98b01d3-4ec7-41b7-afc4-d0e7fdf79cea"
+    },
+    "dataSources": {
+      "mainService": {
+        "uri": "/api/",
+        "type": "OData",
+        "settings": {
+          "annotations": [],
+          "odataVersion": "4.0"
+        }
+      }
+    }
+  },
+  "sap.ui": {
+    "technology": "UI5",
+    "icons": {
+      "icon": "",
+      "favIcon": "",
+      "phone": "",
+      "phone@2": "",
+      "tablet": "",
+      "tablet@2": ""
+    },
+    "deviceTypes": {
+      "desktop": true,
+      "tablet": true,
+      "phone": true
+    }
+  },
+  "sap.ui5": {
+    "flexEnabled": true,
+    "dependencies": {
+      "minUI5Version": "1.143.2",
+      "libs": {
+        "sap.m": {},
+        "sap.ui.core": {},
+        "sap.ui.layout": {},
+        "sap.uxap": {},
+        "sap.f": {},
+        "sap.suite.ui.commons": {}
+      }
+    },
+    "contentDensities": {
+      "compact": true,
+      "cozy": true
+    },
+    "models": {
+      "i18n": {
+        "type": "sap.ui.model.resource.ResourceModel",
+        "settings": {
+          "bundleName": "cvmanagement.i18n.i18n",
+          "supportedLocales": ["", "en"],
+          "fallbackLocale": ""
+        }
+      },
+      "": {
+        "dataSource": "mainService",
+        "preload": true,
+        "settings": {
+          "operationMode": "Server",
+          "autoExpandSelect": true,
+          "earlyRequests": true
+        }
+      }
+    },
+    "resources": {
+      "css": [
+        {
+          "uri": "css/style.css"
+        }
+      ]
+    },
+    "routing": {
+      "config": {
+        "routerClass": "sap.m.routing.Router",
+        "controlAggregation": "pages",
+        "controlId": "app",
+        "transition": "slide",
+        "type": "View",
+        "viewType": "XML",
+        "path": "cvmanagement.view",
+        "async": true,
+        "viewPath": "cvmanagement.view"
+      },
+      "routes": [
+        {
+          "name": "main",
+          "pattern": "",
+          "target": [
+            "main"
+          ]
+        },
+        {
+          "name": "candidateDetail",
+          "pattern": "candidates/{candidateId}",
+          "target": [
+            "candidateDetail"
+          ]
+        },
+        {
+          "name": "jobDetail",
+          "pattern": "jobs/{jobId}",
+          "target": [
+            "jobDetail"
+          ]
+        },
+        {
+          "name": "jobScoring",
+          "pattern": "jobs/{jobId}/scoring",
+          "target": [
+            "jobScoring"
+          ]
+        },
+        {
+          "name": "Upload",
+          "pattern": "upload",
+          "target": [
+            "Upload"
+          ]
+        }
+      ],
+      "targets": {
+        "main": {
+          "id": "Main",
+          "name": "Main"
+        },
+        "candidateDetail": {
+          "id": "CandidateDetail",
+          "name": "CandidateDetail"
+        },
+        "jobDetail": {
+          "id": "JobDetail",
+          "name": "JobDetail"
+        },
+        "jobScoring": {
+          "id": "JobScoring",
+          "name": "JobScoring"
+        },
+        "Upload": {
+          "viewType": "XML",
+          "viewName": "Upload",
+          "viewId": "upload",
+          "viewLevel": 1
+        }
+      }
+    },
+    "rootView": {
+      "viewName": "cvmanagement.view.App",
+      "type": "XML",
+      "id": "App",
+      "async": true
+    }
+  }
+}

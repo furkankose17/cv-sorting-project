@@ -1,0 +1,249 @@
+<mvc:View
+    controllerName="cvmanagement.controller.Upload"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:l="sap.ui.layout"
+    xmlns:f="sap.ui.layout.form"
+    xmlns:upload="sap.m.upload"
+    displayBlock="true">
+
+    <Page
+        id="uploadPage"
+        title="{i18n>uploadTitle}"
+        showNavButton="false">
+
+        <content>
+            <!-- Mode Toggle -->
+            <Bar>
+                <contentLeft>
+                    <SegmentedButton selectedKey="{view>/uploadMode}">
+                        <items>
+                            <SegmentedButtonItem key="single" text="Single Upload" />
+                            <SegmentedButtonItem key="batch" text="Batch Upload" />
+                        </items>
+                    </SegmentedButton>
+                </contentLeft>
+                <contentRight>
+                    <Text text="Auto-create threshold: {view>/autoCreateThreshold}%" />
+                    <Slider
+                        value="{view>/autoCreateThreshold}"
+                        min="60"
+                        max="95"
+                        step="5"
+                        width="200px"
+                        enableTickmarks="true"
+                        visible="{= ${view>/uploadMode} === 'batch'}" />
+                </contentRight>
+            </Bar>
+
+            <!-- Single Upload View -->
+            <l:Splitter
+                id="splitContainer"
+                visible="{= ${view>/uploadMode} === 'single' &amp;&amp; ${view>/documentLoaded}}"
+                orientation="Horizontal"
+                height="100%">
+
+                <!-- Left: CV Preview -->
+                <l:contentAreas>
+                    <VBox class="sapUiSmallMargin">
+                        <Text text="CV Preview" class="sapUiTinyMarginBottom" />
+                        <FlexBox
+                            id="cvPreviewContainer"
+                            height="600px"
+                            width="100%"
+                            justifyContent="Center"
+                            alignItems="Center"
+                            backgroundDesign="Solid">
+                            <Image
+                                id="cvPreviewImage"
+                                src="{view>/previewUrl}"
+                                width="100%"
+                                visible="{= ${view>/fileType} !== 'pdf'}" />
+                            <HTML
+                                id="cvPreviewPdf"
+                                content="{view>/pdfContent}"
+                                visible="{= ${view>/fileType} === 'pdf'}" />
+                        </FlexBox>
+                    </VBox>
+
+                    <!-- Right: Extracted Data Form -->
+                    <ScrollContainer height="100%" vertical="true">
+                        <VBox class="sapUiSmallMargin">
+                            <ObjectHeader
+                                title="Extracted Data"
+                                number="{view>/confidence}"
+                                numberUnit="%"
+                                numberState="{= ${view>/confidence} >= 85 ? 'Success' : ${view>/confidence} >= 70 ? 'Warning' : 'Error'}" />
+
+                            <!-- Tier 1: Personal Information -->
+                            <Panel
+                                headerText="Personal Information (Tier 1)"
+                                expanded="true"
+                                class="sapUiTinyMargin">
+                                <f:SimpleForm
+                                    editable="true"
+                                    layout="ResponsiveGridLayout">
+                                    <f:content>
+                                        <Label text="First Name" />
+                                        <HBox>
+                                            <Input
+                                                value="{view>/tier1/firstName/value}"
+                                                width="80%" />
+                                            <ObjectStatus
+                                                text="{view>/tier1/firstName/confidence}%"
+                                                state="{= ${view>/tier1/firstName/confidence} >= 90 ? 'Success' : 'Warning'}"
+                                                class="sapUiTinyMarginBegin" />
+                                        </HBox>
+
+                                        <Label text="Last Name" />
+                                        <HBox>
+                                            <Input
+                                                value="{view>/tier1/lastName/value}"
+                                                width="80%" />
+                                            <ObjectStatus
+                                                text="{view>/tier1/lastName/confidence}%"
+                                                state="{= ${view>/tier1/lastName/confidence} >= 90 ? 'Success' : 'Warning'}"
+                                                class="sapUiTinyMarginBegin" />
+                                        </HBox>
+
+                                        <Label text="Email" />
+                                        <HBox>
+                                            <Input
+                                                value="{view>/tier1/email/value}"
+                                                width="80%"
+                                                type="Email" />
+                                            <ObjectStatus
+                                                text="{view>/tier1/email/confidence}%"
+                                                state="{= ${view>/tier1/email/confidence} >= 90 ? 'Success' : 'Warning'}"
+                                                class="sapUiTinyMarginBegin" />
+                                        </HBox>
+
+                                        <Label text="Phone" />
+                                        <HBox>
+                                            <Input
+                                                value="{view>/tier1/phone/value}"
+                                                width="80%"
+                                                type="Tel" />
+                                            <ObjectStatus
+                                                text="{view>/tier1/phone/confidence}%"
+                                                state="{= ${view>/tier1/phone/confidence} >= 90 ? 'Success' : 'Warning'}"
+                                                class="sapUiTinyMarginBegin" />
+                                        </HBox>
+
+                                        <Label text="Location" />
+                                        <HBox>
+                                            <Input
+                                                value="{view>/tier1/location/value}"
+                                                width="80%" />
+                                            <ObjectStatus
+                                                text="{view>/tier1/location/confidence}%"
+                                                state="{= ${view>/tier1/location/confidence} >= 90 ? 'Success' : 'Warning'}"
+                                                class="sapUiTinyMarginBegin" />
+                                        </HBox>
+                                    </f:content>
+                                </f:SimpleForm>
+                            </Panel>
+
+                            <!-- Tier 2: Professional Background -->
+                            <Panel
+                                headerText="Professional Background (Tier 2)"
+                                expanded="false"
+                                class="sapUiTinyMargin">
+                                <Text text="Work history and education will be added manually after candidate creation." />
+                            </Panel>
+
+                            <!-- Action Buttons -->
+                            <Toolbar>
+                                <ToolbarSpacer />
+                                <Button
+                                    text="Cancel"
+                                    press=".onCancelUpload" />
+                                <Button
+                                    text="Create Candidate"
+                                    type="Emphasized"
+                                    press=".onCreateCandidate"
+                                    enabled="{= ${view>/tier1/firstName/value} &amp;&amp; ${view>/tier1/email/value}}" />
+                            </Toolbar>
+                        </VBox>
+                    </ScrollContainer>
+                </l:contentAreas>
+            </l:Splitter>
+
+            <!-- File Uploader (shown when no document loaded) -->
+            <VBox
+                alignItems="Center"
+                justifyContent="Center"
+                class="sapUiLargeMargin"
+                visible="{= ${view>/uploadMode} === 'single' &amp;&amp; !${view>/documentLoaded}}">
+                <FileUploader
+                    id="fileUploader"
+                    name="cvFile"
+                    uploadUrl=""
+                    placeholder="Choose CV file (PDF, PNG, JPG, TIFF)"
+                    fileType="pdf,png,jpg,jpeg,tiff"
+                    maximumFileSize="10"
+                    change=".onFileChange"
+                    class="sapUiLargeMarginBottom" />
+                <Text text="Maximum file size: 10 MB" class="sapUiTinyMarginTop" />
+            </VBox>
+
+            <!-- Batch Upload View -->
+            <Panel
+                visible="{= ${view>/uploadMode} === 'batch'}"
+                class="sapUiSmallMargin">
+                <headerToolbar>
+                    <Toolbar>
+                        <Title text="Batch Upload Queue" />
+                        <ToolbarSpacer />
+                        <Button
+                            text="Start Processing"
+                            type="Emphasized"
+                            press=".onStartBatch"
+                            enabled="{= ${view>/batchFiles}.length > 0 &amp;&amp; ${view>/batchStatus} !== 'processing'}" />
+                    </Toolbar>
+                </headerToolbar>
+
+                <content>
+                    <upload:UploadSet
+                        id="batchUploadSet"
+                        instantUpload="false"
+                        uploadUrl=""
+                        fileTypes="pdf,png,jpg,jpeg,tiff"
+                        maxFileSize="10"
+                        items="{view>/batchFiles}" />
+
+                    <!-- Progress Section -->
+                    <VBox
+                        visible="{= ${view>/batchStatus} === 'processing' || ${view>/batchStatus} === 'completed'}"
+                        class="sapUiSmallMargin">
+                        <ProgressIndicator
+                            percentValue="{= (${view>/batchProcessed} / ${view>/batchTotal}) * 100}"
+                            displayValue="Processing {view>/batchProcessed} of {view>/batchTotal}"
+                            state="Information" />
+
+                        <HBox class="sapUiTinyMarginTop">
+                            <VBox class="sapUiSmallMarginEnd">
+                                <ObjectNumber
+                                    number="{view>/batchAutoCreated}"
+                                    unit="Auto-created"
+                                    state="Success" />
+                            </VBox>
+                            <VBox class="sapUiSmallMarginEnd">
+                                <ObjectNumber
+                                    number="{view>/batchReviewRequired}"
+                                    unit="Need Review"
+                                    state="Warning" />
+                            </VBox>
+                            <VBox>
+                                <ObjectNumber
+                                    number="{view>/batchFailed}"
+                                    unit="Failed"
+                                    state="Error" />
+                            </VBox>
+                        </HBox>
+                    </VBox>
+                </content>
+            </Panel>
+        </content>
+    </Page>
+</mvc:View>
