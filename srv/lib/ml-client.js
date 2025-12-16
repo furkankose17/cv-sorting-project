@@ -107,9 +107,18 @@ class MLClient {
     }
 
     /**
-     * Semantic search
+     * Semantic search by query text
      */
-    async semanticSearch({ query, limit, minSimilarity }) {
+    async semanticSearch({ query, candidateId, limit, minSimilarity }) {
+        // If candidateId is provided, search for similar candidates
+        if (candidateId) {
+            return this.request('/api/matching/similar-candidates', 'POST', {
+                candidate_id: candidateId,
+                limit,
+                min_similarity: minSimilarity
+            });
+        }
+        // Otherwise search by query text
         return this.request('/api/matching/search', 'POST', {
             query,
             limit,
@@ -126,6 +135,18 @@ class MLClient {
             file_type: fileType,
             language,
             extract_structured: extractStructured
+        });
+    }
+
+    /**
+     * Process document with OCR and structured extraction
+     */
+    async processOCRWithStructured({ fileContent, fileType, language }) {
+        return this.request('/api/ocr/process', 'POST', {
+            file_content: fileContent,
+            file_type: fileType,
+            language: language || 'en',
+            extract_structured: true
         });
     }
 
