@@ -71,3 +71,6 @@ pip-log.txt
 # Claude Code
 .claude
 .claude-plugin
+
+# Git worktrees
+.worktrees/
