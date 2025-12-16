@@ -103,5 +103,55 @@ describe('Email Automation Entities', () => {
             expect(metadata.deliveryStatus).toBeDefined();
             expect(metadata.n8nExecutionId).toBeDefined();
         });
+
+        it('should default deliveryStatus to queued when not specified', async () => {
+            const { EmailNotifications } = db.entities('cv.sorting');
+
+            const notificationId = cds.utils.uuid();
+            await INSERT.into(EmailNotifications).entries({
+                ID: notificationId,
+                notificationType: 'cv_received',
+                recipientEmail: 'test@example.com',
+                subject: 'Test Subject'
+                // deliveryStatus not specified
+            });
+
+            const notification = await SELECT.one.from(EmailNotifications).where({ ID: notificationId });
+            expect(notification.deliveryStatus).toBe('queued');
+        });
+
+        it('should allow association to candidate', async () => {
+            const { EmailNotifications, Candidates } = db.entities('cv.sorting');
+
+            // Create a candidate first
+            const candidateId = cds.utils.uuid();
+            await INSERT.into(Candidates).entries({
+                ID: candidateId,
+                firstName: 'John',
+                lastName: 'Doe',
+                email: 'john.doe@example.com'
+            });
+
+            // Create notification with candidate association
+            const notificationId = cds.utils.uuid();
+            await INSERT.into(EmailNotifications).entries({
+                ID: notificationId,
+                candidate_ID: candidateId,
+                notificationType: 'cv_received',
+                recipientEmail: 'john.doe@example.com',
+                subject: 'CV Received Confirmation'
+            });
+
+            // Verify association works
+            const notification = await SELECT.one.from(EmailNotifications).where({ ID: notificationId });
+            expect(notification).toBeDefined();
+            expect(notification.candidate_ID).toBe(candidateId);
+
+            // Verify candidate exists
+            const candidate = await SELECT.one.from(Candidates).where({ ID: candidateId });
+            expect(candidate).toBeDefined();
+            expect(candidate.firstName).toBe('John');
+            expect(candidate.lastName).toBe('Doe');
+        });
     });
 });

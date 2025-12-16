@@ -773,8 +773,7 @@ entity JouleInsights : cuid, managed {
  * Email Notification Tracking
  * Tracks all automated emails sent to candidates
  */
-entity EmailNotifications {
-    key ID: UUID;
+entity EmailNotifications : cuid, managed {
     candidate: Association to Candidates;
     jobPosting: Association to JobPostings;
     notificationType: String(50) enum {
