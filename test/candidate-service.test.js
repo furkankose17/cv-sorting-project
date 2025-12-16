@@ -584,5 +584,39 @@ describe('Email Notification Functions', () => {
 
             expect(notification.jobPosting_ID).to.equal(jobPostingId);
         });
+
+        it('should reject missing required parameters', async () => {
+            const result = await CVSortingService.markNotificationSent({
+                // Missing statusHistory_ID
+                candidate_ID: testCandidateId,
+                recipientEmail: 'test@example.com'
+            });
+
+            expect(result.success).to.be.false;
+            expect(result.error).to.include('required parameters');
+        });
+
+        it('should reject invalid email format', async () => {
+            const result = await CVSortingService.markNotificationSent({
+                statusHistory_ID: uuidv4(),
+                candidate_ID: testCandidateId,
+                recipientEmail: 'invalid-email'  // No @ symbol
+            });
+
+            expect(result.success).to.be.false;
+            expect(result.error).to.include('email');
+        });
+
+        it('should reject subject that exceeds max length', async () => {
+            const result = await CVSortingService.markNotificationSent({
+                statusHistory_ID: uuidv4(),
+                candidate_ID: testCandidateId,
+                recipientEmail: 'test@example.com',
+                subject: 'x'.repeat(501)  // Exceeds 500 char limit
+            });
+
+            expect(result.success).to.be.false;
+            expect(result.error).to.include('Subject');
+        });
     });
 });

@@ -1566,6 +1566,75 @@ module.exports = class CVSortingService extends cds.ApplicationService {
                     n8nExecutionId
                 } = req.data;
 
+                // Validate required parameters
+                if (!statusHistory_ID || !candidate_ID || !recipientEmail) {
+                    LOG.warn('markNotificationSent: Missing required parameters');
+                    return {
+                        success: false,
+                        notificationId: null,
+                        error: 'Missing required parameters: statusHistory_ID, candidate_ID, and recipientEmail'
+                    };
+                }
+
+                // Validate email format
+                if (!recipientEmail.includes('@') || recipientEmail.trim().length < 5 || recipientEmail.length > 255) {
+                    LOG.warn('markNotificationSent: Invalid email format', { recipientEmail });
+                    return {
+                        success: false,
+                        notificationId: null,
+                        error: 'Invalid email format or length'
+                    };
+                }
+
+                // Validate UUID formats
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                if (!uuidRegex.test(statusHistory_ID) || !uuidRegex.test(candidate_ID)) {
+                    LOG.warn('markNotificationSent: Invalid UUID format');
+                    return {
+                        success: false,
+                        notificationId: null,
+                        error: 'Invalid UUID format for statusHistory_ID or candidate_ID'
+                    };
+                }
+
+                // Validate optional jobPosting_ID if provided
+                if (jobPosting_ID && !uuidRegex.test(jobPosting_ID)) {
+                    LOG.warn('markNotificationSent: Invalid jobPosting_ID UUID format');
+                    return {
+                        success: false,
+                        notificationId: null,
+                        error: 'Invalid UUID format for jobPosting_ID'
+                    };
+                }
+
+                // Validate string lengths
+                if (subject && subject.length > 500) {
+                    LOG.warn('markNotificationSent: Subject too long', { length: subject.length });
+                    return {
+                        success: false,
+                        notificationId: null,
+                        error: 'Subject exceeds maximum length of 500 characters'
+                    };
+                }
+
+                if (templateUsed && templateUsed.length > 100) {
+                    LOG.warn('markNotificationSent: Template name too long');
+                    return {
+                        success: false,
+                        notificationId: null,
+                        error: 'Template name exceeds maximum length of 100 characters'
+                    };
+                }
+
+                if (n8nExecutionId && n8nExecutionId.length > 100) {
+                    LOG.warn('markNotificationSent: Execution ID too long');
+                    return {
+                        success: false,
+                        notificationId: null,
+                        error: 'Execution ID exceeds maximum length of 100 characters'
+                    };
+                }
+
                 const db = cds.db;
                 const { EmailNotifications } = db.entities('cv.sorting');
 
