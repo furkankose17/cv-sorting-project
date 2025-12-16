@@ -8,6 +8,7 @@ from typing import Dict, Any, List, Optional
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
+from app.api.routes.ocr_extraction import extract_structured_data, ExtractStructuredRequest
 
 router = APIRouter(prefix="/api/ocr", tags=["OCR"])
 logger = logging.getLogger(__name__)
@@ -84,10 +85,13 @@ async def process_document(request: ProcessBase64Request) -> Dict[str, Any]:
         # Extract structured data if requested
         structured_data = None
         if request.extract_structured and result.get('text'):
-            structured_data = processor.extract_structured_data(result['text'])
-            # Remove raw_text from structured data to reduce response size
-            if 'raw_text' in structured_data:
-                del structured_data['raw_text']
+            # Call the structured extraction endpoint function
+            extraction_request = ExtractStructuredRequest(
+                text=result['text'],
+                language=request.language
+            )
+            structured_result = await extract_structured_data(extraction_request)
+            structured_data = structured_result
 
         return {
             "text": result['text'],
@@ -168,9 +172,13 @@ async def process_uploaded_file(
         # Extract structured data if requested
         structured_data = None
         if extract_structured and result.get('text'):
-            structured_data = processor.extract_structured_data(result['text'])
-            if 'raw_text' in structured_data:
-                del structured_data['raw_text']
+            # Call the structured extraction endpoint function
+            extraction_request = ExtractStructuredRequest(
+                text=result['text'],
+                language=language
+            )
+            structured_result = await extract_structured_data(extraction_request)
+            structured_data = structured_result
 
         return {
             "text": result['text'],
@@ -251,4 +259,30 @@ async def get_supported_languages() -> Dict[str, Any]:
             {"code": "kor", "name": "Korean"}
         ],
         "note": "Multiple languages can be combined: eng+deu"
+    }
+
+
+@router.get("/health")
+async def get_ocr_health() -> Dict[str, Any]:
+    """
+    Get OCR service health and engine information.
+
+    Returns:
+        OCR service status and engine details
+    """
+    from app.main import get_ocr_processor
+
+    processor = get_ocr_processor()
+    if processor is None:
+        raise HTTPException(
+            status_code=503,
+            detail="OCR processor not initialized"
+        )
+
+    engine_info = processor.get_engine_info()
+
+    return {
+        "status": "healthy" if processor._ocr_available else "unavailable",
+        "engine_info": engine_info,
+        "message": f"OCR service using {engine_info.get('engine', 'unknown')} engine"
     }
