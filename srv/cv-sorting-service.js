@@ -1438,6 +1438,7 @@ module.exports = class CVSortingService extends cds.ApplicationService {
         this.on('uploadAndProcessCV', ocrHandler.uploadAndProcessCV);
         this.on('uploadBatchCVs', ocrHandler.uploadBatchCVs);
         this.on('getBatchProgress', ocrHandler.getBatchProgress);
+        this.on('reviewAndCreateCandidate', ocrHandler.reviewAndCreateCandidate);
 
         // ML scoring criteria
         this.on('getScoringCriteria', (req) => this._delegateToAIModule(req, 'handleGetScoringCriteria'));

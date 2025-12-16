@@ -96,7 +96,7 @@ entity Candidates : cuid, managed, AuditTrail, SoftDelete, Taggable {
  * CV Documents - Uploaded resume/CV files
  */
 entity CVDocuments : cuid, managed {
-    candidate             : Association to Candidates not null;
+    candidate             : Association to Candidates;
 
     // File Information
     fileName              : String(255) not null;

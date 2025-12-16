@@ -21,11 +21,11 @@ module.exports = {
         {
             displayName: 'unit',
             testMatch: ['**/test/*-*.test.js'],
-            testPathIgnorePatterns: ['integration.test.js']
+            testPathIgnorePatterns: ['integration.test.js', 'integration/']
         },
         {
             displayName: 'integration',
-            testMatch: ['**/test/integration.test.js']
+            testMatch: ['**/test/integration.test.js', '**/test/integration/**/*.test.js']
         }
     ],
 

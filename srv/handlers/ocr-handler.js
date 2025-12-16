@@ -291,9 +291,105 @@ async function getBatchProgress(req) {
     };
 }
 
+/**
+ * Review and create candidate from low-confidence extraction
+ */
+async function reviewAndCreateCandidate(req) {
+    const { documentId, editedData } = req.data;
+    const LOG = cds.log('ocr-handler');
+
+    const db = await cds.connect.to('db');
+    const { CVDocuments, Candidates, CandidateSkills } = db.entities('cv.sorting');
+
+    try {
+        // Get document
+        const document = await SELECT.one.from(CVDocuments)
+            .where({ ID: documentId });
+
+        if (!document) {
+            req.reject(404, `Document ${documentId} not found`);
+        }
+
+        // Parse edited data
+        const extractedData = JSON.parse(editedData);
+        const tier1 = extractedData.tier1 || {};
+
+        // Create candidate
+        const candidateId = cds.utils.uuid();
+        await INSERT.into(Candidates).entries({
+            ID: candidateId,
+            firstName: tier1.firstName?.value,
+            lastName: tier1.lastName?.value,
+            email: tier1.email?.value,
+            phone: tier1.phone?.value,
+            city: tier1.location?.value?.split(',')[0]?.trim(),
+            country: tier1.location?.value?.split(',')[1]?.trim(),
+            status_code: 'new'
+        });
+
+        LOG.info(`Created candidate ${candidateId} from reviewed document ${documentId}`);
+
+        // Link document to candidate
+        await UPDATE(CVDocuments)
+            .set({
+                candidate_ID: candidateId,
+                ocrStatus: 'completed',
+                reviewedBy: req.user.id,
+                reviewedAt: new Date()
+            })
+            .where({ ID: documentId });
+
+        // Generate embedding for semantic search
+        let embeddingGenerated = false;
+        try {
+            const mlClient = createMLClient();
+
+            // Prepare candidate profile for embedding
+            const candidateProfile = {
+                name: `${tier1.firstName?.value || ''} ${tier1.lastName?.value || ''}`.trim(),
+                email: tier1.email?.value || '',
+                skills: [],
+                experience: extractedData.tier2?.workHistory || []
+            };
+
+            // Generate embedding
+            const embeddingResult = await mlClient.generateEmbedding({
+                text: JSON.stringify(candidateProfile),
+                type: 'candidate'
+            });
+
+            if (embeddingResult && embeddingResult.embedding) {
+                await UPDATE(Candidates)
+                    .set({ embedding: JSON.stringify(embeddingResult.embedding) })
+                    .where({ ID: candidateId });
+
+                embeddingGenerated = true;
+                LOG.info(`Generated embedding for candidate ${candidateId}`);
+            }
+        } catch (embeddingError) {
+            LOG.warn(`Failed to generate embedding for candidate ${candidateId}: ${embeddingError.message}`);
+            // Don't fail the whole operation if embedding generation fails
+        }
+
+        // Count linked skills (placeholder - actual skill linking would be done separately)
+        const linkedSkillsCount = 0;
+
+        return {
+            candidateId,
+            linkedSkillsCount,
+            embeddingGenerated
+        };
+
+    } catch (error) {
+        LOG.error(`Failed to create candidate from document ${documentId}: ${error.message}`);
+        req.error(500, `Failed to create candidate: ${error.message}`);
+    }
+}
+
 module.exports = {
     uploadAndProcessCV,
     uploadBatchCVs,
     getBatchProgress,
+    reviewAndCreateCandidate,
     createCandidateFromExtraction
 };
