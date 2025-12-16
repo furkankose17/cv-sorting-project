@@ -80,6 +80,7 @@ entity Candidates : cuid, managed, AuditTrail, SoftDelete, Taggable {
     certifications        : Composition of many Certifications on certifications.candidate = $self;
     notes                 : Composition of many CandidateNotes on notes.candidate = $self;
     interviews            : Composition of many Interviews on interviews.candidate = $self;
+    statusHistory         : Composition of many CandidateStatusHistory on statusHistory.candidate = $self;
 
     // Associations
     matchResults          : Association to many MatchResults on matchResults.candidate = $self;
@@ -806,12 +807,12 @@ entity EmailNotifications : cuid, managed {
  * Candidate Status History
  * Tracks all status changes for candidates with audit trail
  */
-entity CandidateStatusHistory : cuid, managed {
-    candidate: Association to Candidates;
-    previousStatus: Association to CandidateStatuses;
-    newStatus: Association to CandidateStatuses;
+entity CandidateStatusHistory : cuid, managed, AuditTrail {
+    candidate: Association to Candidates not null;
+    previousStatus: Association to CandidateStatuses @assert.target;  // Can be null for initial status
+    newStatus: Association to CandidateStatuses not null @assert.target;
     changedAt: Timestamp not null;
-    changedBy: String(255);
+    changedBy: String(255);  // User who performed status change (may differ from createdByUser)
     reason: String(1000);
     notes: String(2000);
 }
