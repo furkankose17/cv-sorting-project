@@ -154,4 +154,94 @@ describe('Email Automation Entities', () => {
             expect(candidate.lastName).toBe('Doe');
         });
     });
+
+    describe('CandidateStatusHistory', () => {
+        it('should create CandidateStatusHistory record', async () => {
+            const { CandidateStatusHistory, Candidates } = db.entities('cv.sorting');
+
+            // Create a candidate first
+            const candidateId = cds.utils.uuid();
+            await INSERT.into(Candidates).entries({
+                ID: candidateId,
+                firstName: 'Jane',
+                lastName: 'Smith',
+                email: 'jane.smith@example.com'
+            });
+
+            // Use existing status records from CSV (new, screening)
+            // Create status history record
+            const historyId = cds.utils.uuid();
+            const changedAt = new Date().toISOString();
+            await INSERT.into(CandidateStatusHistory).entries({
+                ID: historyId,
+                candidate_ID: candidateId,
+                previousStatus_code: 'new',
+                newStatus_code: 'screening',
+                changedAt: changedAt,
+                changedBy: 'recruiter@example.com',
+                reason: 'Initial screening passed',
+                notes: 'Candidate showed strong technical background'
+            });
+
+            // Verify record was created
+            const history = await SELECT.one.from(CandidateStatusHistory).where({ ID: historyId });
+            expect(history).toBeDefined();
+            expect(history.ID).toBe(historyId);
+            expect(history.candidate_ID).toBe(candidateId);
+            expect(history.previousStatus_code).toBe('new');
+            expect(history.newStatus_code).toBe('screening');
+            expect(history.changedBy).toBe('recruiter@example.com');
+            expect(history.reason).toBe('Initial screening passed');
+        });
+
+        it('should have CandidateStatusHistory entity with required fields', async () => {
+            const { CandidateStatusHistory } = db.entities('cv.sorting');
+            const metadata = CandidateStatusHistory.elements;
+
+            expect(metadata.ID).toBeDefined();
+            expect(metadata.candidate).toBeDefined();
+            expect(metadata.previousStatus).toBeDefined();
+            expect(metadata.newStatus).toBeDefined();
+            expect(metadata.changedAt).toBeDefined();
+            expect(metadata.changedBy).toBeDefined();
+            expect(metadata.reason).toBeDefined();
+            expect(metadata.notes).toBeDefined();
+        });
+
+        it('should allow association to candidate', async () => {
+            const { CandidateStatusHistory, Candidates } = db.entities('cv.sorting');
+
+            // Create a candidate
+            const candidateId = cds.utils.uuid();
+            await INSERT.into(Candidates).entries({
+                ID: candidateId,
+                firstName: 'John',
+                lastName: 'Doe',
+                email: 'john.doe@example.com'
+            });
+
+            // Use existing status records from CSV (screening, interviewing)
+            // Create status history with candidate association
+            const historyId = cds.utils.uuid();
+            await INSERT.into(CandidateStatusHistory).entries({
+                ID: historyId,
+                candidate_ID: candidateId,
+                previousStatus_code: 'screening',
+                newStatus_code: 'interviewing',
+                changedAt: new Date().toISOString(),
+                changedBy: 'system@example.com'
+            });
+
+            // Verify association works
+            const history = await SELECT.one.from(CandidateStatusHistory).where({ ID: historyId });
+            expect(history).toBeDefined();
+            expect(history.candidate_ID).toBe(candidateId);
+
+            // Verify candidate exists
+            const candidate = await SELECT.one.from(Candidates).where({ ID: candidateId });
+            expect(candidate).toBeDefined();
+            expect(candidate.firstName).toBe('John');
+            expect(candidate.lastName).toBe('Doe');
+        });
+    });
 });

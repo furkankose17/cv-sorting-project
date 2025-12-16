@@ -801,3 +801,17 @@ entity EmailNotifications : cuid, managed {
     errorMessage: String(1000);
     n8nExecutionId: String(100);
 }
+
+/**
+ * Candidate Status History
+ * Tracks all status changes for candidates with audit trail
+ */
+entity CandidateStatusHistory : cuid, managed {
+    candidate: Association to Candidates;
+    previousStatus: Association to CandidateStatuses;
+    newStatus: Association to CandidateStatuses;
+    changedAt: Timestamp not null;
+    changedBy: String(255);
+    reason: String(1000);
+    notes: String(2000);
+}
