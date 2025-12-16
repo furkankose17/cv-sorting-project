@@ -141,7 +141,159 @@ async function createCandidateFromExtraction(structuredData, documentId, db) {
     return candidateId;
 }
 
+/**
+ * Upload batch of CVs for processing
+ */
+async function uploadBatchCVs(req) {
+    const { files, autoCreateThreshold } = req.data;
+    const LOG = cds.log('ocr-handler');
+
+    if (!files || files.length === 0) {
+        req.reject(400, 'No files provided');
+    }
+
+    const db = await cds.connect.to('db');
+    const { ProcessingQueue } = db.entities('cv.sorting');
+
+    // Create queue record
+    const queueId = cds.utils.uuid();
+    await INSERT.into(ProcessingQueue).entries({
+        ID: queueId,
+        userId: req.user.id,
+        status: 'queued',
+        totalFiles: files.length,
+        processedCount: 0,
+        autoCreatedCount: 0,
+        reviewRequiredCount: 0,
+        failedCount: 0,
+        autoCreateThreshold: autoCreateThreshold || 85.0,
+        startedAt: new Date()
+    });
+
+    LOG.info(`Created batch queue ${queueId} with ${files.length} files`);
+
+    // Process files sequentially in background
+    setImmediate(() => processBatchQueue(queueId, files, autoCreateThreshold, req.user.id));
+
+    // Estimate time (8 seconds per file)
+    const estimatedTime = files.length * 8;
+
+    return {
+        queueId,
+        totalFiles: files.length,
+        estimatedTime
+    };
+}
+
+/**
+ * Process batch queue sequentially
+ */
+async function processBatchQueue(queueId, files, autoCreateThreshold, userId) {
+    const LOG = cds.log('batch-processor');
+    const db = await cds.connect.to('db');
+    const { ProcessingQueue } = db.entities('cv.sorting');
+
+    await UPDATE(ProcessingQueue)
+        .set({ status: 'processing' })
+        .where({ ID: queueId });
+
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        LOG.info(`Processing file ${i + 1}/${files.length}: ${file.fileName}`);
+
+        await UPDATE(ProcessingQueue)
+            .set({ currentFile: file.fileName })
+            .where({ ID: queueId });
+
+        try {
+            // Create mock request for uploadAndProcessCV
+            const mockReq = {
+                data: {
+                    fileName: file.fileName,
+                    fileContent: file.fileContent,
+                    mediaType: file.mediaType,
+                    autoCreate: true
+                },
+                user: { id: userId },
+                reject: (code, msg) => { throw new Error(msg); },
+                error: (code, msg) => { throw new Error(msg); }
+            };
+
+            const result = await uploadAndProcessCV(mockReq);
+
+            // Update queue counters
+            const updates = { processedCount: i + 1 };
+            if (result.candidateId) {
+                const queue = await SELECT.one.from(ProcessingQueue).where({ ID: queueId });
+                updates.autoCreatedCount = (queue?.autoCreatedCount || 0) + 1;
+            } else if (result.requiresReview) {
+                const queue = await SELECT.one.from(ProcessingQueue).where({ ID: queueId });
+                updates.reviewRequiredCount = (queue?.reviewRequiredCount || 0) + 1;
+            }
+
+            await UPDATE(ProcessingQueue).set(updates).where({ ID: queueId });
+
+        } catch (error) {
+            LOG.error(`Failed to process ${file.fileName}: ${error.message}`);
+
+            const queue = await SELECT.one.from(ProcessingQueue).where({ ID: queueId });
+            await UPDATE(ProcessingQueue)
+                .set({
+                    failedCount: (queue?.failedCount || 0) + 1,
+                    processedCount: i + 1
+                })
+                .where({ ID: queueId });
+        }
+    }
+
+    // Mark queue as completed
+    await UPDATE(ProcessingQueue)
+        .set({
+            status: 'completed',
+            completedAt: new Date(),
+            currentFile: null
+        })
+        .where({ ID: queueId });
+
+    LOG.info(`Batch queue ${queueId} completed`);
+}
+
+/**
+ * Get batch processing progress
+ */
+async function getBatchProgress(req) {
+    const { queueId } = req.data;
+    const db = await cds.connect.to('db');
+
+    const queue = await SELECT.one.from('cv.sorting.ProcessingQueue')
+        .where({ ID: queueId });
+
+    if (!queue) {
+        req.reject(404, `Queue ${queueId} not found`);
+    }
+
+    // Calculate estimated time remaining
+    let estimatedTimeRemaining = 0;
+    if (queue.status === 'processing') {
+        const remaining = queue.totalFiles - queue.processedCount;
+        estimatedTimeRemaining = remaining * 8; // 8 seconds per file
+    }
+
+    return {
+        status: queue.status,
+        totalFiles: queue.totalFiles,
+        processed: queue.processedCount,
+        autoCreated: queue.autoCreatedCount,
+        reviewRequired: queue.reviewRequiredCount,
+        failed: queue.failedCount,
+        currentFile: queue.currentFile,
+        estimatedTimeRemaining
+    };
+}
+
 module.exports = {
     uploadAndProcessCV,
+    uploadBatchCVs,
+    getBatchProgress,
     createCandidateFromExtraction
 };
