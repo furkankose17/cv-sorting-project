@@ -928,6 +928,23 @@ service CVSortingService {
         recipientEmail: String(255);
     };
 
+    /**
+     * Mark notification as sent after n8n successfully sends email
+     * Called by n8n workflows after email delivery
+     */
+    action markNotificationSent(
+        statusHistory_ID: UUID not null,
+        candidate_ID: UUID not null,
+        jobPosting_ID: UUID,
+        recipientEmail: String(255) not null,
+        subject: String(500),
+        templateUsed: String(100),
+        n8nExecutionId: String(100)
+    ) returns {
+        success: Boolean;
+        notificationId: UUID;
+    };
+
     function getScoringCriteria(
         jobPostingId: UUID
     ) returns array of ScoringCriteria;

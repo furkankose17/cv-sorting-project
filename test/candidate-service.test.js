@@ -469,4 +469,120 @@ describe('Email Notification Functions', () => {
             expect(notifiedCandidate).to.not.exist;
         });
     });
+
+    describe('markNotificationSent', () => {
+        let testCandidateId;
+        let testStatusHistoryId;
+
+        beforeAll(async () => {
+            // Create test candidate
+            testCandidateId = uuidv4();
+            await db.run(
+                INSERT.into('cv.sorting.Candidates').entries({
+                    ID: testCandidateId,
+                    firstName: 'Test',
+                    lastName: 'Notification',
+                    email: 'test.notification@example.com',
+                    status_code: 'screening'
+                })
+            );
+
+            // Create status history entry
+            testStatusHistoryId = uuidv4();
+            await db.run(
+                INSERT.into('cv.sorting.CandidateStatusHistory').entries({
+                    ID: testStatusHistoryId,
+                    candidate_ID: testCandidateId,
+                    previousStatus_code: 'new',
+                    newStatus_code: 'screening',
+                    changedAt: new Date(),
+                    changedBy: 'test-user'
+                })
+            );
+        });
+
+        it('should create EmailNotifications record with correct data', async () => {
+            const result = await CVSortingService.markNotificationSent({
+                statusHistory_ID: testStatusHistoryId,
+                candidate_ID: testCandidateId,
+                recipientEmail: 'test.notification@example.com',
+                subject: 'Your Application Status Has Been Updated',
+                templateUsed: 'status_change_notification',
+                n8nExecutionId: 'exec_12345'
+            });
+
+            expect(result).to.exist;
+            expect(result.success).to.be.true;
+            expect(result.notificationId).to.be.a('string');
+
+            // Verify the record was created in database
+            const notification = await db.run(
+                SELECT.one.from('cv.sorting.EmailNotifications')
+                    .where({ ID: result.notificationId })
+            );
+
+            expect(notification).to.exist;
+            expect(notification.statusHistory_ID).to.equal(testStatusHistoryId);
+            expect(notification.candidate_ID).to.equal(testCandidateId);
+            expect(notification.notificationType).to.equal('status_changed');
+            expect(notification.deliveryStatus).to.equal('sent');
+            expect(notification.recipientEmail).to.equal('test.notification@example.com');
+            expect(notification.subject).to.equal('Your Application Status Has Been Updated');
+            expect(notification.templateUsed).to.equal('status_change_notification');
+            expect(notification.n8nExecutionId).to.equal('exec_12345');
+            expect(notification.sentAt).to.exist;
+        });
+
+        it('should be idempotent - calling multiple times should not create duplicates', async () => {
+            const params = {
+                statusHistory_ID: testStatusHistoryId,
+                candidate_ID: testCandidateId,
+                recipientEmail: 'test.notification@example.com',
+                subject: 'Your Application Status Has Been Updated',
+                templateUsed: 'status_change_notification',
+                n8nExecutionId: 'exec_idempotent_test'
+            };
+
+            // Call first time
+            const result1 = await CVSortingService.markNotificationSent(params);
+            expect(result1.success).to.be.true;
+
+            // Call second time with same parameters
+            const result2 = await CVSortingService.markNotificationSent(params);
+            expect(result2.success).to.be.true;
+
+            // Verify only one record exists for this combination
+            const notifications = await db.run(
+                SELECT.from('cv.sorting.EmailNotifications')
+                    .where({
+                        statusHistory_ID: testStatusHistoryId,
+                        n8nExecutionId: 'exec_idempotent_test'
+                    })
+            );
+
+            expect(notifications.length).to.equal(1);
+        });
+
+        it('should work with optional jobPosting_ID parameter', async () => {
+            const jobPostingId = uuidv4();
+
+            const result = await CVSortingService.markNotificationSent({
+                statusHistory_ID: testStatusHistoryId,
+                candidate_ID: testCandidateId,
+                jobPosting_ID: jobPostingId,
+                recipientEmail: 'test.notification@example.com',
+                subject: 'Application Update',
+                n8nExecutionId: 'exec_with_job'
+            });
+
+            expect(result.success).to.be.true;
+
+            const notification = await db.run(
+                SELECT.one.from('cv.sorting.EmailNotifications')
+                    .where({ ID: result.notificationId })
+            );
+
+            expect(notification.jobPosting_ID).to.equal(jobPostingId);
+        });
+    });
 });

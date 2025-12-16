@@ -1550,6 +1550,94 @@ module.exports = class CVSortingService extends cds.ApplicationService {
             }
         });
 
+        /**
+         * Mark notification as sent after n8n successfully delivers email
+         * Action is idempotent - can be called multiple times safely
+         */
+        this.on('markNotificationSent', async (req) => {
+            try {
+                const {
+                    statusHistory_ID,
+                    candidate_ID,
+                    jobPosting_ID,
+                    recipientEmail,
+                    subject,
+                    templateUsed,
+                    n8nExecutionId
+                } = req.data;
+
+                const db = cds.db;
+                const { EmailNotifications } = db.entities('cv.sorting');
+
+                // Check if notification already exists (idempotency)
+                if (statusHistory_ID && n8nExecutionId) {
+                    const existing = await SELECT.one.from(EmailNotifications)
+                        .where({
+                            statusHistory_ID: statusHistory_ID,
+                            n8nExecutionId: n8nExecutionId,
+                            deliveryStatus: 'sent'
+                        });
+
+                    if (existing) {
+                        LOG.info('Notification already marked as sent (idempotent)', {
+                            notificationId: existing.ID,
+                            statusHistory_ID,
+                            n8nExecutionId
+                        });
+                        return {
+                            success: true,
+                            notificationId: existing.ID
+                        };
+                    }
+                }
+
+                // Create new notification record
+                const notificationId = uuidv4();
+                const now = new Date();
+
+                await INSERT.into(EmailNotifications).entries({
+                    ID: notificationId,
+                    candidate_ID: candidate_ID,
+                    jobPosting_ID: jobPosting_ID || null,
+                    statusHistory_ID: statusHistory_ID,
+                    notificationType: 'status_changed',
+                    recipientEmail: recipientEmail,
+                    subject: subject || null,
+                    templateUsed: templateUsed || null,
+                    sentAt: now,
+                    deliveryStatus: 'sent',
+                    n8nExecutionId: n8nExecutionId || null
+                });
+
+                LOG.info('Email notification marked as sent', {
+                    notificationId,
+                    statusHistory_ID,
+                    candidate_ID,
+                    recipientEmail,
+                    n8nExecutionId
+                });
+
+                return {
+                    success: true,
+                    notificationId: notificationId
+                };
+
+            } catch (error) {
+                LOG.error('Error in markNotificationSent', {
+                    error: error.message,
+                    stack: error.stack,
+                    data: req.data
+                });
+
+                // Return error response
+                return {
+                    success: false,
+                    notificationId: null,
+                    error: error.message
+                };
+            }
+        });
+
         LOG.info('Email notification handlers registered');
     }
 
