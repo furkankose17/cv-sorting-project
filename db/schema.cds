@@ -780,6 +780,7 @@ entity JouleInsights : cuid, managed {
 entity EmailNotifications : cuid, managed {
     candidate: Association to Candidates;
     jobPosting: Association to JobPostings;
+    statusHistory: Association to CandidateStatusHistory;
     notificationType: String(50) enum {
         cv_received;
         status_changed;

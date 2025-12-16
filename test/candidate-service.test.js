@@ -420,9 +420,11 @@ describe('Email Notification Functions', () => {
                 })
             );
 
-            // Add status history entry
+            // Add status history entry with explicit ID
+            const statusHistoryId = uuidv4();
             await db.run(
                 INSERT.into('cv.sorting.CandidateStatusHistory').entries({
+                    ID: statusHistoryId,
                     candidate_ID: candidateWithSentNotification,
                     previousStatus_code: 'screening',
                     newStatus_code: 'interviewing',
@@ -431,10 +433,11 @@ describe('Email Notification Functions', () => {
                 })
             );
 
-            // Add email notification record for this status change
+            // Add email notification record for this status change with statusHistory_ID
             await db.run(
                 INSERT.into('cv.sorting.EmailNotifications').entries({
                     candidate_ID: candidateWithSentNotification,
+                    statusHistory_ID: statusHistoryId,
                     notificationType: 'status_changed',
                     recipientEmail: 'already.notified@example.com',
                     subject: 'Status Changed',

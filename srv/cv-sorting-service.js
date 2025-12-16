@@ -1469,66 +1469,83 @@ module.exports = class CVSortingService extends cds.ApplicationService {
          * Queries for status changes without corresponding sent email notifications
          */
         this.on('getPendingStatusNotifications', async (req) => {
-            LOG.info('Getting pending status notifications');
-
             try {
-                // Query for status history entries from the last 24 hours
-                const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+                const db = cds.db;
+                const { CandidateStatusHistory, Candidates, EmailNotifications } = db.entities('cv.sorting');
 
-                // Get all status history records from last 24 hours
+                // Get status changes from last 24 hours
+                const windowHours = parseInt(process.env.NOTIFICATION_WINDOW_HOURS) || 24;
+                const cutoffTime = new Date(Date.now() - windowHours * 60 * 60 * 1000);
+
                 const statusChanges = await SELECT.from(CandidateStatusHistory)
-                    .where`changedAt >= ${oneDayAgo.toISOString()}`
+                    .where`changedAt >= ${cutoffTime.toISOString()}`
                     .orderBy`changedAt desc`;
 
-                LOG.info('Found status changes', { count: statusChanges.length });
+                if (!statusChanges || statusChanges.length === 0) {
+                    LOG.info('No recent status changes found');
+                    return [];
+                }
 
+                // Batch query 1: Get all status history IDs that already have sent notifications
+                const statusHistoryIds = statusChanges.map(s => s.ID);
+                const sentNotifications = await SELECT.from(EmailNotifications)
+                    .columns('statusHistory_ID')
+                    .where({
+                        statusHistory_ID: { in: statusHistoryIds },
+                        notificationType: 'status_changed',
+                        deliveryStatus: 'sent'
+                    });
+
+                const sentStatusHistoryIds = new Set(
+                    sentNotifications.map(n => n.statusHistory_ID).filter(Boolean)
+                );
+
+                // Filter out status changes that already have sent notifications
+                const pendingStatusChanges = statusChanges.filter(
+                    sc => !sentStatusHistoryIds.has(sc.ID)
+                );
+
+                if (pendingStatusChanges.length === 0) {
+                    LOG.info('All status changes already have sent notifications');
+                    return [];
+                }
+
+                // Batch query 2: Get candidate emails for all pending changes
+                const candidateIds = [...new Set(pendingStatusChanges.map(sc => sc.candidate_ID))];
+                const candidates = await SELECT.from(Candidates)
+                    .columns(['ID', 'email'])
+                    .where({ ID: { in: candidateIds } });
+
+                const candidateMap = new Map(candidates.map(c => [c.ID, c]));
+
+                // Build result with email validation
                 const pendingNotifications = [];
+                for (const statusChange of pendingStatusChanges) {
+                    const candidate = candidateMap.get(statusChange.candidate_ID);
 
-                for (const statusChange of statusChanges) {
-                    // Check if there's already a sent notification for this status change
-                    const existingNotification = await SELECT.one.from(EmailNotifications)
-                        .where({
+                    // Validate email exists and is not empty
+                    if (candidate && candidate.email && candidate.email.trim() && candidate.email.includes('@')) {
+                        pendingNotifications.push({
                             candidate_ID: statusChange.candidate_ID,
-                            notificationType: 'status_changed',
-                            deliveryStatus: 'sent'
-                        })
-                        .and`sentAt >= ${statusChange.changedAt}`;
-
-                    // If no notification sent, add to pending list
-                    if (!existingNotification) {
-                        // Get candidate email
-                        const candidate = await SELECT.one.from(Candidates)
-                            .columns(['email'])
-                            .where({ ID: statusChange.candidate_ID });
-
-                        if (candidate && candidate.email) {
-                            // Get status names
-                            const previousStatusName = statusChange.previousStatus_code || 'none';
-                            const newStatusName = statusChange.newStatus_code || 'unknown';
-
-                            pendingNotifications.push({
-                                candidate_ID: statusChange.candidate_ID,
-                                statusHistory_ID: statusChange.ID,
-                                previousStatus: previousStatusName,
-                                newStatus: newStatusName,
-                                changedAt: statusChange.changedAt,
-                                recipientEmail: candidate.email
-                            });
-
-                            LOG.info('Found pending notification', {
-                                candidateId: statusChange.candidate_ID,
-                                email: candidate.email,
-                                statusChange: `${previousStatusName} -> ${newStatusName}`
-                            });
-                        }
+                            statusHistory_ID: statusChange.ID,
+                            previousStatus: statusChange.previousStatus_code || null,
+                            newStatus: statusChange.newStatus_code,
+                            changedAt: statusChange.changedAt,
+                            recipientEmail: candidate.email
+                        });
                     }
                 }
 
-                LOG.info('Returning pending notifications', { count: pendingNotifications.length });
+                LOG.info('Pending status notifications', {
+                    total: statusChanges.length,
+                    pending: pendingNotifications.length,
+                    alreadySent: sentStatusHistoryIds.size
+                });
+
                 return pendingNotifications;
 
             } catch (error) {
-                LOG.error('Error getting pending status notifications', { error: error.message });
+                LOG.error('Error in getPendingStatusNotifications', { error: error.message });
                 throw error;
             }
         });
