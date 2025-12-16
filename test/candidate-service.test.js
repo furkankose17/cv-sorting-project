@@ -367,3 +367,103 @@ describe('MatchingService', () => {
         });
     });
 });
+
+describe('Email Notification Functions', () => {
+    const { expect } = cds.test(__dirname + '/..');
+    const { v4: uuidv4 } = require('uuid');
+
+    let CVSortingService;
+    let db;
+
+    beforeAll(async () => {
+        CVSortingService = await cds.connect.to('CVSortingService');
+        db = await cds.connect.to('db');
+    });
+
+    describe('getPendingStatusNotifications', () => {
+        let candidateWithPendingNotification;
+        let candidateWithSentNotification;
+
+        beforeAll(async () => {
+            // Create candidate with pending status change notification
+            candidateWithPendingNotification = uuidv4();
+            await db.run(
+                INSERT.into('cv.sorting.Candidates').entries({
+                    ID: candidateWithPendingNotification,
+                    firstName: 'Pending',
+                    lastName: 'Notification',
+                    email: 'pending.notification@example.com',
+                    status_code: 'screening'
+                })
+            );
+
+            // Add status history entry (status change from 'new' to 'screening')
+            await db.run(
+                INSERT.into('cv.sorting.CandidateStatusHistory').entries({
+                    candidate_ID: candidateWithPendingNotification,
+                    previousStatus_code: 'new',
+                    newStatus_code: 'screening',
+                    changedAt: new Date(),
+                    changedBy: 'test-user'
+                })
+            );
+
+            // Create candidate with status change AND sent notification
+            candidateWithSentNotification = uuidv4();
+            await db.run(
+                INSERT.into('cv.sorting.Candidates').entries({
+                    ID: candidateWithSentNotification,
+                    firstName: 'Already',
+                    lastName: 'Notified',
+                    email: 'already.notified@example.com',
+                    status_code: 'interviewing'
+                })
+            );
+
+            // Add status history entry
+            await db.run(
+                INSERT.into('cv.sorting.CandidateStatusHistory').entries({
+                    candidate_ID: candidateWithSentNotification,
+                    previousStatus_code: 'screening',
+                    newStatus_code: 'interviewing',
+                    changedAt: new Date(),
+                    changedBy: 'test-user'
+                })
+            );
+
+            // Add email notification record for this status change
+            await db.run(
+                INSERT.into('cv.sorting.EmailNotifications').entries({
+                    candidate_ID: candidateWithSentNotification,
+                    notificationType: 'status_changed',
+                    recipientEmail: 'already.notified@example.com',
+                    subject: 'Status Changed',
+                    sentAt: new Date(),
+                    deliveryStatus: 'sent'
+                })
+            );
+        });
+
+        it('should return candidates with pending status change notifications', async () => {
+            const result = await CVSortingService.getPendingStatusNotifications();
+
+            expect(result).to.exist;
+            expect(Array.isArray(result)).to.be.true;
+
+            // Should include candidate with pending notification
+            const pendingCandidate = result.find(r => r.candidate_ID === candidateWithPendingNotification);
+            expect(pendingCandidate).to.exist;
+            expect(pendingCandidate.recipientEmail).to.equal('pending.notification@example.com');
+            expect(pendingCandidate.newStatus).to.exist;
+            expect(pendingCandidate.previousStatus).to.exist;
+        });
+
+        it('should NOT return candidates with already sent notifications', async () => {
+            const result = await CVSortingService.getPendingStatusNotifications();
+
+            // Should NOT include candidate with sent notification
+            const notifiedCandidate = result.find(r => r.candidate_ID === candidateWithSentNotification);
+            expect(notifiedCandidate).to.not.exist;
+        });
+    });
+});

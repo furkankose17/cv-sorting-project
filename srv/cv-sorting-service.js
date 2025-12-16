@@ -25,7 +25,7 @@ const { createMLClient } = require('./lib/ml-client');
 const { sanitizeString, validateLength } = require('./lib/validators');
 const RuleEngine = require('./lib/rule-engine');
 const cache = require('./lib/cache');
-const rateLimiter = require('./middleware/rate-limiter');
+const { createCapRateLimiter } = require('./middleware/rate-limiter');
 
 const LOG = cds.log('cv-sorting-service');
 
@@ -34,15 +34,13 @@ module.exports = class CVSortingService extends cds.ApplicationService {
     async init() {
         LOG.info('Initializing unified CV Sorting Service');
 
-        // Configure rate limiter
-        rateLimiter.configure({
+        // Register rate limiting middleware
+        const rateLimiterMiddleware = createCapRateLimiter({
             windowMs: 60 * 1000, // 1 minute
             maxRequests: parseInt(process.env.RATE_LIMIT_REQUESTS) || 100,
             keyGenerator: (req) => req.user?.id || req._.req?.ip || 'anonymous'
         });
-
-        // Register rate limiting middleware
-        this.before('*', rateLimiter.middleware());
+        this.before('*', rateLimiterMiddleware);
         LOG.info('Rate limiter configured');
 
         // Initialize ML client (shared across domains)
@@ -85,6 +83,11 @@ module.exports = class CVSortingService extends cds.ApplicationService {
         // AI/ML DOMAIN HANDLERS
         // ============================================================
         this._registerAIHandlers(entities);
+
+        // ============================================================
+        // EMAIL NOTIFICATION HANDLERS
+        // ============================================================
+        this._registerEmailNotificationHandlers(entities);
 
         // ============================================================
         // AUTO-EMBEDDING TRIGGERS
@@ -1452,6 +1455,85 @@ module.exports = class CVSortingService extends cds.ApplicationService {
         this.on('getMLServiceHealth', (req) => this._delegateToAIModule(req, 'handleGetMLServiceHealth'));
 
         LOG.info('AI domain handlers registered');
+    }
+
+    // ================================================================
+    // EMAIL NOTIFICATION HANDLERS
+    // ================================================================
+
+    _registerEmailNotificationHandlers(entities) {
+        const { Candidates, CandidateStatusHistory, EmailNotifications, CandidateStatuses } = entities;
+
+        /**
+         * Get candidates with pending status change notifications
+         * Queries for status changes without corresponding sent email notifications
+         */
+        this.on('getPendingStatusNotifications', async (req) => {
+            LOG.info('Getting pending status notifications');
+
+            try {
+                // Query for status history entries from the last 24 hours
+                const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+                // Get all status history records from last 24 hours
+                const statusChanges = await SELECT.from(CandidateStatusHistory)
+                    .where`changedAt >= ${oneDayAgo.toISOString()}`
+                    .orderBy`changedAt desc`;
+
+                LOG.info('Found status changes', { count: statusChanges.length });
+
+                const pendingNotifications = [];
+
+                for (const statusChange of statusChanges) {
+                    // Check if there's already a sent notification for this status change
+                    const existingNotification = await SELECT.one.from(EmailNotifications)
+                        .where({
+                            candidate_ID: statusChange.candidate_ID,
+                            notificationType: 'status_changed',
+                            deliveryStatus: 'sent'
+                        })
+                        .and`sentAt >= ${statusChange.changedAt}`;
+
+                    // If no notification sent, add to pending list
+                    if (!existingNotification) {
+                        // Get candidate email
+                        const candidate = await SELECT.one.from(Candidates)
+                            .columns(['email'])
+                            .where({ ID: statusChange.candidate_ID });
+
+                        if (candidate && candidate.email) {
+                            // Get status names
+                            const previousStatusName = statusChange.previousStatus_code || 'none';
+                            const newStatusName = statusChange.newStatus_code || 'unknown';
+
+                            pendingNotifications.push({
+                                candidate_ID: statusChange.candidate_ID,
+                                statusHistory_ID: statusChange.ID,
+                                previousStatus: previousStatusName,
+                                newStatus: newStatusName,
+                                changedAt: statusChange.changedAt,
+                                recipientEmail: candidate.email
+                            });
+
+                            LOG.info('Found pending notification', {
+                                candidateId: statusChange.candidate_ID,
+                                email: candidate.email,
+                                statusChange: `${previousStatusName} -> ${newStatusName}`
+                            });
+                        }
+                    }
+                }
+
+                LOG.info('Returning pending notifications', { count: pendingNotifications.length });
+                return pendingNotifications;
+
+            } catch (error) {
+                LOG.error('Error getting pending status notifications', { error: error.message });
+                throw error;
+            }
+        });
+
+        LOG.info('Email notification handlers registered');
     }
 
     // ================================================================

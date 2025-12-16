@@ -911,6 +911,23 @@ service CVSortingService {
         embeddingGenerated: Boolean;
     };
 
+    // ============================================
+    // EMAIL NOTIFICATION FUNCTIONS
+    // ============================================
+
+    /**
+     * Get candidates with pending status change notifications
+     * Returns status changes that don't have corresponding sent email notifications
+     */
+    function getPendingStatusNotifications() returns array of {
+        candidate_ID: UUID;
+        statusHistory_ID: UUID;
+        previousStatus: String(50);
+        newStatus: String(50);
+        changedAt: Timestamp;
+        recipientEmail: String(255);
+    };
+
     function getScoringCriteria(
         jobPostingId: UUID
     ) returns array of ScoringCriteria;
