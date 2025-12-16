@@ -16,6 +16,7 @@ from app.api.routes import (
     health_router,
     embeddings_router,
     ocr_router,
+    ocr_extraction_router,
     matching_router,
     scoring_router
 )
@@ -225,6 +226,7 @@ async def general_exception_handler(request, exc: Exception):
 app.include_router(health_router)
 app.include_router(embeddings_router)
 app.include_router(ocr_router)
+app.include_router(ocr_extraction_router)
 app.include_router(matching_router)
 app.include_router(scoring_router)
 
