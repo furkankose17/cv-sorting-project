@@ -1,30 +1,26 @@
 /**
- * CV Sorting Application - Consolidated Service Definitions
+ * CV Sorting Application - Unified Service
  *
- * Architecture: 3 Services
- * 1. CandidateService - Candidates, CVs, Documents, Skills
- * 2. JobService - Jobs, Matching, Analytics, Notifications, Admin
- * 3. AIService - Joule AI, ML Integration, Embeddings, OCR
+ * Single consolidated service combining:
+ * - Candidate Management (CRUD, documents, skills, interviews)
+ * - Job Management (postings, matching, analytics, notifications)
+ * - AI/ML Integration (Joule AI, embeddings, OCR, scoring)
  *
- * @see https://cap.cloud.sap/docs/guides/providing-services
+ * @path /api
  */
 using { cv.sorting as db } from '../db/schema';
 using { cuid, managed } from '@sap/cds/common';
 
-// ============================================
-// CANDIDATE SERVICE
-// ============================================
-// Handles: Candidates, CVs, Documents, Skills, Interviews
-// Merged from: CandidateService, CVProcessingService, CVService
+@path: '/api'
+@impl: './cv-sorting-service.js'
+service CVSortingService {
 
-@path: '/api/candidates'
-service CandidateService {
-
-    // ----------------------------------------
-    // MAIN ENTITIES
-    // ----------------------------------------
+    // ============================================
+    // CANDIDATE DOMAIN
+    // ============================================
 
     @odata.draft.enabled
+    @cds.redirection.target
     entity Candidates as projection on db.Candidates
         actions {
             @cds.odata.bindingparameter.name: '_it'
@@ -46,7 +42,6 @@ service CandidateService {
             ) returns Boolean;
         };
 
-    // Nested compositions
     @cds.redirection.target
     entity CVDocuments as projection on db.CVDocuments;
     entity WorkExperiences as projection on db.WorkExperiences;
@@ -94,29 +89,25 @@ service CandidateService {
             ) returns Interviews;
         };
 
-    // Document views
     @readonly
     entity Documents as projection on db.CVDocuments {
         *,
         candidate.firstName,
         candidate.lastName,
         candidate.email
-    } excluding { fileContent };
+    } excluding { fileContent }
+    actions {
+        action process() returns {
+            documentId: UUID;
+            status: String;
+            text: LargeString;
+            confidence: Decimal;
+        };
+    };
 
     entity DocumentUploads as projection on db.CVDocuments;
 
-    // Value helps
-    @readonly entity CandidateStatuses as projection on db.CandidateStatuses;
-    @readonly entity DegreeLevels as projection on db.DegreeLevels;
-    @readonly entity Skills as projection on db.Skills;
-    @readonly entity SkillCategories as projection on db.SkillCategories;
-    @readonly entity InterviewTypes as projection on db.InterviewTypes;
-    @readonly entity InterviewStatuses as projection on db.InterviewStatuses;
-
-    // ----------------------------------------
-    // FUNCTIONS (Read operations)
-    // ----------------------------------------
-
+    // Candidate Functions
     function searchCandidates(
         query: String,
         skills: array of UUID,
@@ -186,10 +177,7 @@ service CandidateService {
         warnings: array of String;
     };
 
-    // ----------------------------------------
-    // ACTIONS (Write operations)
-    // ----------------------------------------
-
+    // Candidate Actions
     action bulkUpdateStatus(
         candidateIds: array of UUID not null,
         newStatus: String not null,
@@ -225,6 +213,7 @@ service CandidateService {
         candidateId: UUID
     ) returns {
         documentId: UUID;
+        candidateId: UUID;
         processingStatus: String;
         message: String;
     };
@@ -268,46 +257,16 @@ service CandidateService {
         warnings: array of String;
     };
 
-    // Events
-    event DocumentUploaded {
-        documentId: UUID;
-        fileName: String;
-        uploadedBy: String;
-        timestamp: Timestamp;
-    }
-
-    event DocumentProcessed {
-        documentId: UUID;
-        success: Boolean;
-        candidateId: UUID;
-        confidence: Decimal;
-        timestamp: Timestamp;
-    }
-
-    event ProcessingFailed {
-        documentId: UUID;
-        errorCode: String;
-        errorMessage: String;
-        timestamp: Timestamp;
-    }
-}
-
-// ============================================
-// JOB SERVICE
-// ============================================
-// Handles: Jobs, Matching, Analytics, Notifications, Admin
-// Merged from: JobService, MatchingService, AnalyticsService, NotificationService, AdminService
-
-@path: '/api/jobs'
-service JobService {
-
-    // ----------------------------------------
-    // JOB ENTITIES
-    // ----------------------------------------
+    // ============================================
+    // JOB DOMAIN
+    // ============================================
 
     @odata.draft.enabled
     @cds.redirection.target
-    entity JobPostings as projection on db.JobPostings
+    entity JobPostings as projection on db.JobPostings {
+        *,
+        virtual null as statusCriticality : Integer
+    }
         actions {
             action publish() returns JobPostings;
             action close() returns JobPostings;
@@ -328,7 +287,9 @@ service JobService {
     entity MatchResults as projection on db.MatchResults {
         *,
         candidate: redirected to CandidateView,
-        jobPosting: redirected to JobView
+        jobPosting: redirected to JobView,
+        virtual null as scoreCriticality : Integer,
+        virtual null as reviewStatusCriticality : Integer
     } actions {
         action review(
             status: String not null,
@@ -350,55 +311,10 @@ service JobService {
     entity SortingConfigurations as projection on db.SortingConfigurations;
     entity SavedFilters as projection on db.SavedFilters;
 
-    // Admin entities
-    @cds.redirection.target
-    entity Skills as projection on db.Skills;
-    entity SkillCategories as projection on db.SkillCategories;
-    entity SkillRelations as projection on db.SkillRelations;
-    entity CandidateStatuses as projection on db.CandidateStatuses;
-    @cds.redirection.target
-    entity DegreeLevels as projection on db.DegreeLevels;
-
     @readonly entity AuditLogs as projection on db.AuditLogs;
     @readonly entity WorkflowInstances as projection on db.WorkflowInstances;
 
-    // Notification entities (in-memory)
-    @cds.persistence.skip
-    entity NotificationThresholds {
-        key id: UUID;
-        jobPostingId: UUID;
-        minScoreThreshold: Decimal default 70.0;
-        minCandidatesCount: Integer default 5;
-        notifyEmail: String;
-        isActive: Boolean default true;
-        lastNotifiedAt: Timestamp;
-        createdAt: Timestamp;
-        updatedAt: Timestamp;
-    }
-
-    @cds.persistence.skip
-    entity NotificationHistory {
-        key id: UUID;
-        jobPostingId: UUID;
-        notificationType: String enum { threshold_reached; new_match; candidate_update; system_alert; };
-        recipientEmail: String;
-        subject: String;
-        matchCount: Integer;
-        topScore: Decimal;
-        payload: LargeString;
-        sentAt: Timestamp;
-        deliveryStatus: String enum { pending; sent; failed };
-        errorMessage: String;
-    }
-
-    // Value helps
-    @readonly entity SkillsValueHelp as projection on db.Skills;
-    @readonly entity DegreeLevelsValueHelp as projection on db.DegreeLevels;
-
-    // ----------------------------------------
-    // JOB FUNCTIONS
-    // ----------------------------------------
-
+    // Job Functions
     function getJobStatistics(
         jobPostingId: UUID not null
     ) returns {
@@ -416,10 +332,7 @@ service JobService {
         recommendation: String;
     };
 
-    // ----------------------------------------
-    // MATCHING FUNCTIONS & ACTIONS
-    // ----------------------------------------
-
+    // Matching Functions & Actions
     action calculateMatch(
         candidateId: UUID not null,
         jobPostingId: UUID not null,
@@ -437,12 +350,14 @@ service JobService {
     action batchMatch(
         jobPostingId: UUID not null,
         candidateIds: array of UUID,
-        minScore: Decimal(5,2)
+        minScore: Decimal(5,2),
+        useSemanticMatching: Boolean  // Enable ML semantic matching (defaults to true in handler)
     ) returns {
         totalProcessed: Integer;
         matchesCreated: Integer;
         avgScore: Decimal(5,2);
         processingTime: Integer;
+        mlUsed: Boolean;  // Whether ML service was used
     };
 
     action rankCandidates(
@@ -512,10 +427,7 @@ service JobService {
         improvementTips: array of String;
     };
 
-    // ----------------------------------------
-    // ANALYTICS FUNCTIONS
-    // ----------------------------------------
-
+    // Analytics Functions
     function getPipelineOverview(
         fromDate: Date,
         toDate: Date
@@ -588,9 +500,34 @@ service JobService {
         change: Decimal(5,2);
     };
 
-    // ----------------------------------------
-    // NOTIFICATION ACTIONS & FUNCTIONS
-    // ----------------------------------------
+    // Notification Actions
+    @cds.persistence.skip
+    entity NotificationThresholds {
+        key id: UUID;
+        jobPostingId: UUID;
+        minScoreThreshold: Decimal default 70.0;
+        minCandidatesCount: Integer default 5;
+        notifyEmail: String;
+        isActive: Boolean default true;
+        lastNotifiedAt: Timestamp;
+        createdAt: Timestamp;
+        updatedAt: Timestamp;
+    }
+
+    @cds.persistence.skip
+    entity NotificationHistory {
+        key id: UUID;
+        jobPostingId: UUID;
+        notificationType: String enum { threshold_reached; new_match; candidate_update; system_alert; };
+        recipientEmail: String;
+        subject: String;
+        matchCount: Integer;
+        topScore: Decimal;
+        payload: LargeString;
+        sentAt: Timestamp;
+        deliveryStatus: String enum { pending; sent; failed };
+        errorMessage: String;
+    }
 
     action setThreshold(
         jobPostingId: UUID,
@@ -601,7 +538,6 @@ service JobService {
     ) returns NotificationThresholds;
 
     function getThreshold(jobPostingId: UUID) returns NotificationThresholds;
-
     action deleteThreshold(jobPostingId: UUID) returns { deleted: Boolean };
 
     action checkAndNotify(
@@ -628,31 +564,7 @@ service JobService {
         limit: Integer
     ) returns array of NotificationHistory;
 
-    function getLastNotificationTime(jobPostingId: UUID) returns {
-        sentAt: Timestamp;
-        type: String;
-    };
-
-    action recordNotification(
-        jobPostingId: UUID,
-        notificationType: String,
-        matchCount: Integer,
-        sentAt: Timestamp
-    ) returns { recorded: Boolean };
-
-    function getActiveThresholds() returns array of NotificationThresholds;
-
-    action batchCheckThresholds() returns array of {
-        jobPostingId: UUID;
-        shouldNotify: Boolean;
-        matchCount: Integer;
-        threshold: Integer;
-    };
-
-    // ----------------------------------------
-    // ADMIN ACTIONS
-    // ----------------------------------------
-
+    // Admin Actions
     action importSkills(
         skills: array of { name: String; category: String; aliases: array of String }
     ) returns {
@@ -684,21 +596,10 @@ service JobService {
         jouleAI: String;
         timestamp: Timestamp;
     };
-}
 
-// ============================================
-// AI SERVICE
-// ============================================
-// Handles: Joule AI, ML Integration, Embeddings, OCR, Scoring Criteria
-// Merged from: JouleService, MLIntegrationService
-
-@path: '/api/ai'
-@requires: 'authenticated-user'
-service AIService {
-
-    // ----------------------------------------
-    // ENTITIES
-    // ----------------------------------------
+    // ============================================
+    // AI/ML DOMAIN
+    // ============================================
 
     entity Conversations as projection on db.JouleConversations;
     entity Messages as projection on db.JouleMessages;
@@ -719,10 +620,7 @@ service AIService {
         sortOrder: Integer;
     };
 
-    // ----------------------------------------
-    // JOULE CONVERSATIONAL AI
-    // ----------------------------------------
-
+    // Joule AI Actions
     action chat(
         sessionId: String,
         message: String,
@@ -849,16 +747,6 @@ service AIService {
         message: String;
     };
 
-    action learnFromDecision(
-        candidateId: UUID,
-        jobPostingId: UUID,
-        decision: String,
-        decisionFactors: String
-    ) returns {
-        acknowledged: Boolean;
-        modelImpact: String;
-    };
-
     function quickStat(query: String) returns {
         answer: String;
         value: String;
@@ -880,10 +768,7 @@ service AIService {
         suggestions: array of String;
     };
 
-    // ----------------------------------------
-    // ML INTEGRATION (Embeddings, OCR, Scoring)
-    // ----------------------------------------
-
+    // ML Integration Actions
     action generateCandidateEmbedding(
         candidateId: UUID
     ) returns {
@@ -963,6 +848,69 @@ service AIService {
         structuredData: LargeString;
     };
 
+    // ============================================
+    // OCR PROCESSING ACTIONS
+    // ============================================
+
+    /**
+     * Upload and process single CV with OCR
+     */
+    action uploadAndProcessCV(
+        fileName: String not null,
+        fileContent: LargeBinary not null,
+        mediaType: String not null,
+        autoCreate: Boolean default false
+    ) returns {
+        documentId: UUID;
+        ocrStatus: String;
+        confidence: Decimal;
+        extractedData: String;
+        candidateId: UUID;
+        requiresReview: Boolean;
+    };
+
+    /**
+     * Upload batch of CVs for processing
+     */
+    action uploadBatchCVs(
+        files: array of {
+            fileName: String;
+            fileContent: LargeBinary;
+            mediaType: String;
+        },
+        autoCreateThreshold: Decimal default 85.0
+    ) returns {
+        queueId: UUID;
+        totalFiles: Integer;
+        estimatedTime: Integer;
+    };
+
+    /**
+     * Get batch processing progress
+     */
+    function getBatchProgress(queueId: UUID not null) returns {
+        status: String;
+        totalFiles: Integer;
+        processed: Integer;
+        autoCreated: Integer;
+        reviewRequired: Integer;
+        failed: Integer;
+        currentFile: String;
+        estimatedTimeRemaining: Integer;
+    };
+
+    /**
+     * Review and create candidate from low-confidence extraction
+     */
+    action reviewAndCreateCandidate(
+        documentId: UUID not null,
+        editedData: String not null
+    ) returns {
+        candidateId: UUID;
+        linkedSkillsCount: Integer;
+        embeddingGenerated: Boolean;
+    };
+
     function getScoringCriteria(
         jobPostingId: UUID
     ) returns array of ScoringCriteria;
@@ -1026,20 +974,160 @@ service AIService {
         ocr: Boolean;
     };
 
-    // Events
+    // ============================================
+    // SHARED MASTER DATA
+    // ============================================
+
+    @cds.redirection.target
+    entity Skills as projection on db.Skills;
+    entity SkillCategories as projection on db.SkillCategories;
+    entity SkillRelations as projection on db.SkillRelations;
+    @readonly entity CandidateStatuses as projection on db.CandidateStatuses;
+    @cds.redirection.target
+    entity DegreeLevels as projection on db.DegreeLevels;
+    @readonly entity InterviewTypes as projection on db.InterviewTypes;
+    @readonly entity InterviewStatuses as projection on db.InterviewStatuses;
+
+    // ============================================
+    // SCORING RULE ENGINE
+    // ============================================
+
+    @cds.redirection.target
+    entity ScoringRuleTemplates as projection on db.ScoringRuleTemplates
+        actions {
+            action activate() returns ScoringRuleTemplates;
+            action deactivate() returns ScoringRuleTemplates;
+            action duplicate(newName: String) returns ScoringRuleTemplates;
+        };
+
+    @cds.redirection.target
+    entity ScoringRules as projection on db.ScoringRules
+        actions {
+            action activate() returns ScoringRules;
+            action deactivate() returns ScoringRules;
+            action testRule(
+                candidateData: String,
+                jobData: String
+            ) returns {
+                wouldMatch: Boolean;
+                conditionResult: Boolean;
+                actionResult: String;
+                beforeScore: Decimal;
+                afterScore: Decimal;
+            };
+        };
+
+    // Rule Engine Functions
+    function getRuleTemplates(
+        category: String,
+        isGlobal: Boolean
+    ) returns array of {
+        templateId: UUID;
+        name: String;
+        description: String;
+        category: String;
+        ruleCount: Integer;
+        usageCount: Integer;
+    };
+
+    function evaluateRulesForJob(
+        jobPostingId: UUID not null,
+        candidateId: UUID not null,
+        includeAuditTrail: Boolean
+    ) returns {
+        totalRulesEvaluated: Integer;
+        rulesMatched: Integer;
+        preFilterPassed: Boolean;
+        disqualified: Boolean;
+        disqualificationReason: String;
+        originalScore: Decimal;
+        finalScore: Decimal;
+        auditTrail: array of {
+            ruleId: UUID;
+            ruleName: String;
+            matched: Boolean;
+            actionTaken: String;
+            scoreImpact: Decimal;
+        };
+    };
+
+    function validateRuleSyntax(
+        conditions: String not null,
+        actions: String not null
+    ) returns {
+        valid: Boolean;
+        errors: array of String;
+        warnings: array of String;
+    };
+
+    // Rule Engine Actions
+    action applyTemplateToJob(
+        jobPostingId: UUID not null,
+        templateId: UUID not null,
+        replaceExisting: Boolean
+    ) returns {
+        success: Boolean;
+        rulesApplied: Integer;
+    };
+
+    action dryRunMatching(
+        jobPostingId: UUID not null,
+        candidateIds: array of UUID,
+        testRules: array of {
+            ruleType: String;
+            conditions: String;
+            actions: String;
+            priority: Integer;
+        }
+    ) returns array of {
+        candidateId: UUID;
+        currentScore: Decimal;
+        projectedScore: Decimal;
+        scoreDelta: Decimal;
+        rulesApplied: Integer;
+        wouldBeDisqualified: Boolean;
+    };
+
+    action createRuleTemplate(
+        name: String not null,
+        description: String,
+        category: String,
+        rules: array of {
+            name: String;
+            ruleType: String;
+            conditions: String;
+            actions: String;
+            priority: Integer;
+        }
+    ) returns {
+        templateId: UUID;
+        rulesCreated: Integer;
+    };
+
+    // ============================================
+    // EVENTS
+    // ============================================
+
+    event DocumentUploaded {
+        documentId: UUID;
+        fileName: String;
+        uploadedBy: String;
+        timestamp: Timestamp;
+    }
+
+    event DocumentProcessed {
+        documentId: UUID;
+        success: Boolean;
+        candidateId: UUID;
+        confidence: Decimal;
+        timestamp: Timestamp;
+    }
+
     event JouleQueryProcessed {
         sessionId: String;
         queryType: String;
         processingTime: Integer;
         resultCount: Integer;
-        timestamp: Timestamp;
-    }
-
-    event InsightGenerated {
-        entityType: String;
-        entityId: UUID;
-        insightType: String;
-        confidence: Decimal;
         timestamp: Timestamp;
     }
 }
