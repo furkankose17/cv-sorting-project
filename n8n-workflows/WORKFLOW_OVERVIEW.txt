@@ -1,0 +1,243 @@
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         n8n Email Automation Workflows                      │
+│                              CV Sorting Application                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WORKFLOW 1: Status Change Notification
+───────────────────────────────────────
+Trigger: Webhook (POST /webhook/status-change)
+Purpose: Send status update emails when candidate status changes
+
+Flow:
+┌──────────────┐    ┌───────────────┐    ┌──────────────┐    ┌────────────┐
+│   Webhook    │───▶│ Get Candidate │───▶│  Transform   │───▶│ Send Email │
+│   Trigger    │    │    Details    │    │     Data     │    │            │
+└──────────────┘    └───────────────┘    └──────────────┘    └────────────┘
+                                                                      │
+┌──────────────┐    ┌───────────────┐                               │
+│   Webhook    │◀───│ Mark Sent     │◀──────────────────────────────┘
+│   Response   │    │               │
+└──────────────┘    └───────────────┘
+
+Error Path:
+┌──────────────┐    ┌───────────────┐
+│    Error     │───▶│     Error     │
+│   Handler    │    │   Response    │
+└──────────────┘    └───────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WORKFLOW 2: CV Received Confirmation
+─────────────────────────────────────
+Trigger: Webhook (POST /webhook/cv-received)
+Purpose: Confirm CV receipt and processing
+
+Flow:
+┌──────────────┐    ┌───────────────┐    ┌──────────────┐    ┌────────────┐
+│   Webhook    │───▶│ Get Candidate │───▶│  Transform   │───▶│ Send Email │
+│   Trigger    │    │  + Documents  │    │     Data     │    │            │
+└──────────────┘    └───────────────┘    └──────────────┘    └────────────┘
+                                                                      │
+┌──────────────┐    ┌───────────────┐                               │
+│   Webhook    │◀───│ Mark Sent     │◀──────────────────────────────┘
+│   Response   │    │               │
+└──────────────┘    └───────────────┘
+
+Features:
+• Displays extracted CV data (skills, experience)
+• Shows matching results if available
+• Personalized confirmation message
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WORKFLOW 3: Interview Scheduling
+─────────────────────────────────
+Trigger: Webhook (POST /webhook/interview-schedule)
+Purpose: Send interview invitations with calendar attachments
+
+Flow:
+┌──────────────┐    ┌───────────────┐    ┌──────────────┐
+│   Webhook    │───▶│ Get Interview │───▶│   Generate   │
+│   Trigger    │    │    Details    │    │  Calendar    │
+└──────────────┘    └───────────────┘    │  (ICS File)  │
+                                          └──────────────┘
+                                                  │
+┌──────────────┐    ┌───────────────┐    ┌──────────────┐    ┌────────────┐
+│   Webhook    │◀───│ Mark Sent     │◀───│    Create    │◀───│ Send Email │
+│   Response   │    │               │    │   Calendar   │    │ + Attach   │
+└──────────────┘    └───────────────┘    │    Record    │    │            │
+                                          └──────────────┘    └────────────┘
+
+Features:
+• ICS calendar file generation
+• Meeting link integration
+• Interview details and notes
+• Calendar event tracking
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WORKFLOW 4: Interview Reminders
+────────────────────────────────
+Trigger: Schedule (Every hour)
+Purpose: Send reminder emails 24 hours before interviews
+
+Flow:
+┌──────────────┐    ┌───────────────┐    ┌──────────────┐
+│   Schedule   │───▶│ Get Upcoming  │───▶│    Filter    │
+│  (Hourly)    │    │  Interviews   │    │  Interviews  │
+└──────────────┘    └───────────────┘    │  (24-48hrs)  │
+                                          └──────────────┘
+                                                  │
+                                     ┌────────────┴────────────┐
+                                     │                         │
+                                     ▼                         ▼
+                          ┌──────────────┐         ┌──────────────┐
+                          │  Transform   │         │ No Interviews│
+                          │     Data     │         │   Handler    │
+                          └──────────────┘         └──────────────┘
+                                  │
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌────────────┐
+│  Summarize   │◀───│    Update    │◀───│ Send Email   │◀───┘
+│   Results    │    │  Reminder    │    │              │
+└──────────────┘    │     Flag     │    └──────────────┘
+                    └──────────────┘
+
+Features:
+• Automatic scheduling (runs every hour)
+• Smart filtering (24-48 hour window)
+• Prevents duplicate reminders
+• Success/failure summary
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WORKFLOW 5: Pending Notifications Poller
+─────────────────────────────────────────
+Trigger: Schedule (Every 5 minutes)
+Purpose: Poll and process pending status change notifications
+
+Flow:
+┌──────────────┐    ┌───────────────┐    ┌──────────────┐
+│   Schedule   │───▶│ Get Pending   │───▶│    Split     │
+│ (Every 5min) │    │ Notifications │    │Notifications │
+└──────────────┘    └───────────────┘    └──────────────┘
+                                                  │
+                                     ┌────────────┴────────────┐
+                                     │                         │
+                                     ▼                         ▼
+                          ┌──────────────┐         ┌──────────────┐
+                          │ Get Candidate│         │      No      │
+                          │   Details    │         │Notifications │
+                          └──────────────┘         └──────────────┘
+                                  │
+                          ┌──────────────┐
+                          │  Transform   │
+                          │     Data     │
+                          └──────────────┘
+                                  │
+                          ┌──────────────┐
+                          │ Send Email   │◀───┐
+                          └──────────────┘    │ Error Path
+                                  │           │
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌────────────┐
+│  Summarize   │◀───│ Mark Sent    │◀───┘              │    │   Error    │
+│   Results    │    │              │                    │    │  Handler   │
+└──────────────┘    └──────────────┘              ┌─────┴────┴────────┐
+       ▲                                           │    Log Error      │
+       └───────────────────────────────────────────┤                   │
+                                                   └───────────────────┘
+
+Features:
+• Frequent polling (every 5 minutes)
+• Batch processing with individual error handling
+• Error logging to CAP service
+• Comprehensive result summary
+• Retry capability for failed notifications
+
+═══════════════════════════════════════════════════════════════════════════════
+
+COMMON FEATURES ACROSS ALL WORKFLOWS:
+──────────────────────────────────────
+
+✓ Environment Variable Configuration
+  • CAP_SERVICE_URL
+  • EMAIL_FROM / EMAIL_FROM_NAME
+  • TEMPLATE_PATH
+
+✓ Credential Management
+  • SMTP credentials
+  • CAP service authentication (HTTP Header Auth)
+
+✓ Template-Based Email Generation
+  • HTML email templates
+  • Fallback to simple HTML if template not found
+  • Dynamic variable replacement
+
+✓ Error Handling
+  • Dedicated error handler nodes
+  • Error logging and reporting
+  • Graceful degradation
+
+✓ Audit Trail
+  • markNotificationSent action calls
+  • Timestamp tracking
+  • Metadata storage
+
+✓ Production Ready
+  • Proper node positioning
+  • Clear naming conventions
+  • Comprehensive logging
+  • Retry logic where appropriate
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WEBHOOK URLS (for CAP Service Configuration):
+──────────────────────────────────────────────
+
+Status Change:         http://n8n-instance:5678/webhook/status-change
+CV Received:           http://n8n-instance:5678/webhook/cv-received
+Interview Scheduling:  http://n8n-instance:5678/webhook/interview-schedule
+
+═══════════════════════════════════════════════════════════════════════════════
+
+SCHEDULE CONFIGURATION:
+───────────────────────
+
+Interview Reminders:           Every hour (0 * * * *)
+Pending Notifications Poller:  Every 5 minutes (*/5 * * * *)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+INTEGRATION POINTS WITH CAP SERVICE:
+────────────────────────────────────
+
+OData Endpoints:
+• GET  /odata/v4/candidate/Candidates({id})
+• GET  /odata/v4/candidate/Interviews({id})
+• GET  /odata/v4/candidate/Interviews?$filter=...
+• POST /odata/v4/candidate/InterviewCalendarEvents
+• PATCH /odata/v4/candidate/Interviews({id})
+
+Functions/Actions:
+• POST /odata/v4/candidate/getPendingStatusNotifications
+• POST /odata/v4/candidate/markNotificationSent
+• POST /odata/v4/candidate/logNotificationError
+
+═══════════════════════════════════════════════════════════════════════════════
+
+DEPLOYMENT CHECKLIST:
+─────────────────────
+
+□ Install n8n (version 1.x or later)
+□ Import all 5 workflow JSON files
+□ Configure SMTP credentials in n8n
+□ Configure CAP service authentication
+□ Set environment variables
+□ Place email templates in TEMPLATE_PATH
+□ Test webhook endpoints
+□ Activate workflows
+□ Configure CAP service to call webhooks
+□ Monitor execution logs
+
+═══════════════════════════════════════════════════════════════════════════════
