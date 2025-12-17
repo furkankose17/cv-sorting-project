@@ -154,6 +154,79 @@ def parse_work_history(text: str) -> List[Dict[str, Any]]:
     return jobs
 
 
+def parse_education(text: str) -> List[Dict[str, Any]]:
+    """
+    Parse education section into structured entries.
+
+    Each entry has: degree, fieldOfStudy, institution, graduationYear
+    """
+    education = []
+    lines = [l.strip() for l in text.strip().split('\n') if l.strip()]
+
+    if not lines:
+        return education
+
+    # Degree patterns
+    degree_patterns = [
+        r"(Master of Science|Master of Arts|Master of Business Administration|Master's|M\.S\.|M\.A\.|MBA)",
+        r"(Bachelor of Science|Bachelor of Arts|Bachelor's|B\.S\.|B\.A\.)",
+        r"(Doctor of Philosophy|Ph\.D\.|PhD|Doctorate)",
+        r"(Associate's|Associate of|A\.S\.|A\.A\.)",
+    ]
+    combined_degree_pattern = '|'.join(f'({p})' for p in degree_patterns)
+
+    # Year pattern
+    year_pattern = r'\b(19|20)\d{2}\b'
+
+    # Institution indicators
+    institution_indicators = ['university', 'college', 'institute', 'school', 'academy']
+
+    current_edu = None
+
+    for i, line in enumerate(lines):
+        # Check if line contains a degree
+        degree_match = re.search(combined_degree_pattern, line, re.IGNORECASE)
+
+        if degree_match:
+            # Save previous education if exists
+            if current_edu:
+                education.append(current_edu)
+
+            degree = degree_match.group(0)
+
+            # Extract field of study (text after degree, before institution/year)
+            after_degree = line[degree_match.end():].strip()
+            field_match = re.match(r'\s*(?:in|of)?\s*([^|,\d]+)', after_degree, re.IGNORECASE)
+            field_of_study = field_match.group(1).strip() if field_match else ""
+
+            current_edu = {
+                "degree": {"value": degree, "confidence": 92},
+                "fieldOfStudy": {"value": field_of_study, "confidence": 85 if field_of_study else 50},
+                "institution": {"value": "", "confidence": 50},
+                "graduationYear": {"value": "", "confidence": 50},
+            }
+
+        elif current_edu:
+            # Check for institution
+            is_institution = any(ind in line.lower() for ind in institution_indicators)
+            year_match = re.search(year_pattern, line)
+
+            if is_institution or year_match:
+                # Extract institution (everything before year/pipe)
+                institution_part = re.split(r'\||\d{4}', line)[0].strip()
+                if institution_part:
+                    current_edu["institution"] = {"value": institution_part, "confidence": 88}
+
+                if year_match:
+                    current_edu["graduationYear"] = {"value": year_match.group(0), "confidence": 95}
+
+    # Don't forget the last education entry
+    if current_edu:
+        education.append(current_edu)
+
+    return education
+
+
 class FieldExtraction(BaseModel):
     """Single field extraction result."""
     value: Optional[str] = None
