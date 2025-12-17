@@ -112,3 +112,40 @@ def test_parse_skills_bullet_points():
 """
     skills = parse_skills(text)
     assert len(skills) == 3
+
+def test_extract_tier2_professional_structured():
+    """Integration test for the new tier2 extraction using structured parsers."""
+    from app.api.routes.ocr_extraction import extract_tier2_professional
+
+    text = """John Smith
+Email: john@email.com
+
+WORK EXPERIENCE
+
+Senior Software Engineer
+Tech Solutions Inc. | 2020 - Present
+- Led development of cloud-native applications
+
+EDUCATION
+
+Master of Science in Computer Science
+Stanford University | 2017
+
+SKILLS
+
+Python, JavaScript, React, Docker
+"""
+    tier2 = extract_tier2_professional(text)
+
+    # Work history should be structured
+    assert len(tier2["workHistory"]) >= 1
+    assert "jobTitle" in tier2["workHistory"][0]
+    assert tier2["workHistory"][0]["jobTitle"]["value"] == "Senior Software Engineer"
+
+    # Education should be structured
+    assert len(tier2["education"]) >= 1
+    assert "degree" in tier2["education"][0]
+
+    # Skills should be individual tags
+    assert len(tier2["skills"]) >= 4
+    assert "name" in tier2["skills"][0]

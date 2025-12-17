@@ -408,34 +408,40 @@ def extract_tier1_personal_info(text: str) -> Dict[str, FieldExtraction]:
 
 
 def extract_tier2_professional(text: str) -> Dict[str, Any]:
-    """Extract tier 2 professional background."""
+    """
+    Extract tier 2 professional background with fully structured fields.
+
+    Returns:
+        workHistory: List of structured job entries
+        education: List of structured education entries
+        skills: List of individual skill tags
+    """
     tier2 = {
         "workHistory": [],
         "education": [],
         "skills": []
     }
 
-    # Extract work history section
-    work_pattern = r'(?:WORK\s+EXPERIENCE|EXPERIENCE|EMPLOYMENT\s+HISTORY)(.*?)(?=EDUCATION|SKILLS|$)'
-    work_match = re.search(work_pattern, text, re.IGNORECASE | re.DOTALL)
+    # Find section boundaries using fuzzy matching
+    sections = find_section_headers(text)
 
-    if work_match:
-        work_text = work_match.group(1)
-        # Simple extraction: look for company/role patterns
-        # This is a basic implementation - real version would be more sophisticated
-        lines = work_text.strip().split('\n')
-        current_job = {}
-        for line in lines:
-            line = line.strip()
-            if line and len(line) > 5:
-                # Heuristic: lines with dates are likely positions
-                if re.search(r'\d{4}', line):
-                    if current_job:
-                        tier2["workHistory"].append(current_job)
-                    current_job = {"role": line, "confidence": 75}
+    # Extract work history
+    if "work_experience" in sections:
+        start, end = sections["work_experience"]
+        work_text = text[start:end]
+        tier2["workHistory"] = parse_work_history(work_text)
 
-        if current_job:
-            tier2["workHistory"].append(current_job)
+    # Extract education
+    if "education" in sections:
+        start, end = sections["education"]
+        edu_text = text[start:end]
+        tier2["education"] = parse_education(edu_text)
+
+    # Extract skills
+    if "skills" in sections:
+        start, end = sections["skills"]
+        skills_text = text[start:end]
+        tier2["skills"] = parse_skills(skills_text)
 
     return tier2
 
