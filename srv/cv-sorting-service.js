@@ -238,7 +238,7 @@ module.exports = class CVSortingService extends cds.ApplicationService {
 
     _registerCandidateHandlers(entities) {
         const { Candidates, CandidateSkills, Skills, CandidateNotes, CVDocuments,
-                WorkExperiences, Educations, MatchResults, Interviews } = entities;
+                WorkExperiences, Educations, MatchResults, Interviews, CandidateStatusHistory } = entities;
 
         // ----- Bound Actions on Candidates -----
 
@@ -682,6 +682,60 @@ module.exports = class CVSortingService extends cds.ApplicationService {
                     processingError: error.message
                 });
                 req.error(500, `OCR processing failed: ${error.message}`);
+            }
+        });
+
+        // ----- Status Change Tracking Hooks -----
+
+        // Track status changes - capture previous status before update
+        this.before('UPDATE', 'Candidates', async (req) => {
+            if (!req.data.status_code) return;
+
+            // For UPDATE operations, we need to get the current records that will be updated
+            // Execute a SELECT with the same WHERE clause as the UPDATE
+            const currentRecords = await SELECT.from(Candidates)
+                .where(req.query.UPDATE.where)
+                .columns(['ID', 'status_code']);
+
+            // Store the status changes for each candidate that will actually change
+            req._statusChanges = [];
+
+            for (const record of currentRecords) {
+                if (record.status_code !== req.data.status_code) {
+                    req._statusChanges.push({
+                        candidateId: record.ID,
+                        previousStatus: record.status_code,
+                        newStatus: req.data.status_code
+                    });
+                }
+            }
+        });
+
+        // Create history record after successful status change
+        this.after('UPDATE', 'Candidates', async (data, req) => {
+            if (req._statusChanges && req._statusChanges.length > 0) {
+                // Create history entries for all status changes
+                const historyEntries = req._statusChanges.map(change => ({
+                    ID: uuidv4(),
+                    candidate_ID: change.candidateId,
+                    previousStatus_code: change.previousStatus,
+                    newStatus_code: change.newStatus,
+                    changedAt: new Date().toISOString(),
+                    changedBy: req.user?.id || 'system',
+                    reason: req.data.statusChangeReason || null,
+                    notes: req.data.statusChangeNotes || null
+                }));
+
+                await INSERT.into(CandidateStatusHistory).entries(historyEntries);
+
+                LOG.info('Status change tracked', {
+                    count: historyEntries.length,
+                    changes: req._statusChanges.map(c => ({
+                        candidateId: c.candidateId,
+                        from: c.previousStatus,
+                        to: c.newStatus
+                    }))
+                });
             }
         });
 

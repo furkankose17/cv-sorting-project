@@ -368,6 +368,139 @@ describe('MatchingService', () => {
     });
 });
 
+describe('Status Change Tracking', () => {
+    const { expect } = cds.test(__dirname + '/..');
+    const { v4: uuidv4 } = require('uuid');
+
+    let CVSortingService;
+    let db;
+    let testCandidateId;
+
+    beforeAll(async () => {
+        CVSortingService = await cds.connect.to('CVSortingService');
+        db = await cds.connect.to('db');
+
+        // Create test candidate with initial status
+        testCandidateId = uuidv4();
+        await db.run(
+            INSERT.into('cv.sorting.Candidates').entries({
+                ID: testCandidateId,
+                firstName: 'Status',
+                lastName: 'Tracker',
+                email: 'status.tracker@example.com',
+                status_code: 'new'
+            })
+        );
+    });
+
+    it('should automatically create CandidateStatusHistory when status changes', async () => {
+        // Update candidate status from 'new' to 'screening'
+        await CVSortingService.run(
+            UPDATE('Candidates')
+                .where({ ID: testCandidateId })
+                .set({ status_code: 'screening' })
+        );
+
+        // Verify status history was created
+        const history = await db.run(
+            SELECT.from('cv.sorting.CandidateStatusHistory')
+                .where({ candidate_ID: testCandidateId })
+                .orderBy('changedAt desc')
+                .limit(1)
+        );
+
+        expect(history).to.exist;
+        expect(history.length).to.equal(1);
+        expect(history[0].previousStatus_code).to.equal('new');
+        expect(history[0].newStatus_code).to.equal('screening');
+        expect(history[0].changedAt).to.exist;
+        expect(history[0].changedBy).to.exist;
+    });
+
+    it('should include reason and notes in status history if provided', async () => {
+        // Update status with reason and notes
+        await CVSortingService.run(
+            UPDATE('Candidates')
+                .where({ ID: testCandidateId })
+                .set({
+                    status_code: 'interviewing',
+                    statusChangeReason: 'Passed initial screening',
+                    statusChangeNotes: 'Strong technical background'
+                })
+        );
+
+        // Verify history includes reason and notes
+        const history = await db.run(
+            SELECT.from('cv.sorting.CandidateStatusHistory')
+                .where({ candidate_ID: testCandidateId, newStatus_code: 'interviewing' })
+        );
+
+        expect(history).to.exist;
+        expect(history.length).to.equal(1);
+        expect(history[0].reason).to.equal('Passed initial screening');
+        expect(history[0].notes).to.equal('Strong technical background');
+    });
+
+    it('should NOT create history when updating other fields (name, email)', async () => {
+        // Get current history count
+        const historyBefore = await db.run(
+            SELECT.from('cv.sorting.CandidateStatusHistory')
+                .where({ candidate_ID: testCandidateId })
+        );
+        const countBefore = historyBefore.length;
+
+        // Update non-status fields
+        await CVSortingService.run(
+            UPDATE('Candidates')
+                .where({ ID: testCandidateId })
+                .set({
+                    firstName: 'Updated',
+                    email: 'updated.tracker@example.com',
+                    headline: 'Senior Developer'
+                })
+        );
+
+        // Verify no new history was created
+        const historyAfter = await db.run(
+            SELECT.from('cv.sorting.CandidateStatusHistory')
+                .where({ candidate_ID: testCandidateId })
+        );
+
+        expect(historyAfter.length).to.equal(countBefore);
+    });
+
+    it('should NOT create history when status is set to the same value', async () => {
+        // Get current status
+        const candidate = await db.run(
+            SELECT.one.from('cv.sorting.Candidates')
+                .where({ ID: testCandidateId })
+        );
+        const currentStatus = candidate.status_code;
+
+        // Get current history count
+        const historyBefore = await db.run(
+            SELECT.from('cv.sorting.CandidateStatusHistory')
+                .where({ candidate_ID: testCandidateId })
+        );
+        const countBefore = historyBefore.length;
+
+        // Update with same status
+        await CVSortingService.run(
+            UPDATE('Candidates')
+                .where({ ID: testCandidateId })
+                .set({ status_code: currentStatus })
+        );
+
+        // Verify no new history was created
+        const historyAfter = await db.run(
+            SELECT.from('cv.sorting.CandidateStatusHistory')
+                .where({ candidate_ID: testCandidateId })
+        );
+
+        expect(historyAfter.length).to.equal(countBefore);
+    });
+});
+
 describe('Email Notification Functions', () => {
     const { expect } = cds.test(__dirname + '/..');
     const { v4: uuidv4 } = require('uuid');
