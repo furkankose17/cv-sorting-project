@@ -212,7 +212,7 @@
                                 icon="sap-icon://edit"
                                 tooltip="Review & Edit"
                                 press=".onReviewDocument"
-                                visible="{= ${ocrStatus} === 'completed' || ${ocrStatus} === 'review_required'}" />
+                                visible="{= %{ocrStatus} === 'completed' || %{ocrStatus} === 'review_required'}" />
                             <Button
                                 icon="sap-icon://show"
                                 tooltip="View"
