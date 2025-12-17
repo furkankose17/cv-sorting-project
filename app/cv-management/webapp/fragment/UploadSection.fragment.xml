@@ -40,7 +40,6 @@
                     maximumFileSize="10"
                     uploadOnChange="false"
                     change=".onFileSelected"
-                    style="FileUploaderButton"
                     buttonText="Select CV Files..."
                     tooltip="Select one or more CV files to process"
                     width="300px"
