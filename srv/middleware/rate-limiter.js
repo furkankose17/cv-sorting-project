@@ -76,7 +76,9 @@ function checkRateLimit(identifier, store, windowMs, maxRequests) {
         entry = {
             windowStart: now,
             requestCount: 0,
-            firstRequest: now
+            firstRequest: now,
+            maxRequests: maxRequests,  // Store the limit used
+            windowMs: windowMs  // Store the window used
         };
         store.set(identifier, entry);
     }
@@ -154,7 +156,7 @@ function createCapRateLimiter(options = {}) {
     const store = options.store || requestStore;
 
     return async function (req) {
-        const identifier = req.user?.id ? `user:${req.user.id}` : 'anonymous';
+        const identifier = getClientIdentifier(req);  // Use consistent client identification
         const result = checkRateLimit(identifier, store, windowMs, maxRequests);
 
         if (result.isExceeded) {
@@ -217,14 +219,16 @@ function getRateLimitStatus(identifier, store = requestStore) {
     }
 
     const now = Date.now();
+    const maxRequests = entry.maxRequests || MAX_REQUESTS;  // Use stored limit or default
+    const windowMs = entry.windowMs || WINDOW_MS;  // Use stored window or default
     const windowElapsed = now - entry.windowStart;
-    const resetIn = Math.ceil((WINDOW_MS - windowElapsed) / 1000);
+    const resetIn = Math.ceil((windowMs - windowElapsed) / 1000);
 
     return {
         hasEntry: true,
         requestCount: entry.requestCount,
-        maxRequests: MAX_REQUESTS,
-        remainingRequests: Math.max(0, MAX_REQUESTS - entry.requestCount),
+        maxRequests: maxRequests,
+        remainingRequests: Math.max(0, maxRequests - entry.requestCount),
         windowStart: new Date(entry.windowStart).toISOString(),
         resetIn: resetIn > 0 ? resetIn : 0,
         firstRequest: new Date(entry.firstRequest).toISOString(),
@@ -241,6 +245,15 @@ function resetRateLimit(identifier) {
         LOG.info('Rate limit reset', { identifier });
     }
     return deleted;
+}
+
+/**
+ * Clear all rate limit entries (for testing)
+ */
+function clearAllRateLimits() {
+    requestStore.clear();
+    uploadStore.clear();
+    LOG.debug('All rate limits cleared');
 }
 
 /**
@@ -272,6 +285,7 @@ module.exports = {
     createUploadRateLimiter,
     getRateLimitStatus,
     resetRateLimit,
+    clearAllRateLimits,
     getRateLimitStats,
     getClientIdentifier
 };
