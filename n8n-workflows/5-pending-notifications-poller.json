@@ -1,0 +1,398 @@
+{
+  "name": "5-pending-notifications-poller",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.CAP_SERVICE_URL}}/odata/v4/candidate/getPendingStatusNotifications",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-pending-notifications",
+      "name": "Get Pending Notifications",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        450,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cap-service",
+          "name": "CAP Service Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract notifications array from response\nconst response = $input.first().json;\nconst notifications = response.value || [];\n\nconsole.log(`Found ${notifications.length} pending notifications`);\n\n// Return array of notifications (each will be processed separately)\nif (notifications.length === 0) {\n  return [];\n}\n\nreturn notifications.map(notification => ({ json: notification }));"
+      },
+      "id": "split-notifications",
+      "name": "Split Notifications",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.CAP_SERVICE_URL}}/odata/v4/candidate/Candidates({{$json.candidateId}})",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-candidate-details",
+      "name": "Get Candidate Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        850,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cap-service",
+          "name": "CAP Service Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Transform data for status change email\n// Input: Notification data + Candidate details\n// Output: Email data object\n\nconst notification = $input.first().json;\nconst candidateData = $input.all()[1].json;\n\n// Extract candidate information\nconst candidate = {\n  firstName: candidateData.firstName || '',\n  lastName: candidateData.lastName || '',\n  email: candidateData.email || '',\n  fullName: `${candidateData.firstName} ${candidateData.lastName}`.trim()\n};\n\n// Extract status change information from notification\nconst oldStatus = notification.oldStatus || 'Unknown';\nconst newStatus = notification.newStatus || 'Unknown';\nconst changedAt = notification.changedAt ? new Date(notification.changedAt).toLocaleString() : new Date().toLocaleString();\nconst changedBy = notification.changedBy || 'System';\n\n// Determine status color for email styling\nconst statusColors = {\n  'Applied': '#3498db',\n  'Under Review': '#f39c12',\n  'Shortlisted': '#9b59b6',\n  'Interview Scheduled': '#e67e22',\n  'Interviewed': '#16a085',\n  'Offer Extended': '#27ae60',\n  'Hired': '#2ecc71',\n  'Rejected': '#e74c3c',\n  'Withdrawn': '#95a5a6'\n};\n\nconst statusColor = statusColors[newStatus] || '#34495e';\n\n// Read email template\nconst fs = require('fs');\nconst path = require('path');\nconst templatePath = path.join($env.TEMPLATE_PATH, 'status-changed.html');\nlet emailHtml = '';\n\ntry {\n  emailHtml = fs.readFileSync(templatePath, 'utf8');\n  \n  // Replace template variables\n  emailHtml = emailHtml\n    .replace(/{{candidateName}}/g, candidate.fullName)\n    .replace(/{{firstName}}/g, candidate.firstName)\n    .replace(/{{oldStatus}}/g, oldStatus)\n    .replace(/{{newStatus}}/g, newStatus)\n    .replace(/{{statusColor}}/g, statusColor)\n    .replace(/{{changedAt}}/g, changedAt)\n    .replace(/{{changedBy}}/g, changedBy)\n    .replace(/{{year}}/g, new Date().getFullYear());\n} catch (error) {\n  // Fallback to simple HTML if template not found\n  emailHtml = `\n    <html>\n      <body style=\"font-family: Arial, sans-serif;\">\n        <h2>Application Status Update</h2>\n        <p>Dear ${candidate.fullName},</p>\n        <p>Your application status has been updated:</p>\n        <p>\n          <strong>Previous Status:</strong> ${oldStatus}<br>\n          <strong>New Status:</strong> <span style=\"color: ${statusColor};\">${newStatus}</span>\n        </p>\n        <p>Changed by ${changedBy} on ${changedAt}</p>\n        <p>Best regards,<br>CV Sorting System</p>\n      </body>\n    </html>\n  `;\n}\n\n// Return email data\nreturn {\n  json: {\n    to: candidate.email,\n    subject: `Application Status Update: ${newStatus}`,\n    html: emailHtml,\n    candidateId: notification.candidateId,\n    notificationId: notification.ID,\n    candidateName: candidate.fullName,\n    oldStatus: oldStatus,\n    newStatus: newStatus\n  }\n};"
+      },
+      "id": "transform-data",
+      "name": "Transform Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{$env.EMAIL_FROM}}",
+        "toEmail": "={{$json.to}}",
+        "subject": "={{$json.subject}}",
+        "emailType": "html",
+        "message": "={{$json.html}}",
+        "options": {
+          "senderName": "={{$env.EMAIL_FROM_NAME || 'CV Sorting System'}}"
+        }
+      },
+      "id": "send-email",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1250,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "smtp",
+          "name": "SMTP Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.CAP_SERVICE_URL}}/odata/v4/candidate/markNotificationSent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "candidateId",
+              "value": "={{$json.candidateId}}"
+            },
+            {
+              "name": "notificationType",
+              "value": "STATUS_CHANGE"
+            },
+            {
+              "name": "sentAt",
+              "value": "={{new Date().toISOString()}}"
+            },
+            {
+              "name": "notificationId",
+              "value": "={{$json.notificationId}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "mark-notification-sent",
+      "name": "Mark Notification Sent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1450,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cap-service",
+          "name": "CAP Service Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect and summarize results from all processed notifications\nconst items = $input.all();\n\nconst summary = {\n  totalProcessed: items.length,\n  successful: items.filter(item => item.json.success !== false).length,\n  failed: items.filter(item => item.json.success === false).length,\n  timestamp: new Date().toISOString(),\n  notifications: items.map(item => ({\n    candidateId: item.json.candidateId,\n    email: item.json.to,\n    status: item.json.success !== false ? 'sent' : 'failed'\n  }))\n};\n\nconsole.log('Pending notifications workflow completed:', summary);\n\nreturn { json: summary };"
+      },
+      "id": "summarize-results",
+      "name": "Summarize Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle case when no pending notifications\nconsole.log('No pending notifications found');\n\nreturn {\n  json: {\n    message: 'No pending notifications found',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "no-notifications-handler",
+      "name": "No Notifications Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log error for debugging\nconst error = $input.first().json;\nconsole.error('Workflow error:', error);\n\n// Mark notification as failed and continue\nreturn {\n  json: {\n    success: false,\n    message: error.message || 'Error processing notification',\n    error: error,\n    timestamp: new Date().toISOString(),\n    candidateId: error.candidateId || 'unknown'\n  }\n};"
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.CAP_SERVICE_URL}}/odata/v4/candidate/logNotificationError",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"candidateId\": $json.candidateId, \"notificationType\": \"STATUS_CHANGE\", \"error\": $json.message, \"timestamp\": $json.timestamp } }}",
+        "options": {
+          "ignoreResponseCode": true
+        }
+      },
+      "id": "log-error",
+      "name": "Log Error",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1450,
+        500
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cap-service",
+          "name": "CAP Service Auth"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Pending Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Notifications": {
+      "main": [
+        [
+          {
+            "node": "Split Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Notifications": {
+      "main": [
+        [
+          {
+            "node": "Get Candidate Details",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "No Notifications Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Candidate Details": {
+      "main": [
+        [
+          {
+            "node": "Transform Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Data": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Mark Notification Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Notification Sent": {
+      "main": [
+        [
+          {
+            "node": "Summarize Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Error": {
+      "main": [
+        [
+          {
+            "node": "Summarize Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-01-15T10:00:00.000Z",
+      "updatedAt": "2025-01-15T10:00:00.000Z",
+      "id": "1",
+      "name": "email-automation"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-15T10:00:00.000Z",
+  "versionId": "1"
+}

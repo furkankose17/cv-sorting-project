@@ -1,0 +1,276 @@
+{
+  "name": "2-cv-received-confirmation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cv-received",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "cv-received-webhook"
+    },
+    {
+      "parameters": {
+        "url": "={{$env.CAP_SERVICE_URL}}/odata/v4/candidate/Candidates({{$json.candidateId}})?$expand=documents",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-candidate-details",
+      "name": "Get Candidate Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        450,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cap-service",
+          "name": "CAP Service Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Transform data for CV received confirmation email\n// Input: Webhook payload + Candidate details with documents\n// Output: Email data object\n\nconst webhookData = $input.first().json;\nconst candidateData = $input.all()[1].json;\n\n// Extract candidate information\nconst candidate = {\n  firstName: candidateData.firstName || '',\n  lastName: candidateData.lastName || '',\n  email: candidateData.email || '',\n  fullName: `${candidateData.firstName} ${candidateData.lastName}`.trim()\n};\n\n// Extract document information\nconst documentId = webhookData.documentId;\nconst fileName = webhookData.fileName || 'your CV';\nconst uploadedAt = new Date().toLocaleString();\n\n// Find the document in the expanded documents\nconst documents = candidateData.documents || [];\nconst document = documents.find(doc => doc.ID === documentId) || {};\n\nconst extractedData = document.extractedData || {};\nconst hasExtractedData = Object.keys(extractedData).length > 0;\n\n// Read email template\nconst fs = require('fs');\nconst path = require('path');\nconst templatePath = path.join($env.TEMPLATE_PATH, 'cv-received.html');\nlet emailHtml = '';\n\ntry {\n  emailHtml = fs.readFileSync(templatePath, 'utf8');\n  \n  // Replace template variables\n  emailHtml = emailHtml\n    .replace(/{{candidateName}}/g, candidate.fullName)\n    .replace(/{{firstName}}/g, candidate.firstName)\n    .replace(/{{fileName}}/g, fileName)\n    .replace(/{{uploadedAt}}/g, uploadedAt)\n    .replace(/{{hasExtractedData}}/g, hasExtractedData)\n    .replace(/{{year}}/g, new Date().getFullYear());\n    \n  // Add next steps section if data was extracted\n  if (hasExtractedData) {\n    const skillsCount = extractedData.skills ? extractedData.skills.length : 0;\n    const experienceYears = extractedData.totalYearsExperience || 'N/A';\n    \n    const nextSteps = `\n      <div style=\"background-color: #f0f8ff; padding: 15px; border-radius: 5px; margin-top: 20px;\">\n        <h3 style=\"color: #2c3e50; margin-top: 0;\">What We Found:</h3>\n        <ul style=\"color: #34495e;\">\n          <li><strong>${skillsCount}</strong> skills identified</li>\n          <li><strong>${experienceYears}</strong> years of experience</li>\n          <li>Your profile has been automatically matched against open positions</li>\n        </ul>\n      </div>\n    `;\n    emailHtml = emailHtml.replace('{{nextSteps}}', nextSteps);\n  } else {\n    emailHtml = emailHtml.replace('{{nextSteps}}', '');\n  }\n} catch (error) {\n  // Fallback to simple HTML if template not found\n  emailHtml = `\n    <html>\n      <body style=\"font-family: Arial, sans-serif;\">\n        <h2>CV Received Successfully</h2>\n        <p>Dear ${candidate.fullName},</p>\n        <p>Thank you for submitting your CV (<strong>${fileName}</strong>). We have received and processed your application.</p>\n        <p><strong>Received:</strong> ${uploadedAt}</p>\n        ${hasExtractedData ? `\n          <p>Your CV has been automatically analyzed and your profile has been matched against our open positions. You will be notified if your skills match any of our current opportunities.</p>\n        ` : `\n          <p>We are currently reviewing your application. You will receive updates as your application progresses.</p>\n        `}\n        <p>Best regards,<br>CV Sorting System</p>\n      </body>\n    </html>\n  `;\n}\n\n// Return email data\nreturn {\n  json: {\n    to: candidate.email,\n    subject: 'CV Received - Application Confirmation',\n    html: emailHtml,\n    candidateId: webhookData.candidateId,\n    documentId: documentId,\n    candidateName: candidate.fullName,\n    fileName: fileName\n  }\n};"
+      },
+      "id": "transform-data",
+      "name": "Transform Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{$env.EMAIL_FROM}}",
+        "toEmail": "={{$json.to}}",
+        "subject": "={{$json.subject}}",
+        "emailType": "html",
+        "message": "={{$json.html}}",
+        "options": {
+          "senderName": "={{$env.EMAIL_FROM_NAME || 'CV Sorting System'}}"
+        }
+      },
+      "id": "send-email",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        850,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "smtp",
+          "name": "SMTP Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.CAP_SERVICE_URL}}/odata/v4/candidate/markNotificationSent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "candidateId",
+              "value": "={{$json.candidateId}}"
+            },
+            {
+              "name": "notificationType",
+              "value": "CV_RECEIVED"
+            },
+            {
+              "name": "sentAt",
+              "value": "={{new Date().toISOString()}}"
+            },
+            {
+              "name": "metadata",
+              "value": "={{JSON.stringify({ documentId: $json.documentId, fileName: $json.fileName })}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "mark-notification-sent",
+      "name": "Mark Notification Sent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1050,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cap-service",
+          "name": "CAP Service Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"CV received confirmation sent\", \"candidateId\": $json.candidateId, \"email\": $json.to } }}"
+      },
+      "id": "webhook-response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": $json.message || 'Unknown error' } }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "error-response",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log error for debugging\nconst error = $input.first().json;\nconsole.error('Workflow error:', error);\n\n// Format error message\nreturn {\n  json: {\n    message: error.message || 'Error processing CV received confirmation',\n    error: error,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        500
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Candidate Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Candidate Details": {
+      "main": [
+        [
+          {
+            "node": "Transform Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Data": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Mark Notification Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Notification Sent": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-01-15T10:00:00.000Z",
+      "updatedAt": "2025-01-15T10:00:00.000Z",
+      "id": "1",
+      "name": "email-automation"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-15T10:00:00.000Z",
+  "versionId": "1"
+}

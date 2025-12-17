@@ -1,0 +1,326 @@
+{
+  "name": "3-interview-scheduling",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "interview-schedule",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "interview-schedule-webhook"
+    },
+    {
+      "parameters": {
+        "url": "={{$env.CAP_SERVICE_URL}}/odata/v4/candidate/Interviews({{$json.interviewId}})?$expand=candidate,jobPosting",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-interview-details",
+      "name": "Get Interview Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        450,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cap-service",
+          "name": "CAP Service Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate ICS calendar file for interview\n// Input: Interview details with expanded candidate and job\n// Output: ICS file content and email data\n\nconst interviewData = $input.first().json;\n\n// Extract interview information\nconst interview = {\n  id: interviewData.ID,\n  scheduledDate: interviewData.scheduledDate,\n  duration: interviewData.duration || 60, // default 60 minutes\n  location: interviewData.location || 'TBD',\n  meetingLink: interviewData.meetingLink || '',\n  notes: interviewData.notes || '',\n  interviewType: interviewData.interviewType_code || 'Technical'\n};\n\n// Extract candidate information\nconst candidate = interviewData.candidate || {};\nconst candidateName = `${candidate.firstName} ${candidate.lastName}`.trim();\nconst candidateEmail = candidate.email;\n\n// Extract job information\nconst job = interviewData.jobPosting || {};\nconst jobTitle = job.title || 'Position';\n\n// Calculate interview end time\nconst startDate = new Date(interview.scheduledDate);\nconst endDate = new Date(startDate.getTime() + interview.duration * 60000);\n\n// Format dates for ICS (YYYYMMDDTHHMMSSZ)\nfunction formatICSDate(date) {\n  return date.toISOString().replace(/[-:]/g, '').replace(/\\.\\d{3}/, '');\n}\n\nconst startDateICS = formatICSDate(startDate);\nconst endDateICS = formatICSDate(endDate);\nconst nowICS = formatICSDate(new Date());\n\n// Generate ICS file content\nconst icsContent = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//CV Sorting System//Interview Scheduler//EN\nCALSCALE:GREGORIAN\nMETHOD:REQUEST\nBEGIN:VEVENT\nUID:interview-${interview.id}@cv-sorting-system.com\nDTSTAMP:${nowICS}\nDTSTART:${startDateICS}\nDTEND:${endDateICS}\nSUMMARY:Interview: ${jobTitle}\nDESCRIPTION:Interview for ${jobTitle} position\\n\\nType: ${interview.interviewType}\\n${interview.meetingLink ? `Meeting Link: ${interview.meetingLink}\\n` : ''}${interview.notes ? `Notes: ${interview.notes}` : ''}\nLOCATION:${interview.meetingLink || interview.location}\nSTATUS:CONFIRMED\nSEQUENCE:0\nBEGIN:VALARM\nTRIGGER:-PT1H\nACTION:DISPLAY\nDESCRIPTION:Interview reminder - 1 hour before\nEND:VALARM\nEND:VEVENT\nEND:VCALENDAR`;\n\n// Format dates for email display\nconst dateFormatOptions = {\n  weekday: 'long',\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric',\n  hour: '2-digit',\n  minute: '2-digit',\n  timeZoneName: 'short'\n};\n\nconst formattedDate = startDate.toLocaleString('en-US', dateFormatOptions);\nconst formattedDuration = `${interview.duration} minutes`;\n\n// Read email template\nconst fs = require('fs');\nconst path = require('path');\nconst templatePath = path.join($env.TEMPLATE_PATH, 'interview-invitation.html');\nlet emailHtml = '';\n\ntry {\n  emailHtml = fs.readFileSync(templatePath, 'utf8');\n  \n  // Replace template variables\n  emailHtml = emailHtml\n    .replace(/{{candidateName}}/g, candidateName)\n    .replace(/{{firstName}}/g, candidate.firstName)\n    .replace(/{{jobTitle}}/g, jobTitle)\n    .replace(/{{interviewDate}}/g, formattedDate)\n    .replace(/{{duration}}/g, formattedDuration)\n    .replace(/{{interviewType}}/g, interview.interviewType)\n    .replace(/{{location}}/g, interview.location)\n    .replace(/{{meetingLink}}/g, interview.meetingLink || 'Will be provided')\n    .replace(/{{notes}}/g, interview.notes || 'No additional notes')\n    .replace(/{{year}}/g, new Date().getFullYear());\n} catch (error) {\n  // Fallback to simple HTML if template not found\n  emailHtml = `\n    <html>\n      <body style=\"font-family: Arial, sans-serif;\">\n        <h2>Interview Invitation</h2>\n        <p>Dear ${candidateName},</p>\n        <p>We are pleased to invite you for an interview for the <strong>${jobTitle}</strong> position.</p>\n        <h3>Interview Details:</h3>\n        <ul>\n          <li><strong>Date & Time:</strong> ${formattedDate}</li>\n          <li><strong>Duration:</strong> ${formattedDuration}</li>\n          <li><strong>Type:</strong> ${interview.interviewType}</li>\n          <li><strong>Location:</strong> ${interview.location}</li>\n          ${interview.meetingLink ? `<li><strong>Meeting Link:</strong> <a href=\"${interview.meetingLink}\">${interview.meetingLink}</a></li>` : ''}\n        </ul>\n        ${interview.notes ? `<p><strong>Additional Notes:</strong><br>${interview.notes}</p>` : ''}\n        <p>A calendar invitation is attached to this email. Please accept the invitation to confirm your attendance.</p>\n        <p>We look forward to meeting you!</p>\n        <p>Best regards,<br>CV Sorting System</p>\n      </body>\n    </html>\n  `;\n}\n\n// Return email data with ICS attachment\nreturn {\n  json: {\n    to: candidateEmail,\n    subject: `Interview Invitation: ${jobTitle}`,\n    html: emailHtml,\n    icsContent: icsContent,\n    icsFilename: `interview-${interview.id}.ics`,\n    interviewId: interview.id,\n    candidateId: candidate.ID,\n    candidateName: candidateName,\n    jobTitle: jobTitle,\n    scheduledDate: interview.scheduledDate\n  }\n};"
+      },
+      "id": "generate-calendar-invite",
+      "name": "Generate Calendar Invite",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{$env.EMAIL_FROM}}",
+        "toEmail": "={{$json.to}}",
+        "subject": "={{$json.subject}}",
+        "emailType": "html",
+        "message": "={{$json.html}}",
+        "options": {
+          "senderName": "={{$env.EMAIL_FROM_NAME || 'CV Sorting System'}}",
+          "appendAttribution": false,
+          "attachments": "icsAttachment"
+        },
+        "attachments": "={{$json.icsFilename}}",
+        "attachmentsData": "data:text/calendar;base64,={{Buffer.from($json.icsContent).toString('base64')}}"
+      },
+      "id": "send-email",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        850,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "smtp",
+          "name": "SMTP Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.CAP_SERVICE_URL}}/odata/v4/candidate/InterviewCalendarEvents",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"interview_ID\": $json.interviewId, \"eventUID\": \"interview-\" + $json.interviewId + \"@cv-sorting-system.com\", \"icsContent\": $json.icsContent, \"sentAt\": new Date().toISOString() } }}",
+        "options": {}
+      },
+      "id": "create-calendar-event-record",
+      "name": "Create Calendar Event Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1050,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cap-service",
+          "name": "CAP Service Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.CAP_SERVICE_URL}}/odata/v4/candidate/markNotificationSent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "candidateId",
+              "value": "={{$json.candidateId}}"
+            },
+            {
+              "name": "notificationType",
+              "value": "INTERVIEW_SCHEDULED"
+            },
+            {
+              "name": "sentAt",
+              "value": "={{new Date().toISOString()}}"
+            },
+            {
+              "name": "metadata",
+              "value": "={{JSON.stringify({ interviewId: $json.interviewId, scheduledDate: $json.scheduledDate })}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "mark-notification-sent",
+      "name": "Mark Notification Sent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1250,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cap-service",
+          "name": "CAP Service Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Interview invitation sent\", \"interviewId\": $json.interviewId, \"email\": $json.to } }}"
+      },
+      "id": "webhook-response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": $json.message || 'Unknown error' } }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "error-response",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log error for debugging\nconst error = $input.first().json;\nconsole.error('Workflow error:', error);\n\n// Format error message\nreturn {\n  json: {\n    message: error.message || 'Error processing interview invitation',\n    error: error,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        500
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Interview Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Interview Details": {
+      "main": [
+        [
+          {
+            "node": "Generate Calendar Invite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Calendar Invite": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Create Calendar Event Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Calendar Event Record": {
+      "main": [
+        [
+          {
+            "node": "Mark Notification Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Notification Sent": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-01-15T10:00:00.000Z",
+      "updatedAt": "2025-01-15T10:00:00.000Z",
+      "id": "1",
+      "name": "email-automation"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-15T10:00:00.000Z",
+  "versionId": "1"
+}

@@ -1,0 +1,274 @@
+{
+  "name": "4-interview-reminders",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.CAP_SERVICE_URL}}/odata/v4/candidate/Interviews?$filter=scheduledDate ge {{encodeURIComponent(new Date().toISOString())}} and scheduledDate le {{encodeURIComponent(new Date(Date.now() + 48*60*60*1000).toISOString())}} and reminderSent eq false&$expand=candidate,jobPosting",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-upcoming-interviews",
+      "name": "Get Upcoming Interviews",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        450,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cap-service",
+          "name": "CAP Service Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract interviews array from OData response\nconst response = $input.first().json;\nconst interviews = response.value || [];\n\n// Filter interviews that need reminders (24-48 hours before)\nconst now = Date.now();\nconst twentyFourHours = 24 * 60 * 60 * 1000;\nconst fortyEightHours = 48 * 60 * 60 * 1000;\n\nconst interviewsNeedingReminders = interviews.filter(interview => {\n  const scheduledDate = new Date(interview.scheduledDate).getTime();\n  const timeUntil = scheduledDate - now;\n  \n  // Send reminder if interview is 24-48 hours away\n  return timeUntil >= twentyFourHours && timeUntil <= fortyEightHours;\n});\n\nconsole.log(`Found ${interviewsNeedingReminders.length} interviews needing reminders`);\n\n// Return array of interviews (each will be processed separately)\nreturn interviewsNeedingReminders.map(interview => ({ json: interview }));"
+      },
+      "id": "filter-interviews",
+      "name": "Filter Interviews",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Transform interview data for reminder email\n// Input: Single interview with expanded candidate and job\n// Output: Email data object\n\nconst interview = $input.first().json;\n\n// Extract candidate information\nconst candidate = interview.candidate || {};\nconst candidateName = `${candidate.firstName} ${candidate.lastName}`.trim();\nconst candidateEmail = candidate.email;\n\n// Extract job information\nconst job = interview.jobPosting || {};\nconst jobTitle = job.title || 'Position';\n\n// Extract interview details\nconst scheduledDate = new Date(interview.scheduledDate);\nconst duration = interview.duration || 60;\nconst location = interview.location || 'TBD';\nconst meetingLink = interview.meetingLink || '';\nconst interviewType = interview.interviewType_code || 'Technical';\nconst notes = interview.notes || '';\n\n// Calculate time until interview\nconst timeUntil = scheduledDate.getTime() - Date.now();\nconst hoursUntil = Math.floor(timeUntil / (60 * 60 * 1000));\n\n// Format dates for email display\nconst dateFormatOptions = {\n  weekday: 'long',\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric',\n  hour: '2-digit',\n  minute: '2-digit',\n  timeZoneName: 'short'\n};\n\nconst formattedDate = scheduledDate.toLocaleString('en-US', dateFormatOptions);\nconst formattedDuration = `${duration} minutes`;\n\n// Read email template\nconst fs = require('fs');\nconst path = require('path');\nconst templatePath = path.join($env.TEMPLATE_PATH, 'interview-reminder.html');\nlet emailHtml = '';\n\ntry {\n  emailHtml = fs.readFileSync(templatePath, 'utf8');\n  \n  // Replace template variables\n  emailHtml = emailHtml\n    .replace(/{{candidateName}}/g, candidateName)\n    .replace(/{{firstName}}/g, candidate.firstName)\n    .replace(/{{jobTitle}}/g, jobTitle)\n    .replace(/{{interviewDate}}/g, formattedDate)\n    .replace(/{{hoursUntil}}/g, hoursUntil)\n    .replace(/{{duration}}/g, formattedDuration)\n    .replace(/{{interviewType}}/g, interviewType)\n    .replace(/{{location}}/g, location)\n    .replace(/{{meetingLink}}/g, meetingLink || 'See original invitation')\n    .replace(/{{notes}}/g, notes || 'No additional notes')\n    .replace(/{{year}}/g, new Date().getFullYear());\n} catch (error) {\n  // Fallback to simple HTML if template not found\n  emailHtml = `\n    <html>\n      <body style=\"font-family: Arial, sans-serif;\">\n        <h2>Interview Reminder</h2>\n        <p>Dear ${candidateName},</p>\n        <p>This is a friendly reminder about your upcoming interview for the <strong>${jobTitle}</strong> position.</p>\n        <div style=\"background-color: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0;\">\n          <h3 style=\"margin-top: 0; color: #856404;\">Interview in ${hoursUntil} hours!</h3>\n        </div>\n        <h3>Interview Details:</h3>\n        <ul>\n          <li><strong>Date & Time:</strong> ${formattedDate}</li>\n          <li><strong>Duration:</strong> ${formattedDuration}</li>\n          <li><strong>Type:</strong> ${interviewType}</li>\n          <li><strong>Location:</strong> ${location}</li>\n          ${meetingLink ? `<li><strong>Meeting Link:</strong> <a href=\"${meetingLink}\">${meetingLink}</a></li>` : ''}\n        </ul>\n        ${notes ? `<p><strong>Additional Notes:</strong><br>${notes}</p>` : ''}\n        <div style=\"background-color: #d1ecf1; padding: 15px; border-radius: 5px; margin-top: 20px;\">\n          <h4 style=\"margin-top: 0; color: #0c5460;\">Tips for Success:</h4>\n          <ul style=\"color: #0c5460;\">\n            <li>Test your internet connection and video/audio setup</li>\n            <li>Review your CV and the job description</li>\n            <li>Prepare questions about the role and company</li>\n            <li>Join the meeting 5 minutes early</li>\n          </ul>\n        </div>\n        <p>We look forward to speaking with you!</p>\n        <p>Best regards,<br>CV Sorting System</p>\n      </body>\n    </html>\n  `;\n}\n\n// Return email data\nreturn {\n  json: {\n    to: candidateEmail,\n    subject: `Reminder: Interview Tomorrow - ${jobTitle}`,\n    html: emailHtml,\n    interviewId: interview.ID,\n    candidateId: candidate.ID,\n    candidateName: candidateName,\n    jobTitle: jobTitle,\n    scheduledDate: interview.scheduledDate\n  }\n};"
+      },
+      "id": "transform-data",
+      "name": "Transform Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{$env.EMAIL_FROM}}",
+        "toEmail": "={{$json.to}}",
+        "subject": "={{$json.subject}}",
+        "emailType": "html",
+        "message": "={{$json.html}}",
+        "options": {
+          "senderName": "={{$env.EMAIL_FROM_NAME || 'CV Sorting System'}}"
+        }
+      },
+      "id": "send-email",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1050,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "smtp",
+          "name": "SMTP Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{$env.CAP_SERVICE_URL}}/odata/v4/candidate/Interviews({{$json.interviewId}}})",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"reminderSent\": true } }}",
+        "options": {}
+      },
+      "id": "update-reminder-flag",
+      "name": "Update Reminder Flag",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1250,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cap-service",
+          "name": "CAP Service Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect and summarize results from all processed interviews\nconst items = $input.all();\n\nconst summary = {\n  totalProcessed: items.length,\n  successful: items.filter(item => item.json.success !== false).length,\n  failed: items.filter(item => item.json.success === false).length,\n  timestamp: new Date().toISOString()\n};\n\nconsole.log('Interview reminders workflow completed:', summary);\n\nreturn { json: summary };"
+      },
+      "id": "summarize-results",
+      "name": "Summarize Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle case when no interviews need reminders\nconsole.log('No interviews found needing reminders');\n\nreturn {\n  json: {\n    message: 'No interviews found needing reminders',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "no-interviews-handler",
+      "name": "No Interviews Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log error for debugging\nconst error = $input.first().json;\nconsole.error('Workflow error:', error);\n\n// Format error message\nreturn {\n  json: {\n    message: error.message || 'Error processing interview reminders',\n    error: error,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        500
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Upcoming Interviews",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Upcoming Interviews": {
+      "main": [
+        [
+          {
+            "node": "Filter Interviews",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Interviews": {
+      "main": [
+        [
+          {
+            "node": "Transform Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "No Interviews Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Data": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Update Reminder Flag",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Reminder Flag": {
+      "main": [
+        [
+          {
+            "node": "Summarize Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-01-15T10:00:00.000Z",
+      "updatedAt": "2025-01-15T10:00:00.000Z",
+      "id": "1",
+      "name": "email-automation"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-15T10:00:00.000Z",
+  "versionId": "1"
+}
