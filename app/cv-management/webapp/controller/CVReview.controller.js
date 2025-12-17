@@ -69,8 +69,8 @@ sap.ui.define([
             try {
                 this.getView().setBusy(true);
 
-                // Read document with OData v4 API
-                const sPath = `/CVDocuments('${sDocumentId}')`;
+                // Read document with OData v4 API (GUID keys don't use quotes in v4)
+                const sPath = `/CVDocuments(${sDocumentId})`;
                 const oBinding = oModel.bindContext(sPath, null, {
                     $select: "ID,fileName,mediaType,fileContent,ocrConfidence,ocrMethod,ocrProcessedAt,structuredData,extractedText"
                 });
