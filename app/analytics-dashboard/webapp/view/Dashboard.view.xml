@@ -265,8 +265,7 @@
                             <!-- Loading Indicator -->
                             <BusyIndicator
                                 id="aiBusyIndicator"
-                                visible="{dashboard>/aiData/isLoading}"
-                                size="Medium" />
+                                visible="{dashboard>/aiData/isLoading}" />
 
                             <!-- AI Recommendations List -->
                             <List

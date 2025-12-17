@@ -3,11 +3,12 @@ sap.ui.define([
     "sap/ui/model/json/JSONModel",
     "sap/ui/model/Filter",
     "sap/ui/model/FilterOperator",
+    "sap/ui/core/Fragment",
     "../utils/MLServiceClient",
     "../model/formatter/DataFormatter",
     "../model/formatter/StatusFormatter",
     "../model/formatter/DisplayFormatter"
-], function (BaseController, JSONModel, Filter, FilterOperator, MLServiceClient,
+], function (BaseController, JSONModel, Filter, FilterOperator, Fragment, MLServiceClient,
              DataFormatter, StatusFormatter, DisplayFormatter) {
     "use strict";
 
@@ -35,12 +36,24 @@ sap.ui.define([
             });
             this.setModel(oViewModel, "viewModel");
 
+            // Initialize upload view model
+            const oUploadViewModel = new JSONModel({
+                mode: "single",
+                autoCreate: false,
+                uploadProgress: 0,
+                isUploading: false
+            });
+            this.setModel(oUploadViewModel, "uploadView");
+
             // Attach to route matched
             const oRouter = this.getRouter();
             oRouter.getRoute("main").attachPatternMatched(this._onRouteMatched, this);
 
             // Initialize keyboard shortcuts
             this._initKeyboardShortcuts();
+
+            // Load fragments into tabs
+            this._loadTabFragments();
 
             // Load dashboard statistics after model is ready
             const oModel = this.getModel();
@@ -55,6 +68,39 @@ sap.ui.define([
                     }
                 }, 500);
             }
+        },
+
+        /**
+         * Load fragments into tab filters
+         * @private
+         */
+        _loadTabFragments: function () {
+            const aFragments = [
+                { id: "uploadTab", fragmentName: "cvmanagement.fragment.UploadSection" },
+                { id: "candidatesTab", fragmentName: "cvmanagement.fragment.CandidatesSection" },
+                { id: "documentsTab", fragmentName: "cvmanagement.fragment.DocumentsSection" },
+                { id: "queueTab", fragmentName: "cvmanagement.fragment.QueueSection" }
+            ];
+
+            aFragments.forEach(oFragmentConfig => {
+                Fragment.load({
+                    id: this.getView().getId(),
+                    name: oFragmentConfig.fragmentName,
+                    controller: this
+                }).then(oFragment => {
+                    const oTab = this.byId(oFragmentConfig.id);
+                    if (oTab) {
+                        // Add fragment content to tab
+                        if (Array.isArray(oFragment)) {
+                            oFragment.forEach(oControl => oTab.addContent(oControl));
+                        } else {
+                            oTab.addContent(oFragment);
+                        }
+                    }
+                }).catch(oError => {
+                    console.error("Failed to load fragment: " + oFragmentConfig.fragmentName, oError);
+                });
+            });
         },
 
         /**
@@ -352,6 +398,146 @@ sap.ui.define([
             this.navTo("jobDetail", {
                 jobId: sJobId
             });
+        },
+
+        // ==================== Upload Section Handlers ====================
+
+        /**
+         * Handle upload button press - triggers file upload
+         */
+        onUploadPress: function () {
+            const oUploadSet = this.byId("cvUploadSet");
+            if (oUploadSet) {
+                const aIncompleteItems = oUploadSet.getIncompleteItems();
+                if (aIncompleteItems.length > 0) {
+                    oUploadSet.upload();
+                } else {
+                    this.showInfo("Please select files to upload");
+                }
+            }
+        },
+
+        /**
+         * Handle before upload starts - set headers and parameters
+         * @param {sap.ui.base.Event} oEvent The beforeUploadStarts event
+         */
+        onBeforeUploadStarts: function (oEvent) {
+            const oItem = oEvent.getParameter("item");
+
+            // Add file metadata as headers
+            const oCustomHeaderFileName = new sap.ui.core.Item({
+                key: "X-File-Name",
+                text: encodeURIComponent(oItem.getFileName())
+            });
+            oItem.addHeaderField(oCustomHeaderFileName);
+
+            const oCustomHeaderMediaType = new sap.ui.core.Item({
+                key: "X-Media-Type",
+                text: oItem.getMediaType()
+            });
+            oItem.addHeaderField(oCustomHeaderMediaType);
+
+            // Get autoCreate setting from upload view model
+            const oUploadViewModel = this.getModel("uploadView");
+            const bAutoCreate = oUploadViewModel ? oUploadViewModel.getProperty("/autoCreate") : false;
+
+            const oCustomHeaderAutoCreate = new sap.ui.core.Item({
+                key: "X-Auto-Create",
+                text: bAutoCreate.toString()
+            });
+            oItem.addHeaderField(oCustomHeaderAutoCreate);
+        },
+
+        /**
+         * Handle upload complete
+         * @param {sap.ui.base.Event} oEvent The uploadCompleted event
+         */
+        onUploadComplete: function (oEvent) {
+            const oUploadSet = this.byId("cvUploadSet");
+            const oItem = oEvent.getParameter("item");
+            const sResponse = oEvent.getParameter("response");
+            const iStatus = oEvent.getParameter("status");
+
+            // Remove the header fields from the item after upload
+            oItem.removeAllHeaderFields();
+
+            if (iStatus === 200 || iStatus === 201) {
+                // Parse response
+                try {
+                    const oResponse = JSON.parse(sResponse);
+
+                    if (oResponse.documentId) {
+                        this.showSuccess(`File "${oItem.getFileName()}" processed successfully`);
+
+                        // Refresh documents table
+                        const oModel = this.getModel();
+                        oModel.refresh(true);
+
+                        // Remove the item from upload set
+                        oUploadSet.removeItem(oItem);
+
+                        // If candidate was auto-created, show info
+                        if (oResponse.candidateId && !oResponse.requiresReview) {
+                            this.showSuccess("Candidate created automatically");
+                        } else if (oResponse.requiresReview) {
+                            this.showInfo("Document uploaded - manual review required");
+                        }
+                    } else {
+                        this.handleError("Upload failed: No document ID returned");
+                        oItem.setUploadState("Error");
+                    }
+                } catch (error) {
+                    console.error("Error parsing upload response:", error, "Response:", sResponse);
+                    this.handleError({ message: "Upload failed: " + (sResponse || "Invalid response") });
+                    oItem.setUploadState("Error");
+                }
+            } else {
+                // Upload failed - parse error message from response
+                try {
+                    const oErrorResponse = JSON.parse(sResponse);
+                    this.handleError({
+                        message: oErrorResponse.message || oErrorResponse.error || `Upload failed with status ${iStatus}`
+                    });
+                } catch (e) {
+                    this.handleError({ message: `Upload failed with status ${iStatus}` });
+                }
+                oItem.setUploadState("Error");
+            }
+        },
+
+        /**
+         * Handle clear all button press
+         */
+        onClearAll: function () {
+            const oUploadSet = this.byId("cvUploadSet");
+            if (oUploadSet) {
+                oUploadSet.removeAllIncompleteItems();
+                this.showInfo("Upload queue cleared");
+            }
+        },
+
+        /**
+         * Handle mode change (single vs batch upload)
+         * @param {sap.ui.base.Event} oEvent The select event
+         */
+        onUploadModeChange: function (oEvent) {
+            const sKey = oEvent.getParameter("item").getKey();
+            const oUploadViewModel = this.getModel("uploadView");
+            if (oUploadViewModel) {
+                oUploadViewModel.setProperty("/mode", sKey);
+            }
+        },
+
+        /**
+         * Handle auto-create switch change
+         * @param {sap.ui.base.Event} oEvent The change event
+         */
+        onAutoCreateChange: function (oEvent) {
+            const bState = oEvent.getParameter("state");
+            const oUploadViewModel = this.getModel("uploadView");
+            if (oUploadViewModel) {
+                oUploadViewModel.setProperty("/autoCreate", bState);
+            }
         },
 
         // ==================== Candidates Section Handlers ====================

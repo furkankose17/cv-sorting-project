@@ -611,6 +611,7 @@ module.exports = class CVSortingService extends cds.ApplicationService {
                     ID: targetCandidateId,
                     firstName: firstName,
                     lastName: lastName,
+                    email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@cv-upload.placeholder`,
                     status_code: 'new',
                     source: 'cv-upload'
                 });
@@ -625,8 +626,8 @@ module.exports = class CVSortingService extends cds.ApplicationService {
                 ID: documentId,
                 candidate_ID: targetCandidateId,
                 fileName: fileName,
-                contentType: mediaType,
-                content: contentBuffer,
+                mediaType: mediaType,
+                fileContent: contentBuffer,
                 fileSize: contentBuffer.length,
                 processingStatus: 'pending'
             });

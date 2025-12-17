@@ -63,11 +63,13 @@ async def readiness_check() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Database check failed: {e}")
 
-    # Check OCR (Tesseract)
+    # Check OCR (PaddleOCR or Tesseract fallback)
     try:
-        import pytesseract
-        version = pytesseract.get_tesseract_version()
-        if version:
+        from app.main import get_ocr_processor
+        ocr = get_ocr_processor()
+        if ocr is not None and ocr._paddle_ocr is not None:
+            components["ocr"] = True
+        elif ocr is not None and ocr._tesseract_available:
             components["ocr"] = True
     except Exception as e:
         logger.warning(f"OCR check failed: {e}")

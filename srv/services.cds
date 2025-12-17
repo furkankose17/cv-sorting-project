@@ -51,6 +51,9 @@ service CVSortingService {
     entity Certifications as projection on db.Certifications;
     entity CandidateNotes as projection on db.CandidateNotes;
 
+    @readonly
+    entity ProcessingQueue as projection on db.ProcessingQueue;
+
     entity Interviews as projection on db.Interviews
         actions {
             @cds.odata.bindingparameter.name: '_it'

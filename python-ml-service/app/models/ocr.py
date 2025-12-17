@@ -1,6 +1,6 @@
 """
 OCR Processor for CV Sorting ML Service.
-Uses PaddleOCR as primary engine with Tesseract as fallback.
+Uses RapidOCR as primary engine with Tesseract as fallback.
 Supports multilingual OCR (EN, DE, TR, FR, ES) with table detection.
 """
 
@@ -17,14 +17,14 @@ logger = logging.getLogger(__name__)
 
 class OCRProcessor:
     """
-    OCR processor using PaddleOCR (primary) or Tesseract (fallback).
+    OCR processor using RapidOCR (primary) or Tesseract (fallback).
     Supports PDF, PNG, JPG, TIFF, and other image formats.
 
-    PaddleOCR advantages:
-    - 2x faster than Tesseract on CPU
-    - Excellent table/complex layout handling
+    RapidOCR advantages:
+    - 3-5x faster than PaddleOCR on CPU
+    - Excellent handling of both clean and scanned documents
     - Built-in multilingual support (EN, DE, TR, FR, ES, etc.)
-    - Angle classification for rotated text
+    - Lower memory footprint (~500MB vs 2GB+)
     """
 
     SUPPORTED_FORMATS = {
@@ -89,15 +89,15 @@ class OCRProcessor:
         Initialize OCR processor.
 
         Args:
-            engine: OCR engine to use ('paddleocr' or 'tesseract')
+            engine: OCR engine to use ('rapidocr', 'paddleocr', or 'tesseract')
             tesseract_cmd: Path to tesseract executable
             poppler_path: Path to poppler binaries (for PDF conversion)
             default_language: Default OCR language
-            use_angle_cls: Whether to use angle classification (PaddleOCR)
+            use_angle_cls: Whether to use angle classification
             table_detection: Whether to enable table detection
             layout_analysis: Whether to enable layout analysis
         """
-        self.engine = engine or os.getenv("OCR_ENGINE", "paddleocr")
+        self.engine = engine or os.getenv("OCR_ENGINE", "rapidocr")
         self.default_language = default_language
         self.poppler_path = poppler_path
         self.use_angle_cls = use_angle_cls
@@ -105,30 +105,28 @@ class OCRProcessor:
         self.layout_analysis = layout_analysis
 
         self._paddle_ocr = None
+        self._rapid_ocr = None
         self._tesseract_available = False
 
         # Initialize based on engine selection
-        if self.engine == "paddleocr":
+        if self.engine == "rapidocr":
+            self._init_rapidocr()
+        elif self.engine == "paddleocr":
             self._init_paddleocr()
         else:
             self._init_tesseract(tesseract_cmd)
 
     def _init_paddleocr(self):
-        """Initialize PaddleOCR engine."""
+        """Initialize PaddleOCR engine (v3.x compatible)."""
         try:
             from paddleocr import PaddleOCR
 
             paddle_lang = self.PADDLE_LANG_MAP.get(self.default_language, 'en')
-            logger.info(f"Initializing PaddleOCR with language: {paddle_lang}")
+            logger.info(f"Initializing PaddleOCR 3.x with language: {paddle_lang}")
 
-            self._paddle_ocr = PaddleOCR(
-                use_angle_cls=self.use_angle_cls,
-                lang=paddle_lang,
-                use_gpu=False,  # CPU-only as per requirements
-                show_log=False,
-                enable_mkldnn=True  # Use Intel MKL for faster CPU inference
-            )
-            logger.info("PaddleOCR initialized successfully")
+            # PaddleOCR 3.x simplified initialization
+            self._paddle_ocr = PaddleOCR(lang=paddle_lang)
+            logger.info("PaddleOCR 3.x initialized successfully")
         except ImportError:
             logger.warning("PaddleOCR not available, falling back to Tesseract")
             self.engine = "tesseract"
@@ -154,6 +152,23 @@ class OCRProcessor:
             logger.warning(f"Could not verify Tesseract installation: {e}")
             self._tesseract_available = False
 
+    def _init_rapidocr(self):
+        """Initialize RapidOCR engine."""
+        try:
+            from rapidocr_onnxruntime import RapidOCR
+
+            logger.info("Initializing RapidOCR...")
+            self._rapid_ocr = RapidOCR()
+            logger.info("RapidOCR initialized successfully")
+        except ImportError:
+            logger.warning("RapidOCR not available, falling back to Tesseract")
+            self.engine = "tesseract"
+            self._init_tesseract(None)
+        except Exception as e:
+            logger.warning(f"RapidOCR initialization failed: {e}, falling back to Tesseract")
+            self.engine = "tesseract"
+            self._init_tesseract(None)
+
     def extract_text(
         self,
         file_content: bytes,
@@ -168,7 +183,7 @@ class OCRProcessor:
             file_content: Binary file content
             file_type: File type (pdf, png, jpg, etc.)
             language: OCR language code (en, german, turkish, etc.)
-            engine: Override OCR engine ('paddleocr' or 'tesseract')
+            engine: Override OCR engine ('rapidocr', 'paddleocr', or 'tesseract')
 
         Returns:
             Dict with extracted text, confidence, and metadata
@@ -213,16 +228,16 @@ class OCRProcessor:
             images = convert_from_bytes(
                 content,
                 poppler_path=self.poppler_path,
-                dpi=300,  # Higher DPI for better OCR
+                dpi=150,  # Balanced DPI for speed and quality
                 fmt='png'
             )
         except Exception as e:
             logger.error(f"PDF conversion failed: {e}")
-            # Try lower DPI
+            # Try even lower DPI
             images = convert_from_bytes(
                 content,
                 poppler_path=self.poppler_path,
-                dpi=200,
+                dpi=100,
                 fmt='png'
             )
 
@@ -236,7 +251,9 @@ class OCRProcessor:
         for i, image in enumerate(images):
             logger.debug(f"Processing page {i + 1}/{len(images)}")
 
-            if use_engine == "paddleocr" and self._paddle_ocr:
+            if use_engine == "rapidocr" and self._rapid_ocr:
+                page_result = self._ocr_with_rapid(image, language)
+            elif use_engine == "paddleocr" and self._paddle_ocr:
                 page_result = self._ocr_with_paddle(image, language)
             else:
                 page_result = self._ocr_with_tesseract(image, language)
@@ -305,7 +322,9 @@ class OCRProcessor:
         logger.info(f"Processing image: {image.size}, mode: {image.mode}")
 
         # Perform OCR based on engine
-        if use_engine == "paddleocr" and self._paddle_ocr:
+        if use_engine == "rapidocr" and self._rapid_ocr:
+            ocr_result = self._ocr_with_rapid(image, language)
+        elif use_engine == "paddleocr" and self._paddle_ocr:
             ocr_result = self._ocr_with_paddle(image, language)
         else:
             # Preprocess image for Tesseract
@@ -330,7 +349,7 @@ class OCRProcessor:
 
     def _ocr_with_paddle(self, image, language: str) -> Dict[str, Any]:
         """
-        Perform OCR using PaddleOCR.
+        Perform OCR using PaddleOCR 3.x.
 
         Args:
             image: PIL Image object
@@ -341,40 +360,62 @@ class OCRProcessor:
         """
         import numpy as np
         from PIL import Image
+        import tempfile
+        import os
 
-        # Convert PIL Image to numpy array
+        # Convert PIL Image to numpy array or save to temp file
+        # PaddleOCR 3.x requires file path or numpy array
         if isinstance(image, Image.Image):
-            img_array = np.array(image)
+            # Save to temp file for PaddleOCR 3.x
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+                image.save(tmp.name)
+                temp_path = tmp.name
+
+            try:
+                # Run PaddleOCR 3.x with .predict()
+                result = self._paddle_ocr.predict(temp_path)
+            finally:
+                # Clean up temp file
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
         else:
-            img_array = image
+            # If already numpy array, save to temp file
+            img = Image.fromarray(image) if isinstance(image, np.ndarray) else image
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+                img.save(tmp.name)
+                temp_path = tmp.name
 
-        # Run PaddleOCR
-        result = self._paddle_ocr.ocr(img_array, cls=self.use_angle_cls)
+            try:
+                result = self._paddle_ocr.predict(temp_path)
+            finally:
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
 
-        if not result or not result[0]:
+        if not result or len(result) == 0:
             return {'text': '', 'confidence': 0.0, 'lines': [], 'tables': []}
 
-        lines = result[0]
+        # Extract from PaddleOCR 3.x result format
+        page_result = result[0]
+        rec_texts = page_result.get('rec_texts', [])
+        rec_scores = page_result.get('rec_scores', [])
+        rec_polys = page_result.get('rec_polys', [])
 
         # Extract text and confidence
         texts = []
         confidences = []
         line_data = []
 
-        for line in lines:
-            if len(line) >= 2:
-                bbox = line[0]  # Bounding box coordinates
-                text_info = line[1]  # (text, confidence)
-                text = text_info[0] if isinstance(text_info, (list, tuple)) else str(text_info)
-                conf = text_info[1] if isinstance(text_info, (list, tuple)) and len(text_info) > 1 else 0.9
+        for i, text in enumerate(rec_texts):
+            conf = rec_scores[i] if i < len(rec_scores) else 0.9
+            bbox = rec_polys[i] if i < len(rec_polys) else []
 
-                texts.append(text)
-                confidences.append(float(conf))
-                line_data.append({
-                    'text': text,
-                    'confidence': float(conf),
-                    'bbox': bbox
-                })
+            texts.append(text)
+            confidences.append(float(conf))
+            line_data.append({
+                'text': text,
+                'confidence': float(conf),
+                'bbox': bbox.tolist() if hasattr(bbox, 'tolist') else bbox
+            })
 
         full_text = ' '.join(texts)
         avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
@@ -433,6 +474,44 @@ class OCRProcessor:
         return {
             'text': text,
             'confidence': confidence,
+            'tables': []
+        }
+
+    def _ocr_with_rapid(self, image, language: str) -> Dict[str, Any]:
+        """
+        Perform OCR using RapidOCR.
+
+        Args:
+            image: PIL Image object
+            language: Language code (not used by RapidOCR - auto-detects)
+
+        Returns:
+            Dict with text, confidence, and optional tables
+        """
+        import time
+
+        # RapidOCR accepts PIL Image directly
+        start_time = time.time()
+        result, elapse = self._rapid_ocr(image)
+        elapsed_seconds = time.time() - start_time
+
+        logger.info(f"RapidOCR processing took {elapsed_seconds:.2f}s (lib reported: {elapse}ms)")
+
+        # result format: [[bbox, text, confidence], ...] or None
+        if not result or len(result) == 0:
+            return {'text': '', 'confidence': 0.0, 'lines': [], 'tables': []}
+
+        # Extract text and confidence
+        texts = [item[1] for item in result]
+        confidences = [item[2] for item in result]
+
+        full_text = '\n'.join(texts)
+        avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+
+        return {
+            'text': full_text,
+            'confidence': avg_confidence * 100,  # Convert to percentage
+            'lines': len(texts),
             'tables': []
         }
 
@@ -616,10 +695,11 @@ class OCRProcessor:
         info = {
             "engine": self.engine,
             "default_language": self.default_language,
-            "supported_languages": list(self.PADDLE_LANG_MAP.keys()) if self.engine == "paddleocr" else list(self.TESSERACT_LANG_MAP.keys()),
+            "supported_languages": list(self.PADDLE_LANG_MAP.keys()) if self.engine in ["paddleocr", "rapidocr"] else list(self.TESSERACT_LANG_MAP.keys()),
             "table_detection": self.table_detection,
             "layout_analysis": self.layout_analysis,
             "angle_classification": self.use_angle_cls,
+            "rapid_available": self._rapid_ocr is not None,
             "paddle_available": self._paddle_ocr is not None,
             "tesseract_available": self._tesseract_available,
             "supported_formats": self.get_supported_formats()
@@ -633,7 +713,7 @@ class OCRProcessor:
         Returns:
             List of language codes
         """
-        if self.engine == "paddleocr":
+        if self.engine in ["paddleocr", "rapidocr"]:
             return ["en", "german", "turkish", "french", "spanish", "chinese", "japanese", "korean"]
         else:
             return ["eng", "deu", "tur", "fra", "spa"]
@@ -643,12 +723,14 @@ class OCRProcessor:
         Switch OCR engine at runtime.
 
         Args:
-            engine: New engine ('paddleocr' or 'tesseract')
+            engine: New engine ('rapidocr', 'paddleocr', or 'tesseract')
         """
-        if engine not in ["paddleocr", "tesseract"]:
-            raise ValueError(f"Invalid engine: {engine}. Must be 'paddleocr' or 'tesseract'")
+        if engine not in ["rapidocr", "paddleocr", "tesseract"]:
+            raise ValueError(f"Invalid engine: {engine}. Must be 'rapidocr', 'paddleocr', or 'tesseract'")
 
-        if engine == "paddleocr" and self._paddle_ocr is None:
+        if engine == "rapidocr" and self._rapid_ocr is None:
+            self._init_rapidocr()
+        elif engine == "paddleocr" and self._paddle_ocr is None:
             self._init_paddleocr()
         elif engine == "tesseract" and not self._tesseract_available:
             self._init_tesseract(None)

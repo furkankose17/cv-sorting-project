@@ -1,0 +1,131 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:l="sap.ui.layout"
+    xmlns:f="sap.ui.layout.form"
+    xmlns:upload="sap.m.upload">
+
+    <VBox class="sapUiSmallMargin">
+        <!-- Upload Instructions -->
+        <MessageStrip
+            text="Upload CVs for automatic processing. Files will be processed with OCR and structured data extraction. Confidence ≥85% will auto-create candidates."
+            type="Information"
+            showIcon="true"
+            class="sapUiTinyMarginBottom" />
+
+        <!-- Mode Toggle -->
+        <Bar>
+            <contentLeft>
+                <SegmentedButton
+                    id="uploadModeSegmented"
+                    selectedKey="{uploadView>/mode}">
+                    <items>
+                        <SegmentedButtonItem key="single" text="Single Upload" icon="sap-icon://upload" />
+                        <SegmentedButtonItem key="batch" text="Batch Upload" icon="sap-icon://batch-payments" />
+                    </items>
+                </SegmentedButton>
+            </contentLeft>
+            <contentRight>
+                <Label text="Auto-create threshold:" />
+                <Slider
+                    value="{uploadView>/autoCreateThreshold}"
+                    min="60"
+                    max="95"
+                    step="5"
+                    width="200px"
+                    enableTickmarks="true"
+                    visible="{= ${uploadView>/mode} === 'batch'}"
+                    class="sapUiTinyMarginBegin" />
+                <Text
+                    text="{uploadView>/autoCreateThreshold}%"
+                    visible="{= ${uploadView>/mode} === 'batch'}"
+                    class="sapUiTinyMarginBegin" />
+            </contentRight>
+        </Bar>
+
+        <!-- Upload Area -->
+        <FlexBox
+            justifyContent="Center"
+            alignItems="Center"
+            direction="Column"
+            class="sapUiSmallMargin">
+
+            <upload:UploadSet
+                id="cvUploadSet"
+                uploadUrl="/api/uploadAndProcessCV"
+                multiple="{= ${uploadView>/mode} === 'batch'}"
+                instantUpload="false"
+                maxFileSize="10"
+                mediaTypes="application/pdf,image/png,image/jpeg,image/tiff,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                uploadCompleted=".onUploadComplete"
+                beforeUploadStarts=".onBeforeUploadStarts"
+                mode="SingleSelectMaster">
+                <upload:items>
+                    <!-- Items will be added dynamically -->
+                </upload:items>
+            </upload:UploadSet>
+
+            <VBox alignItems="Center" class="sapUiMediumMarginTop">
+                <Text text="Drag &amp; drop files here or click to browse" class="sapUiTinyMarginBottom" />
+                <Text text="Supported: PDF, PNG, JPG, TIFF, DOC, DOCX (Max 10MB)" class="sapUiTinyMarginBottom" />
+
+                <HBox class="sapUiSmallMarginTop">
+                    <Button
+                        text="Upload"
+                        type="Emphasized"
+                        icon="sap-icon://upload"
+                        press=".onUploadPress"
+                        enabled="{= ${uploadView>/hasFiles}}"
+                        class="sapUiTinyMarginEnd" />
+                    <Button
+                        text="Clear All"
+                        press=".onClearAll"
+                        enabled="{= ${uploadView>/hasFiles}}" />
+                </HBox>
+            </VBox>
+        </FlexBox>
+
+        <!-- Processing Status -->
+        <Panel
+            headerText="Processing Status"
+            visible="{= ${uploadView>/processing}}"
+            class="sapUiSmallMarginTop">
+            <ProgressIndicator
+                percentValue="{uploadView>/progress}"
+                displayValue="{uploadView>/progressText}"
+                showValue="true"
+                state="{uploadView>/progressState}" />
+            <Text
+                text="{uploadView>/statusMessage}"
+                class="sapUiTinyMarginTop" />
+        </Panel>
+
+        <!-- Recent Uploads -->
+        <Panel
+            headerText="Recent Uploads (Last 10)"
+            expanded="true"
+            class="sapUiSmallMarginTop">
+            <List
+                id="recentUploadsList"
+                items="{
+                    path: '/CVDocuments',
+                    parameters: {
+                        $orderby: 'createdAt desc',
+                        $expand: 'candidate'
+                    }
+                }">
+                <StandardListItem
+                    title="{fileName}"
+                    description="Uploaded {createdAt}"
+                    info="{processingStatus}"
+                    type="Navigation"
+                    press=".onDocumentPress">
+                    <customData>
+                        <core:CustomData key="documentId" value="{ID}" />
+                    </customData>
+                </StandardListItem>
+            </List>
+        </Panel>
+    </VBox>
+
+</core:FragmentDefinition>

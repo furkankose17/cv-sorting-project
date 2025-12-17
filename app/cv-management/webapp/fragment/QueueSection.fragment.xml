@@ -1,0 +1,233 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:l="sap.ui.layout">
+
+    <VBox class="sapUiSmallMargin">
+        <!-- Header -->
+        <Toolbar>
+            <Title text="Batch Processing Queue" level="H2" />
+            <ToolbarSpacer />
+            <Button
+                icon="sap-icon://refresh"
+                tooltip="Refresh"
+                press=".onRefreshQueue" />
+            <Switch
+                state="{queueView>/autoRefresh}"
+                customTextOn="Auto-refresh ON"
+                customTextOff="Auto-refresh OFF"
+                change=".onToggleAutoRefresh" />
+        </Toolbar>
+
+        <!-- Active Processing Jobs -->
+        <Panel
+            headerText="Active Jobs ({queueView>/activeCount})"
+            expanded="true"
+            class="sapUiTinyMarginTop">
+
+            <List
+                id="activeQueueList"
+                items="{
+                    path: '/ProcessingQueue',
+                    parameters: {
+                        $orderby: 'startedAt desc'
+                    }
+                }"
+                noDataText="No active processing jobs">
+
+                <CustomListItem>
+                    <VBox width="100%">
+                        <!-- Job Header -->
+                        <HBox width="100%" justifyContent="SpaceBetween">
+                            <VBox width="80%">
+                                <Title text="Batch {ID}" level="H4" />
+                                <Text text="{totalFiles} files" />
+                            </VBox>
+                            <VBox width="20%" alignItems="End">
+                                <ObjectStatus
+                                    text="{status}"
+                                    state="Information"
+                                    icon="sap-icon://process" />
+                                <Text text="{= ${processedFiles} + ' / ' + ${totalFiles} + ' processed'}" />
+                            </VBox>
+                        </HBox>
+
+                        <!-- Progress Bar -->
+                        <ProgressIndicator
+                            percentValue="{= (${processedFiles} / ${totalFiles}) * 100}"
+                            displayValue="{= ${processedFiles} + ' of ' + ${totalFiles}}"
+                            showValue="true"
+                            state="{= ${failedFiles} > 0 ? 'Warning' : 'Success'}"
+                            class="sapUiTinyMarginTop" />
+
+                        <!-- Stats -->
+                        <HBox class="sapUiTinyMarginTop">
+                            <ObjectStatus
+                                text="{autoCreatedFiles} Auto-created"
+                                state="Success"
+                                icon="sap-icon://accept"
+                                class="sapUiTinyMarginEnd" />
+                            <ObjectStatus
+                                text="{reviewRequiredFiles} Need Review"
+                                state="Warning"
+                                icon="sap-icon://warning"
+                                class="sapUiTinyMarginEnd" />
+                            <ObjectStatus
+                                text="{failedFiles} Failed"
+                                state="Error"
+                                icon="sap-icon://error"
+                                class="sapUiTinyMarginEnd" />
+                        </HBox>
+
+                        <!-- Current File -->
+                        <MessageStrip
+                            text="Processing: {currentFile}"
+                            type="Information"
+                            showIcon="true"
+                            visible="{= ${currentFile} !== null}"
+                            class="sapUiTinyMarginTop" />
+
+                        <!-- Estimated Time -->
+                        <Text
+                            text="Estimated time remaining: {estimatedTimeRemaining} seconds"
+                            visible="{= ${estimatedTimeRemaining} > 0}"
+                            class="sapUiTinyMarginTop" />
+
+                        <!-- Actions -->
+                        <HBox class="sapUiTinyMarginTop">
+                            <Button
+                                text="View Details"
+                                icon="sap-icon://detail-view"
+                                press=".onViewQueueDetails">
+                                <customData>
+                                    <core:CustomData key="queueId" value="{ID}" />
+                                </customData>
+                            </Button>
+                            <Button
+                                text="Cancel"
+                                icon="sap-icon://decline"
+                                type="Reject"
+                                press=".onCancelQueue"
+                                class="sapUiTinyMarginBegin">
+                                <customData>
+                                    <core:CustomData key="queueId" value="{ID}" />
+                                </customData>
+                            </Button>
+                        </HBox>
+                    </VBox>
+                </CustomListItem>
+            </List>
+        </Panel>
+
+        <!-- Completed Jobs -->
+        <Panel
+            headerText="Recent Completed Jobs"
+            expanded="false"
+            expandable="true"
+            class="sapUiSmallMarginTop">
+
+            <Table
+                id="completedQueueTable"
+                items="{
+                    path: '/ProcessingQueue',
+                    parameters: {
+                        $orderby: 'completedAt desc'
+                    }
+                }"
+                mode="SingleSelectMaster">
+
+                <columns>
+                    <Column>
+                        <Text text="Batch ID" />
+                    </Column>
+                    <Column hAlign="Center">
+                        <Text text="Status" />
+                    </Column>
+                    <Column hAlign="End">
+                        <Text text="Files" />
+                    </Column>
+                    <Column hAlign="End">
+                        <Text text="Success Rate" />
+                    </Column>
+                    <Column>
+                        <Text text="Started" />
+                    </Column>
+                    <Column>
+                        <Text text="Duration" />
+                    </Column>
+                    <Column>
+                        <Text text="Actions" />
+                    </Column>
+                </columns>
+
+                <items>
+                    <ColumnListItem type="Navigation" press=".onQueueItemPress">
+                        <cells>
+                            <!-- Batch ID -->
+                            <Text text="{ID}" />
+
+                            <!-- Status -->
+                            <ObjectStatus
+                                text="{status}"
+                                state="{= ${status} === 'completed' ? 'Success' : ${status} === 'failed' ? 'Error' : 'None'}"
+                                icon="{= ${status} === 'completed' ? 'sap-icon://sys-enter-2' : ${status} === 'failed' ? 'sap-icon://error' : 'sap-icon://decline'}" />
+
+                            <!-- Files -->
+                            <Text text="{= ${processedFiles} + ' / ' + ${totalFiles}}" />
+
+                            <!-- Success Rate -->
+                            <ObjectNumber
+                                number="{= ${totalFiles} > 0 ? ((${autoCreatedFiles} + ${reviewRequiredFiles}) / ${totalFiles} * 100).toFixed(1) : 0}"
+                                unit="%"
+                                state="{= ${totalFiles} > 0 &amp;&amp; ((${autoCreatedFiles} + ${reviewRequiredFiles}) / ${totalFiles}) >= 0.9 ? 'Success' : 'Warning'}" />
+
+                            <!-- Started At -->
+                            <Text text="{startedAt}" />
+
+                            <!-- Duration -->
+                            <Text text="{= ${duration} ? (${duration} / 1000).toFixed(0) + 's' : 'N/A'}" />
+
+                            <!-- Actions -->
+                            <HBox>
+                                <Button
+                                    icon="sap-icon://detail-view"
+                                    tooltip="View Details"
+                                    press=".onViewQueueDetails">
+                                    <customData>
+                                        <core:CustomData key="queueId" value="{ID}" />
+                                    </customData>
+                                </Button>
+                                <Button
+                                    icon="sap-icon://delete"
+                                    tooltip="Delete"
+                                    type="Reject"
+                                    press=".onDeleteQueue">
+                                    <customData>
+                                        <core:CustomData key="queueId" value="{ID}" />
+                                    </customData>
+                                </Button>
+                            </HBox>
+                        </cells>
+                    </ColumnListItem>
+                </items>
+            </Table>
+        </Panel>
+
+        <!-- Empty State -->
+        <IllustratedMessage
+            id="queueEmptyState"
+            illustrationType="sapIllus-Spot-NoData"
+            title="No Processing Jobs"
+            description="Start a batch upload to see processing jobs here."
+            visible="{= ${queueView>/totalCount} === 0}"
+            class="sapUiMediumMarginTop">
+            <additionalContent>
+                <Button
+                    text="Go to Upload"
+                    icon="sap-icon://upload"
+                    press=".onGoToUpload" />
+            </additionalContent>
+        </IllustratedMessage>
+    </VBox>
+
+</core:FragmentDefinition>

@@ -10,14 +10,14 @@
         },
         "dataSources": {
             "analyticsService": {
-                "uri": "/api/jobs/",
+                "uri": "/api/",
                 "type": "OData",
                 "settings": {
                     "odataVersion": "4.0"
                 }
             },
             "matchingService": {
-                "uri": "/api/jobs/",
+                "uri": "/api/",
                 "type": "OData",
                 "settings": {
                     "odataVersion": "4.0"

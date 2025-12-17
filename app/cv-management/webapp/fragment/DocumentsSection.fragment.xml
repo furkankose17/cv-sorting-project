@@ -1,0 +1,225 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.ui.layout.form">
+
+    <VBox class="sapUiSmallMargin">
+        <!-- Header -->
+        <Toolbar>
+            <Title text="CV Documents Library" level="H2" />
+            <ToolbarSpacer />
+            <SearchField
+                id="documentSearch"
+                placeholder="Search documents..."
+                width="300px"
+                search=".onDocumentSearch" />
+            <Button
+                icon="sap-icon://refresh"
+                tooltip="Refresh"
+                press=".onRefreshDocuments" />
+            <Button
+                icon="sap-icon://filter"
+                text="Filter"
+                press=".onOpenDocumentFilter" />
+        </Toolbar>
+
+        <!-- Filter Bar -->
+        <Panel
+            id="documentFilterPanel"
+            headerText="Filters"
+            expanded="false"
+            expandable="true"
+            class="sapUiTinyMarginTop">
+            <f:SimpleForm
+                editable="true"
+                layout="ResponsiveGridLayout"
+                labelSpanXL="3"
+                labelSpanL="3"
+                labelSpanM="3"
+                emptySpanXL="1"
+                emptySpanL="1"
+                emptySpanM="1"
+                columnsXL="2"
+                columnsL="2"
+                columnsM="1">
+                <f:content>
+                    <Label text="Processing Status" />
+                    <MultiComboBox
+                        id="statusFilter"
+                        placeholder="All Statuses"
+                        selectionChange=".onFilterChange">
+                        <items>
+                            <core:Item key="pending" text="Pending" />
+                            <core:Item key="processing" text="Processing" />
+                            <core:Item key="completed" text="Completed" />
+                            <core:Item key="failed" text="Failed" />
+                            <core:Item key="review_required" text="Review Required" />
+                        </items>
+                    </MultiComboBox>
+
+                    <Label text="OCR Confidence" />
+                    <RangeSlider
+                        id="confidenceFilter"
+                        min="0"
+                        max="100"
+                        step="5"
+                        range="[50, 100]"
+                        change=".onFilterChange"
+                        width="100%" />
+
+                    <Label text="Date Range" />
+                    <DateRangeSelection
+                        id="dateRangeFilter"
+                        change=".onFilterChange" />
+
+                    <Label text="Candidate Linked" />
+                    <Select
+                        id="linkedFilter"
+                        change=".onFilterChange">
+                        <items>
+                            <core:Item key="all" text="All" />
+                            <core:Item key="linked" text="Linked to Candidate" />
+                            <core:Item key="unlinked" text="Not Linked" />
+                        </items>
+                    </Select>
+                </f:content>
+            </f:SimpleForm>
+            <Button
+                text="Apply Filters"
+                type="Emphasized"
+                press=".onApplyDocumentFilters"
+                class="sapUiTinyMargin" />
+            <Button
+                text="Clear Filters"
+                press=".onClearDocumentFilters"
+                class="sapUiTinyMargin" />
+        </Panel>
+
+        <!-- Documents Table -->
+        <Table
+            id="documentsTable"
+            inset="false"
+            items="{
+                path: '/CVDocuments',
+                parameters: {
+                    $expand: 'candidate',
+                    $orderby: 'createdAt desc'
+                },
+                sorter: {
+                    path: 'createdAt',
+                    descending: true
+                }
+            }"
+            mode="MultiSelect"
+            class="sapUiSmallMarginTop">
+
+            <headerToolbar>
+                <OverflowToolbar>
+                    <Title text="Documents ({documentsTable>/count})" />
+                    <ToolbarSpacer />
+                    <Button
+                        text="Process Selected"
+                        icon="sap-icon://simulate"
+                        press=".onProcessSelectedDocuments"
+                        enabled="{= ${documentsTable>/selectedCount} > 0}" />
+                    <Button
+                        text="Delete Selected"
+                        icon="sap-icon://delete"
+                        type="Reject"
+                        press=".onDeleteSelectedDocuments"
+                        enabled="{= ${documentsTable>/selectedCount} > 0}" />
+                    <Button
+                        icon="sap-icon://excel-attachment"
+                        tooltip="Export to Excel"
+                        press=".onExportDocuments" />
+                </OverflowToolbar>
+            </headerToolbar>
+
+            <columns>
+                <Column width="3rem">
+                    <Text text="" />
+                </Column>
+                <Column>
+                    <Text text="File Name" />
+                </Column>
+                <Column>
+                    <Text text="Candidate" />
+                </Column>
+                <Column hAlign="Center">
+                    <Text text="Status" />
+                </Column>
+                <Column hAlign="End">
+                    <Text text="Confidence" />
+                </Column>
+                <Column hAlign="End">
+                    <Text text="Size" />
+                </Column>
+                <Column>
+                    <Text text="Uploaded" />
+                </Column>
+                <Column>
+                    <Text text="Actions" />
+                </Column>
+            </columns>
+
+            <items>
+                <ColumnListItem type="Navigation" press=".onDocumentPress">
+                    <cells>
+                        <!-- File Type Icon -->
+                        <core:Icon
+                            src="{= ${fileType} === 'application/pdf' ? 'sap-icon://pdf-attachment' : 'sap-icon://attachment-photo'}"
+                            color="Default" />
+
+                        <!-- File Name -->
+                        <ObjectIdentifier
+                            title="{fileName}"
+                            text="{= ${fileType} || 'Unknown'}" />
+
+                        <!-- Candidate -->
+                        <Link
+                            text="{= ${candidate/firstName} + ' ' + ${candidate/lastName}}"
+                            press=".onCandidateLinkPress"
+                            visible="{= ${candidate_ID} !== null}" />
+
+                        <!-- Status -->
+                        <ObjectStatus
+                            text="{processingStatus}"
+                            state="{= ${processingStatus} === 'completed' ? 'Success' : ${processingStatus} === 'failed' ? 'Error' : ${processingStatus} === 'review_required' ? 'Warning' : 'None'}"
+                            icon="{= ${processingStatus} === 'completed' ? 'sap-icon://sys-enter-2' : ${processingStatus} === 'failed' ? 'sap-icon://error' : ${processingStatus} === 'review_required' ? 'sap-icon://warning' : 'sap-icon://pending'}" />
+
+                        <!-- Confidence -->
+                        <ObjectNumber
+                            number="{ocrConfidence}"
+                            unit="%"
+                            state="{= ${ocrConfidence} >= 85 ? 'Success' : ${ocrConfidence} >= 70 ? 'Warning' : 'Error'}"
+                            visible="{= ${ocrConfidence} !== null}" />
+
+                        <!-- File Size -->
+                        <Text text="{= ${fileSize} ? (${fileSize} / 1024).toFixed(1) + ' KB' : 'N/A'}" />
+
+                        <!-- Upload Date -->
+                        <Text text="{path: 'createdAt', type: 'sap.ui.model.type.DateTime', formatOptions: {pattern: 'MMM d, yyyy HH:mm'}}" />
+
+                        <!-- Actions -->
+                        <HBox>
+                            <Button
+                                icon="sap-icon://show"
+                                tooltip="View"
+                                press=".onViewDocument" />
+                            <Button
+                                icon="sap-icon://download"
+                                tooltip="Download"
+                                press=".onDownloadDocument" />
+                            <Button
+                                icon="sap-icon://delete"
+                                tooltip="Delete"
+                                type="Reject"
+                                press=".onDeleteDocument" />
+                        </HBox>
+                    </cells>
+                </ColumnListItem>
+            </items>
+        </Table>
+    </VBox>
+
+</core:FragmentDefinition>

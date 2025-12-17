@@ -1480,25 +1480,56 @@ Always provide structured insights when analyzing candidates or jobs.`
         // Get document
         const doc = await SELECT.one.from(CVDocuments)
             .where({ ID: documentId })
-            .columns(['ID', 'content', 'fileName', 'contentType']);
+            .columns(['ID', 'fileContent', 'fileName', 'fileType', 'mediaType']);
 
         if (!doc) {
             req.error(404, `Document ${documentId} not found`);
             return;
         }
 
-        // Determine file type from content type
+        if (!doc.fileContent) {
+            req.error(400, `Document ${documentId} has no file content to process`);
+            return;
+        }
+
+        // Determine file type from file type or media type
+        const contentType = doc.mediaType || doc.fileType || 'application/pdf';
         const fileTypeMap = {
             'application/pdf': 'pdf',
             'image/png': 'png',
             'image/jpeg': 'jpg',
             'image/tiff': 'tiff'
         };
-        const fileType = fileTypeMap[doc.contentType] || 'pdf';
+        const fileType = fileTypeMap[contentType] || 'pdf';
+
+        // Ensure fileContent is a Buffer (handle Stream/Readable from database)
+        let contentBuffer;
+        if (Buffer.isBuffer(doc.fileContent)) {
+            contentBuffer = doc.fileContent;
+        } else if (typeof doc.fileContent === 'string') {
+            // Already base64 or plain string
+            contentBuffer = Buffer.from(doc.fileContent, 'base64');
+        } else if (doc.fileContent && typeof doc.fileContent.pipe === 'function') {
+            // It's a Readable stream - read it into a buffer
+            const chunks = [];
+            for await (const chunk of doc.fileContent) {
+                chunks.push(chunk);
+            }
+            contentBuffer = Buffer.concat(chunks);
+        } else {
+            req.error(400, 'Invalid file content format');
+            return;
+        }
+
+        LOG.info('Processing OCR', {
+            documentId,
+            fileType,
+            bufferLength: contentBuffer.length
+        });
 
         // Call ML service
         const result = await this.mlClient.processOCR({
-            fileContent: doc.content.toString('base64'),
+            fileContent: contentBuffer.toString('base64'),
             fileType,
             language: language || 'eng',
             extractStructured: true

@@ -13,10 +13,9 @@ sentence-transformers==2.2.2
 torch==2.1.2
 transformers==4.36.2
 
-# OCR - Primary: PaddleOCR (faster, better tables), Fallback: Tesseract
-# PaddlePaddle CPU version (no GPU required)
-paddlepaddle==2.6.0
-paddleocr==2.7.0
+# OCR - Primary: RapidOCR (3-5x faster, lighter weight), Fallback: Tesseract
+# RapidOCR with ONNX Runtime (optimized inference, ~500MB vs 2GB+ for PaddleOCR)
+rapidocr-onnxruntime>=1.3.0
 
 # OCR - Tesseract (fallback engine)
 pytesseract==0.3.10

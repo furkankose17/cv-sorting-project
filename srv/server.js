@@ -5,7 +5,16 @@
 'use strict';
 
 const cds = require('@sap/cds');
+const multer = require('multer');
 const { correlationMiddleware } = require('./lib/logger');
+
+// Configure multer for file uploads (memory storage)
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB limit
+    }
+});
 
 // Register custom service handlers
 cds.on('bootstrap', (app) => {
@@ -55,6 +64,75 @@ cds.on('bootstrap', (app) => {
 
         const httpStatus = status.status === 'READY' ? 200 : 503;
         res.status(httpStatus).json(status);
+    });
+
+    // File upload endpoint for CV processing
+    app.post('/api/uploadAndProcessCV', upload.single('file'), async (req, res) => {
+        const LOG = cds.log('upload');
+
+        try {
+            if (!req.file) {
+                return res.status(400).json({
+                    error: 'No file uploaded'
+                });
+            }
+
+            // Get file metadata from headers or multipart form data
+            const fileName = req.headers['x-file-name']
+                ? decodeURIComponent(req.headers['x-file-name'])
+                : req.file.originalname;
+            const mediaType = req.headers['x-media-type'] || req.file.mimetype;
+            const autoCreate = req.headers['x-auto-create'] === 'true';
+
+            LOG.info('File upload received', {
+                fileName,
+                mediaType,
+                fileSize: req.file.size,
+                autoCreate
+            });
+
+            // Load the OCR handler
+            const ocrHandler = require('./handlers/ocr-handler');
+
+            // Create mock request object for the action handler
+            const mockReq = {
+                data: {
+                    fileName,
+                    fileContent: req.file.buffer,
+                    mediaType,
+                    autoCreate
+                },
+                user: req.user || { id: 'anonymous' },
+                reject: (code, msg) => {
+                    throw new Error(`${code}: ${msg}`);
+                },
+                error: (code, msg) => {
+                    throw new Error(`${code}: ${msg}`);
+                }
+            };
+
+            // Call the uploadAndProcessCV action handler
+            const result = await ocrHandler.uploadAndProcessCV(mockReq);
+
+            LOG.info('File processed successfully', {
+                documentId: result.documentId,
+                ocrStatus: result.ocrStatus
+            });
+
+            // Return success response
+            res.status(201).json(result);
+
+        } catch (error) {
+            LOG.error('File upload failed', {
+                error: error.message,
+                stack: error.stack
+            });
+
+            res.status(500).json({
+                error: 'Upload failed',
+                message: error.message
+            });
+        }
     });
 });
 

@@ -32,37 +32,36 @@
                 class="sapUiResponsiveContentPadding">
 
                 <items>
+                    <!-- Upload Tab -->
+                    <IconTabFilter
+                        id="uploadTab"
+                        icon="sap-icon://upload"
+                        text="Upload CVs"
+                        key="upload">
+                    </IconTabFilter>
+
                     <!-- Candidates Tab -->
                     <IconTabFilter
                         id="candidatesTab"
                         icon="sap-icon://employee"
                         text="Candidates"
                         key="candidates">
-                        <core:Fragment
-                            fragmentName="cvmanagement.fragment.CandidatesSection"
-                            type="XML" />
                     </IconTabFilter>
 
-                    <!-- Job Postings Tab -->
+                    <!-- Documents Tab -->
                     <IconTabFilter
-                        id="jobsTab"
-                        icon="sap-icon://work-history"
-                        text="Job Postings"
-                        key="jobs">
-                        <core:Fragment
-                            fragmentName="cvmanagement.fragment.JobsSection"
-                            type="XML" />
+                        id="documentsTab"
+                        icon="sap-icon://document"
+                        text="Documents"
+                        key="documents">
                     </IconTabFilter>
 
-                    <!-- Dashboard Tab -->
+                    <!-- Queue Tab -->
                     <IconTabFilter
-                        id="dashboardTab"
-                        icon="sap-icon://business-objects-experience"
-                        text="Analytics"
-                        key="dashboard">
-                        <core:Fragment
-                            fragmentName="cvmanagement.fragment.DashboardSection"
-                            type="XML" />
+                        id="queueTab"
+                        icon="sap-icon://process"
+                        text="Processing Queue"
+                        key="queue">
                     </IconTabFilter>
                 </items>
             </IconTabBar>

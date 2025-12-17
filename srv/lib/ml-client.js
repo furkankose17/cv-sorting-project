@@ -9,7 +9,7 @@ const LOG = cds.log('ml-client');
 class MLClient {
     constructor(baseUrl) {
         this.baseUrl = baseUrl || process.env.ML_SERVICE_URL || 'http://localhost:8000';
-        this.timeout = parseInt(process.env.ML_SERVICE_TIMEOUT) || 30000;
+        this.timeout = parseInt(process.env.ML_SERVICE_TIMEOUT) || 300000; // 5 minutes for PDF OCR
     }
 
     /**

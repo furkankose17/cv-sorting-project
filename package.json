@@ -16,6 +16,7 @@
     "@sap/xssec": "^3",
     "express": "^4",
     "mammoth": "^1.6",
+    "multer": "^2.0.2",
     "passport": "^0.7",
     "pdf-parse": "^1.1.1",
     "tesseract.js": "^5",
@@ -158,10 +159,9 @@
     }
   },
   "sapux": [
-    "app/jobs",
-    "app/cv-upload",
-    "app/candidate-management",
-    "app/analytics-dashboard"
+    "app/cv-management",
+    "app/analytics-dashboard",
+    "app/ml-showcase"
   ],
   "engines": {
     "node": "^18 || ^20"
