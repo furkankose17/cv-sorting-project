@@ -138,10 +138,11 @@ describe('File Validator', () => {
         });
 
         it('should handle invalid input', () => {
-            // Empty string is falsy, so returns 'unknown'
-            expect(sanitizeFileName('')).toBe('unknown');
-            // '.' after sanitization becomes empty or '.', so returns 'document'
+            // Empty string should be sanitized to 'document'
+            expect(sanitizeFileName('')).toBe('document');
+            // '.' should be sanitized to 'document'
             expect(sanitizeFileName('.')).toBe('document');
+            // null/undefined should return 'unknown'
             expect(sanitizeFileName(null)).toBe('unknown');
             expect(sanitizeFileName(undefined)).toBe('unknown');
         });

@@ -177,7 +177,8 @@ function validateFileExtension(fileName, mimeType) {
  * @returns {string} Sanitized file name
  */
 function sanitizeFileName(fileName) {
-    if (!fileName || typeof fileName !== 'string') {
+    // Check for null/undefined/non-string, but allow empty strings to be processed
+    if (fileName == null || typeof fileName !== 'string') {
         return 'unknown';
     }
 
