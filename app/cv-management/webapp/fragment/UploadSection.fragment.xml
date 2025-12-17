@@ -113,11 +113,11 @@
                     path: '/CVDocuments',
                     parameters: {
                         $orderby: 'createdAt desc',
-                        $expand: 'candidate',
-                        $top: 10
+                        $expand: 'candidate'
                     }
                 }"
-                growing="false"
+                growing="true"
+                growingThreshold="10"
                 sticky="ColumnHeaders">
                 <columns>
                     <Column width="30%">
