@@ -83,6 +83,77 @@ def find_section_headers(text: str) -> Dict[str, Tuple[int, int]]:
     return sections
 
 
+def parse_work_history(text: str) -> List[Dict[str, Any]]:
+    """
+    Parse work history section into structured job entries.
+
+    Each job has: jobTitle, company, startDate, endDate, responsibilities
+    """
+    jobs = []
+    lines = [l.strip() for l in text.strip().split('\n') if l.strip()]
+
+    if not lines:
+        return jobs
+
+    # Date pattern to identify job blocks
+    date_pattern = r'(\d{4})\s*[-–—]\s*(Present|Current|\d{4})'
+    company_indicators = ['inc', 'ltd', 'llc', 'corp', 'gmbh', 'ag', 'co.', 'company', '|']
+
+    current_job = None
+    responsibilities = []
+
+    for i, line in enumerate(lines):
+        # Check if line contains dates (likely company/date line)
+        date_match = re.search(date_pattern, line, re.IGNORECASE)
+
+        if date_match:
+            # Save previous job if exists
+            if current_job:
+                current_job["responsibilities"] = {
+                    "value": '\n'.join(responsibilities),
+                    "confidence": 80
+                }
+                jobs.append(current_job)
+                responsibilities = []
+
+            # Extract company name (before the date or pipe)
+            company_part = re.split(r'\||\d{4}', line)[0].strip()
+            company_part = re.sub(r'[-–—].*$', '', company_part).strip()
+
+            # Previous line is likely job title
+            job_title = lines[i-1] if i > 0 and not re.search(date_pattern, lines[i-1]) else ""
+
+            # Remove job title from company if it got merged
+            if job_title and job_title in company_part:
+                company_part = company_part.replace(job_title, '').strip()
+
+            current_job = {
+                "jobTitle": {"value": job_title, "confidence": 90 if job_title else 50},
+                "company": {"value": company_part, "confidence": 85 if company_part else 50},
+                "startDate": {"value": date_match.group(1), "confidence": 95},
+                "endDate": {"value": date_match.group(2), "confidence": 95},
+            }
+
+        elif current_job and (line.startswith('-') or line.startswith('•') or line.startswith('*')):
+            # This is a responsibility bullet point
+            responsibilities.append(line)
+
+        elif current_job and not date_match and i > 0:
+            # Could be continuation of responsibilities
+            if responsibilities:
+                responsibilities.append(line)
+
+    # Don't forget the last job
+    if current_job:
+        current_job["responsibilities"] = {
+            "value": '\n'.join(responsibilities),
+            "confidence": 80
+        }
+        jobs.append(current_job)
+
+    return jobs
+
+
 class FieldExtraction(BaseModel):
     """Single field extraction result."""
     value: Optional[str] = None
