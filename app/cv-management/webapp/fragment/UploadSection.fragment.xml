@@ -141,18 +141,7 @@
                             <ObjectIdentifier
                                 title="{fileName}"
                                 text="{mediaType}" />
-                            <Text
-                                text="{
-                                    path: 'createdAt',
-                                    type: 'sap.ui.model.type.DateTime',
-                                    formatOptions: {
-                                        pattern: 'dd MMM yyyy HH:mm'
-                                    },
-                                    constraints: {
-                                        nullable: true
-                                    }
-                                }"
-                                visible="{= %{createdAt} ? true : false}" />
+                            <Text text="{= %{createdAt} ? ${path: 'createdAt', type: 'sap.ui.model.type.DateTime', formatOptions: {pattern: 'dd MMM yyyy HH:mm'}} : '-' }" />
                             <ObjectStatus
                                 text="{ocrStatus}"
                                 state="{= ${ocrStatus} === 'completed' ? 'Success' : ${ocrStatus} === 'processing' ? 'Information' : ${ocrStatus} === 'failed' ? 'Error' : 'Warning' }" />

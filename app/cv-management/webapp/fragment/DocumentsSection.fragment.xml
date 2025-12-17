@@ -204,18 +204,7 @@
                         <Text text="{= ${fileSize} ? (${fileSize} / 1024).toFixed(1) + ' KB' : 'N/A'}" />
 
                         <!-- Upload Date -->
-                        <Text
-                            text="{
-                                path: 'createdAt',
-                                type: 'sap.ui.model.type.DateTime',
-                                formatOptions: {
-                                    pattern: 'dd MMM yyyy HH:mm'
-                                },
-                                constraints: {
-                                    nullable: true
-                                }
-                            }"
-                            visible="{= %{createdAt} ? true : false}" />
+                        <Text text="{= %{createdAt} ? ${path: 'createdAt', type: 'sap.ui.model.type.DateTime', formatOptions: {pattern: 'dd MMM yyyy HH:mm'}} : '-' }" />
 
                         <!-- Actions -->
                         <HBox>
