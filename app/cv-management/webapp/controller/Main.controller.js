@@ -38,10 +38,14 @@ sap.ui.define([
 
             // Initialize upload view model
             const oUploadViewModel = new JSONModel({
-                mode: "single",
                 autoCreate: false,
-                uploadProgress: 0,
-                isUploading: false
+                selectedFiles: [],
+                processing: false,
+                progress: 0,
+                progressText: "",
+                statusMessage: "",
+                resultMessage: "",
+                resultType: "Success"
             });
             this.setModel(oUploadViewModel, "uploadView");
 
@@ -403,141 +407,164 @@ sap.ui.define([
         // ==================== Upload Section Handlers ====================
 
         /**
-         * Handle upload button press - triggers file upload
-         */
-        onUploadPress: function () {
-            const oUploadSet = this.byId("cvUploadSet");
-            if (oUploadSet) {
-                const aIncompleteItems = oUploadSet.getIncompleteItems();
-                if (aIncompleteItems.length > 0) {
-                    oUploadSet.upload();
-                } else {
-                    this.showInfo("Please select files to upload");
-                }
-            }
-        },
-
-        /**
-         * Handle before upload starts - set headers and parameters
-         * @param {sap.ui.base.Event} oEvent The beforeUploadStarts event
-         */
-        onBeforeUploadStarts: function (oEvent) {
-            const oItem = oEvent.getParameter("item");
-
-            // Add file metadata as headers
-            const oCustomHeaderFileName = new sap.ui.core.Item({
-                key: "X-File-Name",
-                text: encodeURIComponent(oItem.getFileName())
-            });
-            oItem.addHeaderField(oCustomHeaderFileName);
-
-            const oCustomHeaderMediaType = new sap.ui.core.Item({
-                key: "X-Media-Type",
-                text: oItem.getMediaType()
-            });
-            oItem.addHeaderField(oCustomHeaderMediaType);
-
-            // Get autoCreate setting from upload view model
-            const oUploadViewModel = this.getModel("uploadView");
-            const bAutoCreate = oUploadViewModel ? oUploadViewModel.getProperty("/autoCreate") : false;
-
-            const oCustomHeaderAutoCreate = new sap.ui.core.Item({
-                key: "X-Auto-Create",
-                text: bAutoCreate.toString()
-            });
-            oItem.addHeaderField(oCustomHeaderAutoCreate);
-        },
-
-        /**
-         * Handle upload complete
-         * @param {sap.ui.base.Event} oEvent The uploadCompleted event
-         */
-        onUploadComplete: function (oEvent) {
-            const oUploadSet = this.byId("cvUploadSet");
-            const oItem = oEvent.getParameter("item");
-            const sResponse = oEvent.getParameter("response");
-            const iStatus = oEvent.getParameter("status");
-
-            // Remove the header fields from the item after upload
-            oItem.removeAllHeaderFields();
-
-            if (iStatus === 200 || iStatus === 201) {
-                // Parse response
-                try {
-                    const oResponse = JSON.parse(sResponse);
-
-                    if (oResponse.documentId) {
-                        this.showSuccess(`File "${oItem.getFileName()}" processed successfully`);
-
-                        // Refresh documents table
-                        const oModel = this.getModel();
-                        oModel.refresh(true);
-
-                        // Remove the item from upload set
-                        oUploadSet.removeItem(oItem);
-
-                        // If candidate was auto-created, show info
-                        if (oResponse.candidateId && !oResponse.requiresReview) {
-                            this.showSuccess("Candidate created automatically");
-                        } else if (oResponse.requiresReview) {
-                            this.showInfo("Document uploaded - manual review required");
-                        }
-                    } else {
-                        this.handleError("Upload failed: No document ID returned");
-                        oItem.setUploadState("Error");
-                    }
-                } catch (error) {
-                    console.error("Error parsing upload response:", error, "Response:", sResponse);
-                    this.handleError({ message: "Upload failed: " + (sResponse || "Invalid response") });
-                    oItem.setUploadState("Error");
-                }
-            } else {
-                // Upload failed - parse error message from response
-                try {
-                    const oErrorResponse = JSON.parse(sResponse);
-                    this.handleError({
-                        message: oErrorResponse.message || oErrorResponse.error || `Upload failed with status ${iStatus}`
-                    });
-                } catch (e) {
-                    this.handleError({ message: `Upload failed with status ${iStatus}` });
-                }
-                oItem.setUploadState("Error");
-            }
-        },
-
-        /**
-         * Handle clear all button press
-         */
-        onClearAll: function () {
-            const oUploadSet = this.byId("cvUploadSet");
-            if (oUploadSet) {
-                oUploadSet.removeAllIncompleteItems();
-                this.showInfo("Upload queue cleared");
-            }
-        },
-
-        /**
-         * Handle mode change (single vs batch upload)
-         * @param {sap.ui.base.Event} oEvent The select event
-         */
-        onUploadModeChange: function (oEvent) {
-            const sKey = oEvent.getParameter("item").getKey();
-            const oUploadViewModel = this.getModel("uploadView");
-            if (oUploadViewModel) {
-                oUploadViewModel.setProperty("/mode", sKey);
-            }
-        },
-
-        /**
-         * Handle auto-create switch change
+         * Handle file selection - track selected files
          * @param {sap.ui.base.Event} oEvent The change event
          */
-        onAutoCreateChange: function (oEvent) {
-            const bState = oEvent.getParameter("state");
+        onFileSelected: function (oEvent) {
+            const oFileUploader = oEvent.getSource();
+            const aFiles = oEvent.getParameter("files") || [];
             const oUploadViewModel = this.getModel("uploadView");
-            if (oUploadViewModel) {
-                oUploadViewModel.setProperty("/autoCreate", bState);
+
+            if (aFiles.length === 0) {
+                oUploadViewModel.setProperty("/selectedFiles", []);
+                return;
             }
+
+            // Convert File objects to displayable format
+            const aFileData = Array.from(aFiles).map(file => ({
+                name: file.name,
+                size: this._formatFileSize(file.size),
+                file: file
+            }));
+
+            oUploadViewModel.setProperty("/selectedFiles", aFileData);
+            oUploadViewModel.setProperty("/resultMessage", "");
+        },
+
+        /**
+         * Format file size for display
+         * @param {number} bytes File size in bytes
+         * @returns {string} Formatted file size
+         * @private
+         */
+        _formatFileSize: function (bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        },
+
+        /**
+         * Process CVs - upload files one by one
+         */
+        onProcessCVs: async function () {
+            const oUploadViewModel = this.getModel("uploadView");
+            const aSelectedFiles = oUploadViewModel.getProperty("/selectedFiles");
+            const bAutoCreate = oUploadViewModel.getProperty("/autoCreate");
+
+            if (!aSelectedFiles || aSelectedFiles.length === 0) {
+                this.showInfo("Please select files first");
+                return;
+            }
+
+            // Set processing state
+            oUploadViewModel.setProperty("/processing", true);
+            oUploadViewModel.setProperty("/progress", 0);
+            oUploadViewModel.setProperty("/resultMessage", "");
+
+            let successCount = 0;
+            let failCount = 0;
+            const totalFiles = aSelectedFiles.length;
+
+            for (let i = 0; i < totalFiles; i++) {
+                const fileData = aSelectedFiles[i];
+                const file = fileData.file;
+
+                // Update progress
+                const percent = ((i) / totalFiles) * 100;
+                oUploadViewModel.setProperty("/progress", percent);
+                oUploadViewModel.setProperty("/progressText", `${i + 1} / ${totalFiles}`);
+                oUploadViewModel.setProperty("/statusMessage", `Processing: ${file.name}`);
+
+                try {
+                    // Upload file
+                    await this._uploadSingleFile(file, bAutoCreate);
+                    successCount++;
+                } catch (error) {
+                    console.error(`Failed to upload ${file.name}:`, error);
+                    failCount++;
+                }
+            }
+
+            // Update final progress
+            oUploadViewModel.setProperty("/progress", 100);
+            oUploadViewModel.setProperty("/progressText", "Complete");
+            oUploadViewModel.setProperty("/statusMessage", "");
+            oUploadViewModel.setProperty("/processing", false);
+
+            // Show result summary
+            let resultMessage = "";
+            let resultType = "Success";
+
+            if (successCount === totalFiles) {
+                resultMessage = `All ${totalFiles} file(s) processed successfully!`;
+                resultType = "Success";
+            } else if (failCount === totalFiles) {
+                resultMessage = `All ${totalFiles} file(s) failed to process.`;
+                resultType = "Error";
+            } else {
+                resultMessage = `Processed ${successCount} file(s) successfully. ${failCount} failed.`;
+                resultType = "Warning";
+            }
+
+            oUploadViewModel.setProperty("/resultMessage", resultMessage);
+            oUploadViewModel.setProperty("/resultType", resultType);
+
+            // Clear selected files and reset uploader
+            oUploadViewModel.setProperty("/selectedFiles", []);
+            const oFileUploader = this.byId("cvFileUploader");
+            if (oFileUploader) {
+                oFileUploader.clear();
+            }
+
+            // Refresh documents table
+            const oModel = this.getModel();
+            if (oModel) {
+                oModel.refresh(true);
+            }
+        },
+
+        /**
+         * Upload a single file
+         * @param {File} file The file to upload
+         * @param {boolean} bAutoCreate Whether to auto-create candidates
+         * @returns {Promise} Upload promise
+         * @private
+         */
+        _uploadSingleFile: function (file, bAutoCreate) {
+            return new Promise((resolve, reject) => {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                fetch('/api/uploadAndProcessCV', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-File-Name': encodeURIComponent(file.name),
+                        'X-Media-Type': file.type,
+                        'X-Auto-Create': bAutoCreate.toString()
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => {
+                            throw new Error(err.message || err.error || `HTTP ${response.status}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.documentId) {
+                        resolve(data);
+                    } else {
+                        reject(new Error('No document ID returned'));
+                    }
+                })
+                .catch(error => {
+                    reject(error);
+                });
+            });
         },
 
         // ==================== Candidates Section Handlers ====================
