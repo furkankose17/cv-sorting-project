@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>{{updateTitle}} - {{companyName}}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <!-- Main Container -->
+                <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+                    <!-- Header with Logo -->
+                    <tr>
+                        <td align="center" style="padding: 40px 30px 30px 30px; background-color: #0066CC; border-radius: 8px 8px 0 0;">
+                            <img src="{{companyLogo}}" alt="{{companyName}} Logo" width="150" style="display: block; max-width: 150px; height: auto;">
+                        </td>
+                    </tr>
+
+                    <!-- Main Content -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+
+                            <!-- Icon (optional, can be customized based on update type) -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="center" style="padding-bottom: 20px;">
+                                        <div style="width: 60px; height: 60px; background-color: #0066CC; border-radius: 50%; display: inline-block; text-align: center; line-height: 60px;">
+                                            <span style="color: #ffffff; font-size: 30px; font-weight: bold;">ℹ️</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Title -->
+                            <h1 style="margin: 0 0 20px 0; color: #333333; font-size: 24px; font-weight: bold; text-align: center;">
+                                {{updateTitle}}
+                            </h1>
+
+                            <!-- Personal Greeting -->
+                            <p style="margin: 0 0 15px 0; color: #555555; font-size: 16px; line-height: 24px;">
+                                Dear {{candidateFirstName}},
+                            </p>
+
+                            <!-- Main Message Content -->
+                            <div style="margin: 20px 0; color: #555555; font-size: 16px; line-height: 24px;">
+                                {{updateMessage}}
+                            </div>
+
+                            <!-- Action Required Section (if applicable) -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 25px 0; background-color: #fff8e6; border-left: 4px solid #FFA500; border-radius: 4px;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <h2 style="margin: 0 0 10px 0; color: #FFA500; font-size: 16px; font-weight: bold;">
+                                            ⚠️ Action Required
+                                        </h2>
+                                        <p style="margin: 0; color: #555555; font-size: 15px; line-height: 22px;">
+                                            {{actionRequired}}
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Call to Action Button (if applicable) -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{{actionLink}}" style="display: inline-block; padding: 14px 30px; background-color: #0066CC; color: #ffffff; text-decoration: none; border-radius: 4px; font-size: 16px; font-weight: bold;">
+                                            {{actionButtonText}}
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Important Information Box -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 25px 0; background-color: #e8f4f8; border-left: 4px solid #0066CC; border-radius: 4px;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <h2 style="margin: 0 0 10px 0; color: #333333; font-size: 16px; font-weight: bold;">
+                                            Important Information
+                                        </h2>
+                                        <p style="margin: 0; color: #555555; font-size: 15px; line-height: 22px;">
+                                            {{importantInfo}}
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Timeline or Deadline (if applicable) -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 25px 0; background-color: #f8f9fa; border-radius: 8px; overflow: hidden;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr>
+                                                <td width="30" valign="top">
+                                                    <span style="color: #0066CC; font-size: 20px;">📅</span>
+                                                </td>
+                                                <td>
+                                                    <p style="margin: 0; color: #888888; font-size: 13px;">Deadline / Timeline</p>
+                                                    <p style="margin: 2px 0 0 0; color: #333333; font-size: 16px; font-weight: bold;">
+                                                        {{deadline}}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Additional Details -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 25px 0; background-color: #f8f9fa; border-left: 4px solid #00AA66; border-radius: 4px;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <h2 style="margin: 0 0 10px 0; color: #333333; font-size: 16px; font-weight: bold;">
+                                            Additional Details
+                                        </h2>
+                                        <div style="margin: 0; color: #555555; font-size: 15px; line-height: 22px;">
+                                            {{additionalDetails}}
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Key Points (if applicable) -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px; background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px;">
+                                        <h2 style="margin: 0 0 10px 0; color: #333333; font-size: 16px; font-weight: bold;">
+                                            Key Points to Remember
+                                        </h2>
+                                        <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #555555; font-size: 15px; line-height: 22px;">
+                                            <li style="margin-bottom: 8px;">{{keyPoint1}}</li>
+                                            <li style="margin-bottom: 8px;">{{keyPoint2}}</li>
+                                            <li style="margin-bottom: 8px;">{{keyPoint3}}</li>
+                                            <li>{{keyPoint4}}</li>
+                                        </ul>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Resources or Links (if applicable) -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 25px 0; background-color: #f0f0f0; border-radius: 8px;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <h2 style="margin: 0 0 15px 0; color: #333333; font-size: 16px; font-weight: bold;">
+                                            Helpful Resources
+                                        </h2>
+                                        <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr>
+                                                <td style="padding: 8px 0;">
+                                                    <a href="{{resource1Link}}" style="color: #0066CC; font-size: 15px; text-decoration: none;">
+                                                        → {{resource1Title}}
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 0;">
+                                                    <a href="{{resource2Link}}" style="color: #0066CC; font-size: 15px; text-decoration: none;">
+                                                        → {{resource2Title}}
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 0;">
+                                                    <a href="{{resource3Link}}" style="color: #0066CC; font-size: 15px; text-decoration: none;">
+                                                        → {{resource3Title}}
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Application Reference (if applicable) -->
+                            <p style="margin: 20px 0 0 0; color: #666666; font-size: 14px; line-height: 20px;">
+                                <strong>Reference Number:</strong> {{referenceNumber}}<br>
+                                <strong>Update Date:</strong> {{updateDate}}
+                            </p>
+
+                            <!-- Questions Section -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 25px 0; background-color: #e8f9f1; border-left: 4px solid #00AA66; border-radius: 4px;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <h2 style="margin: 0 0 10px 0; color: #333333; font-size: 16px; font-weight: bold;">
+                                            Questions?
+                                        </h2>
+                                        <p style="margin: 0; color: #555555; font-size: 15px; line-height: 22px;">
+                                            If you have any questions or need clarification, please don't hesitate to contact us at
+                                            <a href="mailto:{{companyEmail}}" style="color: #0066CC; text-decoration: none;">{{companyEmail}}</a>
+                                            or call us at {{companyPhone}}.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Contact Person (if applicable) -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 25px 0; background-color: #f8f9fa; border-radius: 8px; overflow: hidden;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <h2 style="margin: 0 0 15px 0; color: #333333; font-size: 16px; font-weight: bold; text-align: center;">
+                                            Your Contact Person
+                                        </h2>
+                                        <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr>
+                                                <td align="center">
+                                                    <p style="margin: 0 0 5px 0; color: #333333; font-size: 16px; font-weight: bold;">
+                                                        {{contactPersonName}}
+                                                    </p>
+                                                    <p style="margin: 0 0 5px 0; color: #666666; font-size: 14px;">
+                                                        {{contactPersonTitle}}
+                                                    </p>
+                                                    <p style="margin: 0; color: #0066CC; font-size: 14px;">
+                                                        <a href="mailto:{{contactPersonEmail}}" style="color: #0066CC; text-decoration: none;">{{contactPersonEmail}}</a>
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Closing Message -->
+                            <p style="margin: 20px 0 0 0; color: #555555; font-size: 16px; line-height: 24px;">
+                                {{closingMessage}}
+                            </p>
+
+                            <!-- Closing -->
+                            <p style="margin: 25px 0 5px 0; color: #555555; font-size: 16px; line-height: 24px;">
+                                Best regards,
+                            </p>
+                            <p style="margin: 0; color: #333333; font-size: 16px; font-weight: bold;">
+                                The {{companyName}} Team
+                            </p>
+
+                        </td>
+                    </tr>
+
+                    <!-- Divider -->
+                    <tr>
+                        <td style="padding: 0 30px;">
+                            <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 0;">
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 30px; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
+
+                            <!-- Contact Information -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <p style="margin: 0 0 10px 0; color: #666666; font-size: 14px; line-height: 20px;">
+                                            <strong>{{companyName}}</strong>
+                                        </p>
+                                        <p style="margin: 0 0 15px 0; color: #666666; font-size: 13px; line-height: 18px;">
+                                            {{companyAddress}}
+                                        </p>
+                                        <p style="margin: 0 0 15px 0; color: #666666; font-size: 13px; line-height: 18px;">
+                                            Email: <a href="mailto:{{companyEmail}}" style="color: #0066CC; text-decoration: none;">{{companyEmail}}</a> |
+                                            Phone: {{companyPhone}}
+                                        </p>
+                                        <p style="margin: 0 0 15px 0; color: #666666; font-size: 13px; line-height: 18px;">
+                                            Website: <a href="{{companyWebsite}}" style="color: #0066CC; text-decoration: none;">{{companyWebsite}}</a>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Social Links -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 20px 0;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{{linkedInUrl}}" style="display: inline-block; margin: 0 8px; text-decoration: none;">
+                                            <img src="https://cdn-icons-png.flaticon.com/512/174/174857.png" alt="LinkedIn" width="24" height="24" style="display: block;">
+                                        </a>
+                                        <a href="{{twitterUrl}}" style="display: inline-block; margin: 0 8px; text-decoration: none;">
+                                            <img src="https://cdn-icons-png.flaticon.com/512/733/733579.png" alt="Twitter" width="24" height="24" style="display: block;">
+                                        </a>
+                                        <a href="{{facebookUrl}}" style="display: inline-block; margin: 0 8px; text-decoration: none;">
+                                            <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" alt="Facebook" width="24" height="24" style="display: block;">
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Legal Links -->
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <p style="margin: 0 0 10px 0; color: #888888; font-size: 12px; line-height: 18px;">
+                                            <a href="{{privacyPolicyUrl}}" style="color: #0066CC; text-decoration: none;">Privacy Policy</a> |
+                                            <a href="{{termsUrl}}" style="color: #0066CC; text-decoration: none;">Terms of Service</a> |
+                                            <a href="{{unsubscribeLink}}" style="color: #0066CC; text-decoration: none;">Unsubscribe</a>
+                                        </p>
+                                        <p style="margin: 0; color: #888888; font-size: 12px; line-height: 18px;">
+                                            &copy; {{currentYear}} {{companyName}}. All rights reserved.
+                                        </p>
+                                        <p style="margin: 10px 0 0 0; color: #888888; font-size: 11px; line-height: 16px;">
+                                            This is an automated message. Please do not reply directly to this email.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
