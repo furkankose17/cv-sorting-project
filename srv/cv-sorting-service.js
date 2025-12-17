@@ -26,6 +26,7 @@ const { sanitizeString, validateLength } = require('./lib/validators');
 const RuleEngine = require('./lib/rule-engine');
 const cache = require('./lib/cache');
 const { createCapRateLimiter } = require('./middleware/rate-limiter');
+const webhookHelper = require('./lib/webhook-helper');
 
 const LOG = cds.log('cv-sorting-service');
 
@@ -736,6 +737,44 @@ module.exports = class CVSortingService extends cds.ApplicationService {
                         to: c.newStatus
                     }))
                 });
+
+                // Send webhooks for status changes (if enabled)
+                if (process.env.ENABLE_WEBHOOKS === 'true') {
+                    for (const change of req._statusChanges) {
+                        try {
+                            const statusChange = {
+                                oldStatus: change.previousStatus,
+                                newStatus: change.newStatus,
+                                changedBy: req.user?.id || 'system',
+                                reason: req.data.statusChangeReason || null,
+                                notes: req.data.statusChangeNotes || null
+                            };
+
+                            const result = await webhookHelper.sendStatusChangeWebhook(
+                                change.candidateId,
+                                statusChange
+                            );
+
+                            if (result.success) {
+                                LOG.info('Status change webhook sent successfully', {
+                                    candidateId: change.candidateId,
+                                    webhookId: result.webhookId
+                                });
+                            } else {
+                                LOG.warn('Status change webhook failed (non-blocking)', {
+                                    candidateId: change.candidateId,
+                                    error: result.error
+                                });
+                            }
+                        } catch (webhookError) {
+                            // Log error but don't fail the status change
+                            LOG.error('Unexpected webhook error (non-blocking)', {
+                                candidateId: change.candidateId,
+                                error: webhookError.message
+                            });
+                        }
+                    }
+                }
             }
         });
 
