@@ -1,0 +1,246 @@
+/* CV Management App - Custom Styles */
+
+/* ==================== Responsive Design ==================== */
+
+/* Desktop (default) - Already handled by UI5 */
+
+/* Tablet (below 1024px) */
+@media (max-width: 1024px) {
+    /* Hide less critical table columns */
+    .cv-table-column-desktop-only {
+        display: none !important;
+    }
+
+    /* Reduce search field width */
+    #globalSearch {
+        width: 250px !important;
+    }
+
+    /* Stack stat cards */
+    .cv-stats-card {
+        width: 100% !important;
+        max-width: 180px;
+    }
+}
+
+/* Phone (below 600px) */
+@media (max-width: 600px) {
+    /* Further reduce search field width */
+    #globalSearch {
+        width: 200px !important;
+    }
+
+    /* Hide search placeholder text on mobile */
+    #globalSearch input::placeholder {
+        font-size: 0.8rem;
+    }
+
+    /* Full width stat cards */
+    .cv-stats-card {
+        width: 100% !important;
+        max-width: none;
+    }
+
+    /* Reduce icon sizes */
+    .cv-stat-icon {
+        font-size: 1.5rem !important;
+    }
+
+    /* Compact toolbar buttons */
+    .sapMBtn {
+        min-width: auto;
+    }
+
+    /* Hide button text, show only icons on mobile */
+    .cv-mobile-hide-text .sapMBtnContent .sapMBtnText {
+        display: none;
+    }
+}
+
+/* ==================== Dashboard Cards ==================== */
+
+.cv-dashboard-card {
+    border: 1px solid #d9d9d9;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 0.5rem;
+    background: #ffffff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.2s ease;
+}
+
+.cv-dashboard-card:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.cv-stat-card {
+    text-align: center;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+/* ==================== Match Details ==================== */
+
+.cv-match-details-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1rem;
+    border-radius: 4px 4px 0 0;
+}
+
+.cv-score-indicator {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+/* ==================== Custom Table Styling ==================== */
+
+.cv-table-row-high-score {
+    background-color: #e6f4ea !important;
+}
+
+.cv-table-row-medium-score {
+    background-color: #fef7e0 !important;
+}
+
+.cv-table-row-low-score {
+    background-color: #fce8e6 !important;
+}
+
+/* ==================== Progress Indicators ==================== */
+
+.cv-matching-progress {
+    padding: 1rem;
+}
+
+.cv-progress-step-completed {
+    color: #2e844a;
+}
+
+.cv-progress-step-running {
+    color: #0a6ed1;
+}
+
+.cv-progress-step-pending {
+    color: #91929d;
+}
+
+/* ==================== Search Results ==================== */
+
+.cv-search-popover {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.cv-search-result-highlight {
+    background-color: #fff6b3;
+    font-weight: bold;
+}
+
+/* ==================== Accessibility ==================== */
+
+/* High contrast focus indicators */
+a:focus,
+button:focus,
+input:focus {
+    outline: 2px solid #0a6ed1;
+    outline-offset: 2px;
+}
+
+/* Screen reader only text */
+.cv-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* ==================== Print Styles ==================== */
+
+@media print {
+    /* Hide navigation and action buttons when printing */
+    .sapUiHideOnPrint,
+    button,
+    .sapMBtn {
+        display: none !important;
+    }
+
+    /* Expand all collapsed sections */
+    .sapMPanel {
+        box-shadow: none;
+    }
+}
+
+/* ==================== Custom Animations ==================== */
+
+@keyframes cv-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.cv-animate-fade-in {
+    animation: cv-fade-in 0.3s ease-in-out;
+}
+
+/* ==================== Loading States ==================== */
+
+.cv-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: cv-skeleton-loading 1.5s ease-in-out infinite;
+}
+
+@keyframes cv-skeleton-loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* ==================== Embedded Dashboard iframe ==================== */
+
+.dashboardIframeContainer {
+    width: 100%;
+    height: calc(100vh - 200px);
+    min-height: 600px;
+    position: relative;
+    overflow: hidden;
+}
+
+.analyticsIframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+}
+
+/* Ensure iframe content is responsive */
+@media (max-width: 1024px) {
+    .dashboardIframeContainer {
+        height: calc(100vh - 150px);
+        min-height: 500px;
+    }
+}
+
+@media (max-width: 600px) {
+    .dashboardIframeContainer {
+        height: calc(100vh - 120px);
+        min-height: 400px;
+    }
+}

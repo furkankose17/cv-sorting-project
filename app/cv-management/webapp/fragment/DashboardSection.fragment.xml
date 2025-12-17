@@ -1,0 +1,35 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:html="http://www.w3.org/1999/xhtml">
+
+    <VBox class="sapUiNoMargin" height="100%">
+        <!-- Header with action -->
+        <Toolbar class="sapUiTinyMarginBottom">
+            <Title text="Analytics Dashboard" level="H2" />
+            <ToolbarSpacer />
+            <Button
+                text="Open in New Tab"
+                icon="sap-icon://action"
+                type="Emphasized"
+                press=".onOpenAnalyticsDashboard" />
+        </Toolbar>
+
+        <!-- Loading Indicator -->
+        <BusyIndicator
+            id="dashboardLoadingIndicator"
+            visible="{viewModel>/dashboardLoading}"
+            class="sapUiMediumMargin" />
+
+        <!-- Embedded Analytics Dashboard via iframe -->
+        <VBox
+            visible="{= !${viewModel>/dashboardLoading} }"
+            height="100%"
+            class="dashboardIframeContainer">
+            <core:HTML
+                id="analyticsIframe"
+                content="&lt;iframe id='dashboardFrame' src='/cv-sorting-analytics-dashboard/index.html' class='analyticsIframe' frameborder='0' allowfullscreen&gt;&lt;/iframe&gt;" />
+        </VBox>
+    </VBox>
+
+</core:FragmentDefinition>

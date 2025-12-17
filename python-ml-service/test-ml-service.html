@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ML Service Test Console</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .service-url {
+            background: rgba(255,255,255,0.2);
+            padding: 10px 20px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #6c757d;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .status-dot.healthy {
+            background: #28a745;
+        }
+
+        .status-dot.error {
+            background: #dc3545;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .test-section {
+            margin-bottom: 30px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .test-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .test-header h3 {
+            color: #495057;
+            font-size: 1.2em;
+        }
+
+        .endpoint-badge {
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-family: 'Courier New', monospace;
+        }
+
+        .test-body {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #495057;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group textarea {
+            min-height: 80px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102,126,234,0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .response-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .response-box pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #212529;
+        }
+
+        .response-box.success {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+
+        .response-box.error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #fff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .quick-action-btn {
+            padding: 15px;
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .quick-action-btn:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .quick-action-btn h4 {
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .quick-action-btn p {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 ML Service Test Console</h1>
+            <p>Test and monitor CV Sorting ML Service endpoints</p>
+            <div class="service-url" id="serviceUrlDisplay">http://localhost:8000</div>
+        </div>
+
+        <div class="content">
+            <div class="status-bar">
+                <div class="status-indicator">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Checking service...</span>
+                </div>
+                <button onclick="checkHealth()">🔄 Refresh Status</button>
+            </div>
+
+            <div class="quick-actions">
+                <div class="quick-action-btn" onclick="scrollToSection('health')">
+                    <h4>❤️ Health Check</h4>
+                    <p>Verify service status</p>
+                </div>
+                <div class="quick-action-btn" onclick="scrollToSection('embeddings')">
+                    <h4>🔢 Embeddings</h4>
+                    <p>Generate vectors</p>
+                </div>
+                <div class="quick-action-btn" onclick="scrollToSection('search')">
+                    <h4>🔍 Search</h4>
+                    <p>Semantic search</p>
+                </div>
+                <div class="quick-action-btn" onclick="scrollToSection('matching')">
+                    <h4>🎯 Matching</h4>
+                    <p>Job-candidate matching</p>
+                </div>
+            </div>
+
+            <!-- Health Check -->
+            <div class="test-section" id="health">
+                <div class="test-header">
+                    <h3>Health Check</h3>
+                    <span class="endpoint-badge">GET /health/ready</span>
+                </div>
+                <div class="test-body">
+                    <button onclick="testHealth()">Check Health</button>
+                    <div id="healthResponse" class="hidden response-box"></div>
+                </div>
+            </div>
+
+            <!-- Generate Embedding -->
+            <div class="test-section" id="embeddings">
+                <div class="test-header">
+                    <h3>Generate Embedding</h3>
+                    <span class="endpoint-badge">POST /api/embeddings/generate</span>
+                </div>
+                <div class="test-body">
+                    <div class="form-group">
+                        <label>Text Content (min 10 characters)</label>
+                        <textarea id="embeddingText" placeholder="Enter text to generate embedding vector...">Senior Software Engineer with 5 years of experience in Python, JavaScript, and cloud technologies. Skilled in microservices architecture and agile development.</textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Entity Type</label>
+                            <input type="text" id="entityType" value="candidate">
+                        </div>
+                        <div class="form-group">
+                            <label>Entity ID</label>
+                            <input type="text" id="entityId" value="test-123">
+                        </div>
+                    </div>
+                    <button onclick="testEmbedding()">Generate Embedding</button>
+                    <div id="embeddingResponse" class="hidden response-box"></div>
+                </div>
+            </div>
+
+            <!-- Semantic Search -->
+            <div class="test-section" id="search">
+                <div class="test-header">
+                    <h3>Semantic Search</h3>
+                    <span class="endpoint-badge">POST /api/matching/search</span>
+                </div>
+                <div class="test-body">
+                    <div class="form-group">
+                        <label>Search Query</label>
+                        <input type="text" id="searchQuery" value="Python developer with cloud experience" placeholder="Enter search query...">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Minimum Similarity (0-1)</label>
+                            <input type="number" id="searchMinSimilarity" value="0.3" step="0.1" min="0" max="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Limit</label>
+                            <input type="number" id="searchLimit" value="10" min="1" max="100">
+                        </div>
+                    </div>
+                    <button onclick="testSearch()">Search Candidates</button>
+                    <div id="searchResponse" class="hidden response-box"></div>
+                </div>
+            </div>
+
+            <!-- Job Matching -->
+            <div class="test-section" id="matching">
+                <div class="test-header">
+                    <h3>Job-Candidate Matching</h3>
+                    <span class="endpoint-badge">POST /api/matching/semantic</span>
+                </div>
+                <div class="test-body">
+                    <div class="form-group">
+                        <label>Job Posting ID</label>
+                        <input type="text" id="jobId" value="f1b2c3d4-e5f6-7890-abcd-ef1234567801" placeholder="Enter job posting UUID...">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Minimum Score (0-100)</label>
+                            <input type="number" id="matchMinScore" value="50" min="0" max="100">
+                        </div>
+                        <div class="form-group">
+                            <label>Limit</label>
+                            <input type="number" id="matchLimit" value="20" min="1" max="500">
+                        </div>
+                    </div>
+                    <button onclick="testMatching()">Find Matches</button>
+                    <div id="matchingResponse" class="hidden response-box"></div>
+                </div>
+            </div>
+
+            <!-- Similar Candidates -->
+            <div class="test-section">
+                <div class="test-header">
+                    <h3>Find Similar Candidates</h3>
+                    <span class="endpoint-badge">POST /api/matching/similar-candidates</span>
+                </div>
+                <div class="test-body">
+                    <div class="form-group">
+                        <label>Candidate ID</label>
+                        <input type="text" id="similarCandidateId" value="a1b2c3d4-e5f6-7890-abcd-ef1234567801" placeholder="Enter candidate UUID...">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Minimum Similarity (0-1)</label>
+                            <input type="number" id="similarMinSimilarity" value="0.3" step="0.1" min="0" max="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Limit</label>
+                            <input type="number" id="similarLimit" value="10" min="1" max="100">
+                        </div>
+                    </div>
+                    <button onclick="testSimilarCandidates()">Find Similar</button>
+                    <div id="similarResponse" class="hidden response-box"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ML_SERVICE_URL = 'http://localhost:8000';
+
+        async function callAPI(method, endpoint, body = null) {
+            const url = ML_SERVICE_URL + endpoint;
+            const options = {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            };
+
+            if (body && method !== 'GET') {
+                options.body = JSON.stringify(body);
+            }
+
+            try {
+                const response = await fetch(url, options);
+                const data = await response.json();
+
+                return {
+                    success: response.ok,
+                    status: response.status,
+                    data: data
+                };
+            } catch (error) {
+                return {
+                    success: false,
+                    status: 0,
+                    error: error.message
+                };
+            }
+        }
+
+        function displayResponse(elementId, result) {
+            const element = document.getElementById(elementId);
+            element.classList.remove('hidden', 'success', 'error');
+
+            if (result.success) {
+                element.classList.add('success');
+                element.innerHTML = `<pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+            } else {
+                element.classList.add('error');
+                element.innerHTML = `<pre>❌ Error (${result.status})\n\n${JSON.stringify(result.error || result.data, null, 2)}</pre>`;
+            }
+        }
+
+        async function checkHealth() {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            statusDot.className = 'status-dot';
+            statusText.textContent = 'Checking...';
+
+            const result = await callAPI('GET', '/health/ready');
+
+            if (result.success) {
+                statusDot.classList.add('healthy');
+                statusText.textContent = `✓ Service is healthy (${result.data.status})`;
+            } else {
+                statusDot.classList.add('error');
+                statusText.textContent = '✗ Service is not responding';
+            }
+        }
+
+        async function testHealth() {
+            const result = await callAPI('GET', '/health/ready');
+            displayResponse('healthResponse', result);
+        }
+
+        async function testEmbedding() {
+            const text = document.getElementById('embeddingText').value;
+            const entityType = document.getElementById('entityType').value;
+            const entityId = document.getElementById('entityId').value;
+
+            const result = await callAPI('POST', '/api/embeddings/generate', {
+                entity_type: entityType,
+                entity_id: entityId,
+                text_content: text,
+                store: false
+            });
+
+            displayResponse('embeddingResponse', result);
+        }
+
+        async function testSearch() {
+            const query = document.getElementById('searchQuery').value;
+            const minSimilarity = parseFloat(document.getElementById('searchMinSimilarity').value);
+            const limit = parseInt(document.getElementById('searchLimit').value);
+
+            const result = await callAPI('POST', '/api/matching/search', {
+                query: query,
+                min_similarity: minSimilarity,
+                limit: limit
+            });
+
+            displayResponse('searchResponse', result);
+        }
+
+        async function testMatching() {
+            const jobId = document.getElementById('jobId').value;
+            const minScore = parseFloat(document.getElementById('matchMinScore').value);
+            const limit = parseInt(document.getElementById('matchLimit').value);
+
+            const result = await callAPI('POST', '/api/matching/semantic', {
+                job_posting_id: jobId,
+                min_score: minScore,
+                limit: limit,
+                include_breakdown: true
+            });
+
+            displayResponse('matchingResponse', result);
+        }
+
+        async function testSimilarCandidates() {
+            const candidateId = document.getElementById('similarCandidateId').value;
+            const minSimilarity = parseFloat(document.getElementById('similarMinSimilarity').value);
+            const limit = parseInt(document.getElementById('similarLimit').value);
+
+            const result = await callAPI('POST', '/api/matching/similar-candidates', {
+                candidate_id: candidateId,
+                min_similarity: minSimilarity,
+                limit: limit
+            });
+
+            displayResponse('similarResponse', result);
+        }
+
+        function scrollToSection(id) {
+            document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // Check health on page load
+        window.addEventListener('load', checkHealth);
+    </script>
+</body>
+</html>

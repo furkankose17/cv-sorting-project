@@ -1,0 +1,140 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:form="sap.ui.layout.form">
+
+    <Dialog
+        id="createJobDialog"
+        title="Create Job Posting"
+        contentWidth="600px"
+        afterClose=".onAfterCloseDialog">
+
+        <content>
+            <form:SimpleForm
+                layout="ResponsiveGridLayout"
+                editable="true"
+                columnsL="1"
+                columnsM="1">
+                <form:content>
+                    <!-- Basic Information -->
+                    <core:Title text="Job Information" />
+
+                    <Label text="Job Title" required="true" />
+                    <Input
+                        id="jobTitleInput"
+                        value="{dialogModel>/title}"
+                        placeholder="e.g., Senior Software Engineer"
+                        required="true" />
+
+                    <Label text="Department" required="true" />
+                    <Select
+                        selectedKey="{dialogModel>/department}"
+                        width="100%"
+                        required="true">
+                        <items>
+                            <core:Item key="Engineering" text="Engineering" />
+                            <core:Item key="Sales" text="Sales" />
+                            <core:Item key="Marketing" text="Marketing" />
+                            <core:Item key="HR" text="Human Resources" />
+                            <core:Item key="Finance" text="Finance" />
+                            <core:Item key="Operations" text="Operations" />
+                        </items>
+                    </Select>
+
+                    <Label text="Location" required="true" />
+                    <Input
+                        value="{dialogModel>/location}"
+                        placeholder="e.g., San Francisco, CA or Remote"
+                        required="true" />
+
+                    <Label text="Employment Type" required="true" />
+                    <Select
+                        selectedKey="{dialogModel>/employmentType}"
+                        width="100%">
+                        <items>
+                            <core:Item key="Full-time" text="Full-time" />
+                            <core:Item key="Part-time" text="Part-time" />
+                            <core:Item key="Contract" text="Contract" />
+                            <core:Item key="Internship" text="Internship" />
+                        </items>
+                    </Select>
+
+                    <!-- Job Details -->
+                    <core:Title text="Job Details" class="sapUiTinyMarginTop" />
+
+                    <Label text="Description" required="true" />
+                    <TextArea
+                        value="{dialogModel>/description}"
+                        rows="5"
+                        width="100%"
+                        placeholder="Describe the role, responsibilities, and what makes it exciting..."
+                        required="true" />
+
+                    <Label text="Requirements" />
+                    <TextArea
+                        value="{dialogModel>/requirements}"
+                        rows="4"
+                        width="100%"
+                        placeholder="List key requirements, qualifications, and skills..." />
+
+                    <!-- Experience & Salary -->
+                    <core:Title text="Experience & Compensation" class="sapUiTinyMarginTop" />
+
+                    <Label text="Minimum Experience (years)" />
+                    <StepInput
+                        value="{dialogModel>/minExperience}"
+                        min="0"
+                        max="30"
+                        step="1"
+                        width="150px" />
+
+                    <Label text="Maximum Experience (years)" />
+                    <StepInput
+                        value="{dialogModel>/maxExperience}"
+                        min="0"
+                        max="40"
+                        step="1"
+                        width="150px" />
+
+                    <Label text="Salary Range" />
+                    <Input
+                        value="{dialogModel>/salaryRange}"
+                        placeholder="e.g., $120,000 - $180,000" />
+
+                    <!-- Status -->
+                    <core:Title text="Publishing" class="sapUiTinyMarginTop" />
+
+                    <Label text="Status" />
+                    <Select
+                        selectedKey="{dialogModel>/status}"
+                        width="100%">
+                        <items>
+                            <core:Item key="draft" text="Save as Draft" />
+                            <core:Item key="published" text="Publish Immediately" />
+                        </items>
+                    </Select>
+
+                    <MessageStrip
+                        text="Job postings saved as 'Draft' can be edited and published later."
+                        type="Information"
+                        showIcon="true"
+                        class="sapUiTinyMarginTop" />
+                </form:content>
+            </form:SimpleForm>
+        </content>
+
+        <beginButton>
+            <Button
+                text="Create Job"
+                type="Emphasized"
+                press=".onConfirmCreateJob" />
+        </beginButton>
+
+        <endButton>
+            <Button
+                text="Cancel"
+                press=".onCancelDialog" />
+        </endButton>
+    </Dialog>
+
+</core:FragmentDefinition>

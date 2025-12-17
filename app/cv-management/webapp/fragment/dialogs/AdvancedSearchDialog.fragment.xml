@@ -1,0 +1,203 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:form="sap.ui.layout.form"
+    xmlns:layout="sap.ui.layout">
+
+    <Dialog
+        id="advancedSearchDialog"
+        title="Advanced Candidate Search"
+        contentWidth="600px"
+        contentHeight="70%"
+        resizable="true"
+        draggable="true">
+
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <!-- Search Type Toggle -->
+                <Toolbar>
+                    <Label text="Search Type:" />
+                    <Switch
+                        id="searchTypeSwitch"
+                        state="{dialogModel>/useSemanticSearch}"
+                        customTextOn="AI Search"
+                        customTextOff="Traditional"
+                        change=".onSearchTypeChange" />
+                    <ToolbarSpacer />
+                    <core:Icon
+                        src="sap-icon://lightbulb"
+                        color="#0854A0"
+                        size="1.5rem"
+                        tooltip="Semantic search uses AI to understand natural language queries" />
+                </Toolbar>
+
+                <!-- Semantic Search Panel -->
+                <Panel
+                    id="semanticSearchPanel"
+                    headerText="Semantic Search (AI-Powered)"
+                    visible="{dialogModel>/useSemanticSearch}"
+                    class="sapUiSmallMarginTop">
+                    <content>
+                        <VBox class="sapUiSmallMargin">
+                            <Label text="Describe the ideal candidate in natural language:" />
+                            <TextArea
+                                value="{dialogModel>/semanticQuery}"
+                                rows="4"
+                                width="100%"
+                                placeholder="Example: Looking for a senior full-stack developer with 5+ years experience in React and Node.js, preferably with cloud deployment experience..."
+                                class="sapUiTinyMarginTop" />
+
+                            <HBox class="sapUiSmallMarginTop">
+                                <Label text="Minimum Similarity Score:" class="sapUiMediumMarginEnd" />
+                                <Slider
+                                    value="{dialogModel>/minScore}"
+                                    min="0"
+                                    max="100"
+                                    step="5"
+                                    width="200px"
+                                    enableTickmarks="true"
+                                    class="sapUiTinyMarginEnd" />
+                                <Text text="{dialogModel>/minScore}%" />
+                            </HBox>
+                        </VBox>
+                    </content>
+                </Panel>
+
+                <!-- Traditional Search Panel -->
+                <Panel
+                    id="traditionalSearchPanel"
+                    headerText="Traditional Search"
+                    visible="{= !${dialogModel>/useSemanticSearch} }"
+                    class="sapUiSmallMarginTop">
+                    <content>
+                        <form:SimpleForm
+                            layout="ResponsiveGridLayout"
+                            editable="true"
+                            columnsXL="1"
+                            columnsL="1"
+                            columnsM="1">
+                            <form:content>
+                                <Label text="Search Query" />
+                                <Input
+                                    value="{dialogModel>/query}"
+                                    placeholder="Search by name, email, or keywords..." />
+
+                                <Label text="Years of Experience" />
+                                <HBox>
+                                    <StepInput
+                                        value="{dialogModel>/minExperience}"
+                                        min="0"
+                                        max="50"
+                                        width="100px"
+                                        class="sapUiTinyMarginEnd" />
+                                    <Text text="to" class="sapUiTinyMarginEnd sapUiTinyMarginTop" />
+                                    <StepInput
+                                        value="{dialogModel>/maxExperience}"
+                                        min="0"
+                                        max="50"
+                                        width="100px" />
+                                </HBox>
+
+                                <Label text="Location" />
+                                <Input
+                                    value="{dialogModel>/location}"
+                                    placeholder="City or country..." />
+
+                                <Label text="Status" />
+                                <MultiComboBox
+                                    id="statusFilter"
+                                    selectedKeys="{dialogModel>/statuses}">
+                                    <items>
+                                        <core:Item key="new" text="New" />
+                                        <core:Item key="screening" text="Screening" />
+                                        <core:Item key="interviewing" text="Interviewing" />
+                                        <core:Item key="offered" text="Offered" />
+                                        <core:Item key="hired" text="Hired" />
+                                    </items>
+                                </MultiComboBox>
+
+                                <Label text="Skills" />
+                                <MultiComboBox
+                                    id="skillsFilter"
+                                    selectedKeys="{dialogModel>/skills}"
+                                    items="{/Skills}">
+                                    <core:Item key="{ID}" text="{name}" />
+                                </MultiComboBox>
+                            </form:content>
+                        </form:SimpleForm>
+                    </content>
+                </Panel>
+
+                <!-- Search Results -->
+                <Panel
+                    id="searchResultsPanel"
+                    headerText="Search Results ({dialogModel>/resultsCount} found)"
+                    visible="{dialogModel>/hasSearched}"
+                    class="sapUiSmallMarginTop">
+                    <content>
+                        <Table
+                            id="searchResultsTable"
+                            items="{dialogModel>/searchResults}"
+                            mode="SingleSelectMaster"
+                            selectionChange=".onSearchResultSelect">
+                            <columns>
+                                <Column>
+                                    <Text text="Candidate" />
+                                </Column>
+                                <Column width="8em">
+                                    <Text text="Status" />
+                                </Column>
+                                <Column width="8em">
+                                    <Text text="Experience" />
+                                </Column>
+                                <Column width="6em" visible="{dialogModel>/useSemanticSearch}">
+                                    <Text text="Match %" />
+                                </Column>
+                            </columns>
+                            <items>
+                                <ColumnListItem>
+                                    <cells>
+                                        <VBox>
+                                            <Text text="{dialogModel>firstName} {dialogModel>lastName}" />
+                                            <Text text="{dialogModel>email}" class="sapUiTinyText" />
+                                        </VBox>
+                                        <ObjectStatus
+                                            text="{dialogModel>status/name}"
+                                            state="{
+                                                path: 'dialogModel>status/name',
+                                                formatter: '.formatStatusState'
+                                            }" />
+                                        <Text text="{dialogModel>yearsOfExperience} years" />
+                                        <ObjectNumber
+                                            number="{dialogModel>similarityScore}"
+                                            unit="%"
+                                            state="{
+                                                path: 'dialogModel>similarityScore',
+                                                formatter: '.formatScoreState'
+                                            }"
+                                            visible="{dialogModel>/useSemanticSearch}" />
+                                    </cells>
+                                </ColumnListItem>
+                            </items>
+                        </Table>
+                    </content>
+                </Panel>
+            </VBox>
+        </content>
+
+        <beginButton>
+            <Button
+                text="Search"
+                type="Emphasized"
+                icon="sap-icon://search"
+                press=".onConfirmAdvancedSearch" />
+        </beginButton>
+
+        <endButton>
+            <Button
+                text="Close"
+                press=".onCancelDialog" />
+        </endButton>
+    </Dialog>
+
+</core:FragmentDefinition>

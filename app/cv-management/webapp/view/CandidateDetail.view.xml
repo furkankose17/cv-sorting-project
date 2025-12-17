@@ -1,0 +1,447 @@
+<mvc:View
+    controllerName="cvmanagement.controller.CandidateDetail"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:uxap="sap.uxap"
+    xmlns:layout="sap.ui.layout"
+    xmlns:form="sap.ui.layout.form"
+    displayBlock="true">
+
+    <uxap:ObjectPageLayout
+        id="candidateDetailPage"
+        showTitleInHeaderContent="true"
+        alwaysShowContentHeader="false"
+        preserveHeaderStateOnScroll="false"
+        headerContentPinnable="true"
+        isChildPage="true"
+        upperCaseAnchorBar="false">
+
+        <!-- Header Title -->
+        <uxap:headerTitle>
+            <uxap:ObjectPageDynamicHeaderTitle>
+                <uxap:expandedHeading>
+                    <Title
+                        text="{firstName} {lastName}"
+                        wrapping="true" />
+                </uxap:expandedHeading>
+
+                <uxap:snappedHeading>
+                    <FlexBox alignItems="Center" justifyContent="SpaceBetween">
+                        <Title text="{firstName} {lastName}" wrapping="true" />
+                    </FlexBox>
+                </uxap:snappedHeading>
+
+                <uxap:expandedContent>
+                    <Text text="{email}" />
+                </uxap:expandedContent>
+
+                <uxap:snappedContent>
+                    <Text text="{email}" />
+                </uxap:snappedContent>
+
+                <uxap:actions>
+                    <Button
+                        text="Update Status"
+                        type="Emphasized"
+                        press=".onUpdateStatus" />
+                    <Button
+                        text="Add Skill"
+                        press=".onAddSkill" />
+                    <Button
+                        text="Timeline"
+                        icon="sap-icon://history"
+                        press=".onShowTimeline" />
+                    <Button
+                        text="Find Similar"
+                        icon="sap-icon://compare"
+                        press=".onFindSimilar" />
+                    <Button
+                        text="Delete"
+                        icon="sap-icon://delete"
+                        type="Transparent"
+                        press=".onDeleteCandidate" />
+                </uxap:actions>
+
+                <uxap:navigationActions>
+                    <Button
+                        icon="sap-icon://nav-back"
+                        type="Transparent"
+                        press=".onNavBack" />
+                </uxap:navigationActions>
+            </uxap:ObjectPageDynamicHeaderTitle>
+        </uxap:headerTitle>
+
+        <!-- Header Content -->
+        <uxap:headerContent>
+            <layout:HorizontalLayout allowWrapping="true">
+                <layout:VerticalLayout class="sapUiMediumMarginEnd">
+                    <Avatar
+                        displaySize="L"
+                        initials="{
+                            parts: ['firstName', 'lastName'],
+                            formatter: '.DisplayFormatter.formatInitials'
+                        }"
+                        class="sapUiSmallMarginBottom" />
+                </layout:VerticalLayout>
+
+                <layout:VerticalLayout class="sapUiMediumMarginEnd">
+                    <Label text="Status" />
+                    <ObjectStatus
+                        text="{status/name}"
+                        state="{
+                            path: 'status/name',
+                            formatter: '.StatusFormatter.formatStatusState'
+                        }" />
+                </layout:VerticalLayout>
+
+                <layout:VerticalLayout class="sapUiMediumMarginEnd">
+                    <Label text="Experience" />
+                    <Text text="{totalExperienceYears} years" />
+                </layout:VerticalLayout>
+
+                <layout:VerticalLayout class="sapUiMediumMarginEnd">
+                    <Label text="Location" />
+                    <Text text="{
+                        parts: ['city', 'country/name'],
+                        formatter: '.DataFormatter.formatLocation'
+                    }" />
+                </layout:VerticalLayout>
+
+                <layout:VerticalLayout class="sapUiMediumMarginEnd">
+                    <Label text="Overall Score" />
+                    <ObjectNumber
+                        number="{
+                            path: 'overallScore',
+                            formatter: '.DataFormatter.formatScore'
+                        }"
+                        unit="%"
+                        state="{
+                            path: 'overallScore',
+                            formatter: '.StatusFormatter.formatScoreState'
+                        }" />
+                </layout:VerticalLayout>
+            </layout:HorizontalLayout>
+        </uxap:headerContent>
+
+        <!-- Sections -->
+        <uxap:sections>
+            <!-- Summary Section -->
+            <uxap:ObjectPageSection
+                id="summarySection"
+                title="Summary">
+                <uxap:subSections>
+                    <uxap:ObjectPageSubSection>
+                        <uxap:blocks>
+                            <form:SimpleForm
+                                layout="ResponsiveGridLayout"
+                                editable="false"
+                                columnsXL="2"
+                                columnsL="2"
+                                columnsM="1">
+                                <form:content>
+                                    <Label text="First Name" />
+                                    <Text text="{firstName}" />
+
+                                    <Label text="Last Name" />
+                                    <Text text="{lastName}" />
+
+                                    <Label text="Email" />
+                                    <Link text="{email}" href="mailto:{email}" />
+
+                                    <Label text="Phone" />
+                                    <Text text="{phone}" />
+
+                                    <Label text="Total Experience" />
+                                    <Text text="{totalExperienceYears} years" />
+
+                                    <Label text="Location" />
+                                    <Text text="{
+                                        parts: ['city', 'country/name'],
+                                        formatter: '.DataFormatter.formatLocation'
+                                    }" />
+
+                                    <Label text="Available From" />
+                                    <Text text="{
+                                        path: 'availableFrom',
+                                        type: 'sap.ui.model.type.Date',
+                                        formatOptions: {pattern: 'MMM dd, yyyy'}
+                                    }" />
+                                </form:content>
+                            </form:SimpleForm>
+                        </uxap:blocks>
+                    </uxap:ObjectPageSubSection>
+                </uxap:subSections>
+            </uxap:ObjectPageSection>
+
+            <!-- Skills Section -->
+            <uxap:ObjectPageSection
+                id="skillsSection"
+                title="Skills">
+                <uxap:subSections>
+                    <uxap:ObjectPageSubSection>
+                        <uxap:blocks>
+                            <Table
+                                id="skillsTable"
+                                items="{
+                                    path: 'skills',
+                                    parameters: {
+                                        $expand: 'skill'
+                                    }
+                                }">
+                                <headerToolbar>
+                                    <OverflowToolbar>
+                                        <Title text="Skills" level="H4" />
+                                        <ToolbarSpacer />
+                                        <Button
+                                            text="Add Skill"
+                                            icon="sap-icon://add"
+                                            press=".onAddSkill" />
+                                    </OverflowToolbar>
+                                </headerToolbar>
+                                <columns>
+                                    <Column>
+                                        <Text text="Skill" />
+                                    </Column>
+                                    <Column>
+                                        <Text text="Proficiency" />
+                                    </Column>
+                                    <Column>
+                                        <Text text="Years of Experience" />
+                                    </Column>
+                                    <Column width="5em">
+                                        <Text text="Actions" />
+                                    </Column>
+                                </columns>
+                                <items>
+                                    <ColumnListItem>
+                                        <cells>
+                                            <Text text="{skill/name}" />
+                                            <ObjectStatus
+                                                text="{proficiencyLevel}"
+                                                state="{
+                                                    path: 'proficiencyLevel',
+                                                    formatter: '.StatusFormatter.formatProficiencyState'
+                                                }" />
+                                            <Text text="{yearsOfExperience} years" />
+                                            <Button
+                                                icon="sap-icon://delete"
+                                                type="Transparent"
+                                                press=".onRemoveSkill" />
+                                        </cells>
+                                    </ColumnListItem>
+                                </items>
+                            </Table>
+                        </uxap:blocks>
+                    </uxap:ObjectPageSubSection>
+                </uxap:subSections>
+            </uxap:ObjectPageSection>
+
+            <!-- Education Section -->
+            <uxap:ObjectPageSection
+                id="educationSection"
+                title="Education">
+                <uxap:subSections>
+                    <uxap:ObjectPageSubSection>
+                        <uxap:blocks>
+                            <List
+                                id="educationList"
+                                items="{educations}">
+                                <StandardListItem
+                                    title="{degree} in {fieldOfStudy}"
+                                    description="{
+                                        parts: ['institution', 'startDate', 'endDate', 'isOngoing'],
+                                        formatter: '.DisplayFormatter.formatEducation'
+                                    }"
+                                    info="{grade}" />
+                            </List>
+                        </uxap:blocks>
+                    </uxap:ObjectPageSubSection>
+                </uxap:subSections>
+            </uxap:ObjectPageSection>
+
+            <!-- Experience Section -->
+            <uxap:ObjectPageSection
+                id="experienceSection"
+                title="Work Experience">
+                <uxap:subSections>
+                    <uxap:ObjectPageSubSection>
+                        <uxap:blocks>
+                            <List
+                                id="experienceList"
+                                items="{experiences}">
+                                <CustomListItem>
+                                    <VBox>
+                                        <Title text="{jobTitle}" level="H5" />
+                                        <Text text="{companyName}" class="sapUiSmallMarginBottom" />
+                                        <Text text="{
+                                            parts: ['startDate', 'endDate', 'isCurrent'],
+                                            formatter: '.DisplayFormatter.formatDateRange'
+                                        }" class="sapUiTinyText sapUiSmallMarginBottom" />
+                                        <Text
+                                            text="{location}"
+                                            class="sapUiTinyText sapUiSmallMarginBottom"
+                                            visible="{
+                                                path: 'location',
+                                                targetType: 'any',
+                                                formatter: '.DataFormatter.hasValue'
+                                            }" />
+                                    </VBox>
+                                </CustomListItem>
+                            </List>
+                        </uxap:blocks>
+                    </uxap:ObjectPageSubSection>
+                </uxap:subSections>
+            </uxap:ObjectPageSection>
+
+            <!-- Interviews Section -->
+            <uxap:ObjectPageSection
+                id="interviewsSection"
+                title="Interviews">
+                <uxap:subSections>
+                    <uxap:ObjectPageSubSection>
+                        <uxap:blocks>
+                            <Table
+                                id="interviewsTable"
+                                items="{
+                                    path: 'interviews',
+                                    parameters: {
+                                        $expand: 'interviewType,status'
+                                    }
+                                }">
+                                <headerToolbar>
+                                    <OverflowToolbar>
+                                        <Title text="Interview History" level="H4" />
+                                        <ToolbarSpacer />
+                                        <Button
+                                            text="Schedule Interview"
+                                            icon="sap-icon://create-entry-time"
+                                            press=".onScheduleInterview" />
+                                    </OverflowToolbar>
+                                </headerToolbar>
+                                <columns>
+                                    <Column>
+                                        <Text text="Type" />
+                                    </Column>
+                                    <Column>
+                                        <Text text="Scheduled Date" />
+                                    </Column>
+                                    <Column>
+                                        <Text text="Status" />
+                                    </Column>
+                                    <Column>
+                                        <Text text="Overall Rating" />
+                                    </Column>
+                                    <Column>
+                                        <Text text="Actions" />
+                                    </Column>
+                                </columns>
+                                <items>
+                                    <ColumnListItem>
+                                        <cells>
+                                            <Text text="{interviewType}" />
+                                            <Text text="{
+                                                path: 'scheduledDate',
+                                                type: 'sap.ui.model.type.DateTime',
+                                                formatOptions: {pattern: 'MMM dd, yyyy HH:mm'}
+                                            }" />
+                                            <ObjectStatus
+                                                text="{status}"
+                                                state="{
+                                                    path: 'status',
+                                                    formatter: '.StatusFormatter.formatInterviewStatusState'
+                                                }" />
+                                            <RatingIndicator
+                                                value="{overallRating}"
+                                                maxValue="5"
+                                                editable="false" />
+                                            <Button
+                                                text="Add Feedback"
+                                                type="Emphasized"
+                                                press=".onAddInterviewFeedback"
+                                                visible="{= ${status} === 'completed' &amp;&amp; !${feedbackSubmitted} }" />
+                                        </cells>
+                                    </ColumnListItem>
+                                </items>
+                            </Table>
+                        </uxap:blocks>
+                    </uxap:ObjectPageSubSection>
+                </uxap:subSections>
+            </uxap:ObjectPageSection>
+
+            <!-- Match Results Section -->
+            <uxap:ObjectPageSection
+                id="matchResultsSection"
+                title="Job Matches">
+                <uxap:subSections>
+                    <uxap:ObjectPageSubSection>
+                        <uxap:blocks>
+                            <Table
+                                id="matchResultsTable"
+                                items="{
+                                    path: 'matchResults',
+                                    parameters: {
+                                        $expand: 'jobPosting'
+                                    }
+                                }">
+                                <columns>
+                                    <Column>
+                                        <Text text="Job Title" />
+                                    </Column>
+                                    <Column>
+                                        <Text text="Overall Score" />
+                                    </Column>
+                                    <Column>
+                                        <Text text="Semantic Score" />
+                                    </Column>
+                                    <Column>
+                                        <Text text="Created At" />
+                                    </Column>
+                                    <Column>
+                                        <Text text="Actions" />
+                                    </Column>
+                                </columns>
+                                <items>
+                                    <ColumnListItem type="Navigation" press=".onMatchResultPress">
+                                        <cells>
+                                            <Text text="{jobPosting/title}" />
+                                            <ObjectNumber
+                                                number="{
+                                                    path: 'overallScore',
+                                                    formatter: '.DataFormatter.formatScore'
+                                                }"
+                                                unit="%"
+                                                state="{
+                                                    path: 'overallScore',
+                                                    formatter: '.StatusFormatter.formatScoreState'
+                                                }" />
+                                            <ObjectNumber
+                                                number="{
+                                                    path: 'semanticScore',
+                                                    formatter: '.DataFormatter.formatScore'
+                                                }"
+                                                unit="%"
+                                                state="{
+                                                    path: 'semanticScore',
+                                                    formatter: '.StatusFormatter.formatScoreState'
+                                                }" />
+                                            <Text text="{
+                                                path: 'createdAt',
+                                                type: 'sap.ui.model.type.DateTime',
+                                                formatOptions: {pattern: 'MMM dd, yyyy'}
+                                            }" />
+                                            <Button
+                                                text="View Job"
+                                                type="Emphasized"
+                                                press=".onViewJob" />
+                                        </cells>
+                                    </ColumnListItem>
+                                </items>
+                            </Table>
+                        </uxap:blocks>
+                    </uxap:ObjectPageSubSection>
+                </uxap:subSections>
+            </uxap:ObjectPageSection>
+
+        </uxap:sections>
+    </uxap:ObjectPageLayout>
+</mvc:View>

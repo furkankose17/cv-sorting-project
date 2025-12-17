@@ -1,0 +1,83 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core">
+
+    <Popover
+        id="globalSearchPopover"
+        placement="Bottom"
+        contentWidth="400px"
+        contentHeight="400px"
+        showHeader="true"
+        title="Search Results">
+
+        <content>
+            <VBox>
+                <!-- Candidates Section -->
+                <Panel headerText="Candidates ({viewModel>/searchResults/candidatesCount})" expanded="true">
+                    <content>
+                        <List
+                            id="candidateSearchResults"
+                            items="{viewModel>/searchResults/candidates}"
+                            mode="SingleSelectMaster"
+                            itemPress=".onSearchResultSelect"
+                            noDataText="No candidates found">
+                            <StandardListItem
+                                title="{viewModel>firstName} {viewModel>lastName}"
+                                description="{viewModel>email}"
+                                info="{viewModel>status/name}"
+                                infoState="{
+                                    path: 'viewModel>status/name',
+                                    formatter: '.formatStatusState'
+                                }"
+                                icon="sap-icon://employee"
+                                type="Navigation" />
+                        </List>
+                    </content>
+                </Panel>
+
+                <!-- Jobs Section -->
+                <Panel headerText="Job Postings ({viewModel>/searchResults/jobsCount})" expanded="true">
+                    <content>
+                        <List
+                            id="jobSearchResults"
+                            items="{viewModel>/searchResults/jobs}"
+                            mode="SingleSelectMaster"
+                            itemPress=".onSearchJobSelect"
+                            noDataText="No jobs found">
+                            <StandardListItem
+                                title="{viewModel>title}"
+                                description="{viewModel>department}"
+                                info="{viewModel>status}"
+                                infoState="{
+                                    path: 'viewModel>status',
+                                    formatter: '.formatJobStatusState'
+                                }"
+                                icon="sap-icon://work-history"
+                                type="Navigation" />
+                        </List>
+                    </content>
+                </Panel>
+
+                <!-- No Results Message -->
+                <MessageStrip
+                    text="No results found. Try different keywords."
+                    type="Information"
+                    visible="{= ${viewModel>/searchResults/candidatesCount} === 0 &amp;&amp; ${viewModel>/searchResults/jobsCount} === 0 }"
+                    class="sapUiSmallMargin" />
+            </VBox>
+        </content>
+
+        <footer>
+            <Toolbar>
+                <ToolbarSpacer />
+                <Button
+                    text="Advanced Search"
+                    press=".onOpenAdvancedSearch" />
+                <Button
+                    text="Close"
+                    press=".onCloseSearchPopover" />
+            </Toolbar>
+        </footer>
+    </Popover>
+
+</core:FragmentDefinition>

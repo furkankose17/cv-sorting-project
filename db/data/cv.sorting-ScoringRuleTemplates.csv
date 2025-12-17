@@ -1,0 +1,4 @@
+ID;name;description;category;isGlobal;isActive
+tpl-001;Technical Role Standard;Standard scoring rules for technical positions;Technical;true;true
+tpl-002;Senior Leadership;Scoring rules for senior leadership roles;Management;true;true
+tpl-003;Entry Level Focus;Rules optimized for entry-level positions;General;true;true

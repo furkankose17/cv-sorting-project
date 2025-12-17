@@ -1,0 +1,155 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:layout="sap.ui.layout">
+
+    <Dialog
+        id="findSimilarDialog"
+        title="Find Similar Candidates"
+        contentWidth="700px"
+        contentHeight="70%"
+        resizable="true"
+        draggable="true">
+
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <!-- Reference Candidate -->
+                <Panel headerText="Reference Candidate" class="sapUiSmallMarginBottom">
+                    <content>
+                        <HBox class="sapUiSmallMargin" alignItems="Center">
+                            <Avatar
+                                initials="{dialogModel>/candidateInitials}"
+                                displaySize="M"
+                                class="sapUiMediumMarginEnd" />
+                            <VBox>
+                                <Title text="{dialogModel>/candidateName}" level="H4" />
+                                <Text text="{dialogModel>/email}" class="sapUiTinyText" />
+                                <Text text="{dialogModel>/yearsOfExperience} years experience" />
+                            </VBox>
+                        </HBox>
+                    </content>
+                </Panel>
+
+                <!-- Similarity Factors -->
+                <Panel headerText="Similarity Factors" class="sapUiSmallMarginBottom">
+                    <content>
+                        <layout:VerticalLayout class="sapUiSmallMargin">
+                            <CheckBox
+                                selected="{dialogModel>/matchBySkills}"
+                                text="Match by Skills"
+                                class="sapUiTinyMarginBottom" />
+                            <CheckBox
+                                selected="{dialogModel>/matchByExperience}"
+                                text="Match by Experience Level"
+                                class="sapUiTinyMarginBottom" />
+                            <CheckBox
+                                selected="{dialogModel>/matchByEducation}"
+                                text="Match by Education"
+                                class="sapUiTinyMarginBottom" />
+                            <CheckBox
+                                selected="{dialogModel>/matchByLocation}"
+                                text="Match by Location"
+                                class="sapUiTinyMarginBottom" />
+
+                            <HBox class="sapUiSmallMarginTop" alignItems="Center">
+                                <Label text="Max Results:" class="sapUiMediumMarginEnd" />
+                                <Slider
+                                    value="{dialogModel>/maxResults}"
+                                    min="5"
+                                    max="50"
+                                    step="5"
+                                    width="200px"
+                                    enableTickmarks="true"
+                                    class="sapUiTinyMarginEnd" />
+                                <Text text="{dialogModel>/maxResults}" />
+                            </HBox>
+                        </layout:VerticalLayout>
+                    </content>
+                </Panel>
+
+                <!-- Search Button -->
+                <Button
+                    text="Find Similar Candidates"
+                    type="Emphasized"
+                    icon="sap-icon://search"
+                    press=".onFindSimilarSearch"
+                    class="sapUiSmallMarginBottom" />
+
+                <!-- Results Panel -->
+                <Panel
+                    id="similarResultsPanel"
+                    headerText="Similar Candidates ({dialogModel>/resultsCount} found)"
+                    visible="{dialogModel>/hasResults}">
+                    <content>
+                        <Table
+                            id="similarCandidatesTable"
+                            items="{dialogModel>/similarCandidates}"
+                            mode="SingleSelectMaster"
+                            selectionChange=".onSimilarCandidateSelect">
+                            <columns>
+                                <Column>
+                                    <Text text="Candidate" />
+                                </Column>
+                                <Column width="8em">
+                                    <Text text="Status" />
+                                </Column>
+                                <Column width="8em">
+                                    <Text text="Experience" />
+                                </Column>
+                                <Column width="10em">
+                                    <Text text="Similarity Score" />
+                                </Column>
+                                <Column width="8em">
+                                    <Text text="Actions" />
+                                </Column>
+                            </columns>
+                            <items>
+                                <ColumnListItem>
+                                    <cells>
+                                        <VBox>
+                                            <Text text="{dialogModel>firstName} {dialogModel>lastName}" />
+                                            <Text text="{dialogModel>email}" class="sapUiTinyText" />
+                                        </VBox>
+                                        <ObjectStatus
+                                            text="{dialogModel>status/name}"
+                                            state="{
+                                                path: 'dialogModel>status/name',
+                                                formatter: '.formatStatusState'
+                                            }" />
+                                        <Text text="{dialogModel>yearsOfExperience} years" />
+                                        <ObjectNumber
+                                            number="{dialogModel>similarityScore}"
+                                            unit="%"
+                                            state="{
+                                                path: 'dialogModel>similarityScore',
+                                                formatter: '.formatScoreState'
+                                            }" />
+                                        <Button
+                                            text="View"
+                                            type="Emphasized"
+                                            press=".onViewSimilarCandidate" />
+                                    </cells>
+                                </ColumnListItem>
+                            </items>
+                        </Table>
+                    </content>
+                </Panel>
+
+                <!-- ML Service Status -->
+                <MessageStrip
+                    text="{dialogModel>/mlMessage}"
+                    type="{dialogModel>/mlMessageType}"
+                    showIcon="true"
+                    visible="{dialogModel>/showMLMessage}"
+                    class="sapUiSmallMarginTop" />
+            </VBox>
+        </content>
+
+        <endButton>
+            <Button
+                text="Close"
+                press=".onCancelDialog" />
+        </endButton>
+    </Dialog>
+
+</core:FragmentDefinition>

@@ -1,0 +1,74 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:form="sap.ui.layout.form">
+
+    <Dialog
+        id="addSkillDialog"
+        title="Add Skill"
+        contentWidth="400px">
+
+        <content>
+            <form:SimpleForm
+                layout="ResponsiveGridLayout"
+                editable="true">
+                <form:content>
+                    <Label text="Candidate" />
+                    <Text text="{dialogModel>/candidateName}" />
+
+                    <Label text="Skill" required="true" />
+                    <ComboBox
+                        id="skillComboBox"
+                        selectedKey="{dialogModel>/skillId}"
+                        placeholder="Select or type a skill..."
+                        width="100%"
+                        items="{/Skills}">
+                        <core:Item key="{ID}" text="{name}" />
+                    </ComboBox>
+
+                    <Label text="Proficiency Level" required="true" />
+                    <SegmentedButton
+                        id="proficiencySegment"
+                        selectedKey="{dialogModel>/proficiencyLevel}"
+                        width="100%">
+                        <items>
+                            <SegmentedButtonItem key="beginner" text="Beginner" />
+                            <SegmentedButtonItem key="intermediate" text="Intermediate" />
+                            <SegmentedButtonItem key="advanced" text="Advanced" />
+                            <SegmentedButtonItem key="expert" text="Expert" />
+                        </items>
+                    </SegmentedButton>
+
+                    <Label text="Years of Experience" required="true" />
+                    <StepInput
+                        value="{dialogModel>/yearsOfExperience}"
+                        min="0"
+                        max="50"
+                        step="0.5"
+                        width="100%" />
+
+                    <Label text="Notes" />
+                    <TextArea
+                        value="{dialogModel>/notes}"
+                        rows="3"
+                        width="100%"
+                        placeholder="Optional notes about this skill..." />
+                </form:content>
+            </form:SimpleForm>
+        </content>
+
+        <beginButton>
+            <Button
+                text="Add"
+                type="Emphasized"
+                press=".onConfirmAddSkill" />
+        </beginButton>
+
+        <endButton>
+            <Button
+                text="Cancel"
+                press=".onCancelDialog" />
+        </endButton>
+    </Dialog>
+
+</core:FragmentDefinition>

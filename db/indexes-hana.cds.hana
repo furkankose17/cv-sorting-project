@@ -1,0 +1,165 @@
+/**
+ * SAP HANA Specific Index Optimizations
+ *
+ * Profile: hana (production only)
+ * Usage: cds deploy --to hana --profile hana
+ *
+ * Features:
+ * - Composite indexes for common query patterns
+ * - DESC support for efficient sorting
+ * - HANA-specific performance tuning
+ *
+ * NOTE: These indexes are NOT used in SQLite development mode
+ */
+
+using { cv.sorting as db } from './schema';
+
+// ============================================
+// MATCH RESULTS - TOP-N QUERY OPTIMIZATION
+// ============================================
+
+annotate db.MatchResults with @sql.append: `
+  CREATE INDEX idx_match_composite_score ON cv_sorting_MatchResults
+    (jobPosting_ID ASC, overallScore DESC)
+    COMMENT 'Optimized for: Get top N candidates for a job posting'
+`;
+
+annotate db.MatchResults with @sql.append: `
+  CREATE INDEX idx_match_by_date ON cv_sorting_MatchResults
+    (createdAt DESC, overallScore DESC)
+    COMMENT 'Recent matches sorted by score'
+`;
+
+annotate db.MatchResults with @sql.append: `
+  CREATE INDEX idx_match_review_queue ON cv_sorting_MatchResults
+    (reviewStatus ASC, overallScore DESC)
+    COMMENT 'Review queue sorted by score'
+`;
+
+// ============================================
+// INTERVIEW SCHEDULING OPTIMIZATION
+// ============================================
+
+annotate db.Interviews with @sql.append: `
+  CREATE INDEX idx_interviews_upcoming ON cv_sorting_Interviews
+    (scheduledAt ASC, status_code ASC)
+    COMMENT 'Efficient upcoming interview queries'
+`;
+
+annotate db.Interviews with @sql.append: `
+  CREATE INDEX idx_interviews_by_candidate ON cv_sorting_Interviews
+    (candidate_ID ASC, scheduledAt DESC)
+    COMMENT 'Candidate interview timeline'
+`;
+
+annotate db.Interviews with @sql.append: `
+  CREATE INDEX idx_interviews_by_job ON cv_sorting_Interviews
+    (jobPosting_ID ASC, scheduledAt ASC, status_code ASC)
+    COMMENT 'Job interview schedule'
+`;
+
+// ============================================
+// CANDIDATE SKILLS - COMPOSITE LOOKUP
+// ============================================
+
+annotate db.CandidateSkills with @sql.append: `
+  CREATE INDEX idx_candskills_lookup ON cv_sorting_CandidateSkills
+    (candidate_ID ASC, skill_ID ASC, proficiencyLevel ASC)
+    COMMENT 'Efficient skill lookup with proficiency'
+`;
+
+annotate db.CandidateSkills with @sql.append: `
+  CREATE INDEX idx_candskills_verified ON cv_sorting_CandidateSkills
+    (isVerified ASC, candidate_ID ASC)
+    COMMENT 'Find candidates with verified skills'
+`;
+
+// ============================================
+// JOB REQUIRED SKILLS - MATCHING OPTIMIZATION
+// ============================================
+
+annotate db.JobRequiredSkills with @sql.append: `
+  CREATE INDEX idx_jobreqskills_lookup ON cv_sorting_JobRequiredSkills
+    (jobPosting_ID ASC, isRequired DESC, skill_ID ASC)
+    COMMENT 'Job requirements with required skills first'
+`;
+
+// ============================================
+// WORK EXPERIENCE TIMELINE
+// ============================================
+
+annotate db.WorkExperiences with @sql.append: `
+  CREATE INDEX idx_workexp_timeline ON cv_sorting_WorkExperiences
+    (candidate_ID ASC, startDate DESC, endDate DESC)
+    COMMENT 'Chronological work history'
+`;
+
+annotate db.WorkExperiences with @sql.append: `
+  CREATE INDEX idx_workexp_current ON cv_sorting_WorkExperiences
+    (candidate_ID ASC, endDate IS NULL)
+    COMMENT 'Current positions'
+`;
+
+// ============================================
+// AUDIT TRAIL OPTIMIZATION
+// ============================================
+
+annotate db.AuditLogs with @sql.append: `
+  CREATE INDEX idx_auditlogs_entity_timeline ON cv_sorting_AuditLogs
+    (entityName ASC, entityId ASC, modifiedAt DESC)
+    COMMENT 'Entity change history timeline'
+`;
+
+annotate db.AuditLogs with @sql.append: `
+  CREATE INDEX idx_auditlogs_recent ON cv_sorting_AuditLogs
+    (modifiedAt DESC, action ASC)
+    COMMENT 'Recent activity feed'
+`;
+
+// ============================================
+// JOB POSTINGS - ANALYTICS OPTIMIZATION
+// ============================================
+
+annotate db.JobPostings with @sql.append: `
+  CREATE INDEX idx_jobs_timeline ON cv_sorting_JobPostings
+    (publishedAt DESC, status ASC, closingDate ASC)
+    COMMENT 'Active job postings timeline'
+`;
+
+annotate db.JobPostings with @sql.append: `
+  CREATE INDEX idx_jobs_active ON cv_sorting_JobPostings
+    (status ASC, closingDate ASC)
+    COMMENT 'Active jobs by deadline'
+`;
+
+// ============================================
+// CANDIDATE PIPELINE ANALYTICS
+// ============================================
+
+annotate db.Candidates with @sql.append: `
+  CREATE INDEX idx_candidates_pipeline ON cv_sorting_Candidates
+    (status_code ASC, createdAt DESC, totalExperienceYears DESC)
+    COMMENT 'Candidate flow through pipeline'
+`;
+
+annotate db.Candidates with @sql.append: `
+  CREATE INDEX idx_candidates_recent ON cv_sorting_Candidates
+    (createdAt DESC, status_code ASC)
+    COMMENT 'Recently added candidates'
+`;
+
+// ============================================
+// CV DOCUMENTS - PROCESSING QUEUE
+// ============================================
+
+annotate db.CVDocuments with @sql.append: `
+  CREATE INDEX idx_cvdocs_processing ON cv_sorting_CVDocuments
+    (processingStatus ASC, createdAt ASC)
+    COMMENT 'Document processing queue'
+`;
+
+annotate db.CVDocuments with @sql.append: `
+  CREATE INDEX idx_cvdocs_latest ON cv_sorting_CVDocuments
+    (candidate_ID ASC, isLatest DESC, createdAt DESC)
+    COMMENT 'Latest document version per candidate'
+`;

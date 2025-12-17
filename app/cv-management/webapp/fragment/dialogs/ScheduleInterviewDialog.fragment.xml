@@ -1,0 +1,109 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:form="sap.ui.layout.form"
+    xmlns:u="sap.ui.unified">
+
+    <Dialog
+        id="scheduleInterviewDialog"
+        title="Schedule Interview"
+        contentWidth="500px">
+
+        <content>
+            <form:SimpleForm
+                layout="ResponsiveGridLayout"
+                editable="true"
+                columnsXL="1"
+                columnsL="1"
+                columnsM="1">
+                <form:content>
+                    <Label text="Candidate" />
+                    <Text text="{dialogModel>/candidateName}" />
+
+                    <Label text="Interview Type" required="true" />
+                    <Select
+                        id="interviewTypeSelect"
+                        selectedKey="{dialogModel>/interviewType}"
+                        width="100%">
+                        <items>
+                            <core:Item key="phone_screen" text="Phone Screen" />
+                            <core:Item key="technical" text="Technical Interview" />
+                            <core:Item key="behavioral" text="Behavioral Interview" />
+                            <core:Item key="cultural" text="Cultural Fit Interview" />
+                            <core:Item key="panel" text="Panel Interview" />
+                            <core:Item key="final" text="Final Interview" />
+                        </items>
+                    </Select>
+
+                    <Label text="Scheduled Date & Time" required="true" />
+                    <DateTimePicker
+                        value="{dialogModel>/scheduledDate}"
+                        valueFormat="yyyy-MM-dd'T'HH:mm:ss"
+                        displayFormat="MMM dd, yyyy HH:mm"
+                        width="100%"
+                        placeholder="Select date and time..." />
+
+                    <Label text="Duration (minutes)" required="true" />
+                    <Select
+                        id="durationSelect"
+                        selectedKey="{dialogModel>/duration}"
+                        width="100%">
+                        <items>
+                            <core:Item key="30" text="30 minutes" />
+                            <core:Item key="45" text="45 minutes" />
+                            <core:Item key="60" text="1 hour" />
+                            <core:Item key="90" text="1.5 hours" />
+                            <core:Item key="120" text="2 hours" />
+                        </items>
+                    </Select>
+
+                    <Label text="Interviewer Name" required="true" />
+                    <Input
+                        value="{dialogModel>/interviewerName}"
+                        placeholder="Enter interviewer name..." />
+
+                    <Label text="Interviewer Email" required="true" />
+                    <Input
+                        value="{dialogModel>/interviewerEmail}"
+                        type="Email"
+                        placeholder="interviewer@company.com" />
+
+                    <Label text="Meeting Link / Location" required="true" />
+                    <Input
+                        value="{dialogModel>/meetingLink}"
+                        placeholder="Zoom link, Google Meet, or physical location..." />
+
+                    <Label text="Notes" />
+                    <TextArea
+                        value="{dialogModel>/notes}"
+                        rows="3"
+                        width="100%"
+                        placeholder="Additional notes for the interview..." />
+
+                    <Label text="Send Notifications" />
+                    <CheckBox
+                        selected="{dialogModel>/sendCandidateEmail}"
+                        text="Send email to candidate"
+                        class="sapUiTinyMarginBottom" />
+                    <CheckBox
+                        selected="{dialogModel>/sendInterviewerEmail}"
+                        text="Send email to interviewer" />
+                </form:content>
+            </form:SimpleForm>
+        </content>
+
+        <beginButton>
+            <Button
+                text="Schedule"
+                type="Emphasized"
+                press=".onConfirmScheduleInterview" />
+        </beginButton>
+
+        <endButton>
+            <Button
+                text="Cancel"
+                press=".onCancelDialog" />
+        </endButton>
+    </Dialog>
+
+</core:FragmentDefinition>

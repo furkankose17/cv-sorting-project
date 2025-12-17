@@ -1,0 +1,176 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:form="sap.ui.layout.form">
+
+    <Dialog
+        id="interviewFeedbackDialog"
+        title="Interview Feedback"
+        contentWidth="600px"
+        contentHeight="80%"
+        resizable="true"
+        draggable="true">
+
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <!-- Interview Info -->
+                <Panel headerText="Interview Details" class="sapUiSmallMarginBottom">
+                    <content>
+                        <form:SimpleForm
+                            layout="ResponsiveGridLayout"
+                            editable="false"
+                            columnsXL="2"
+                            columnsL="2"
+                            columnsM="1">
+                            <form:content>
+                                <Label text="Interview Type" />
+                                <Text text="{dialogModel>/interviewType}" />
+
+                                <Label text="Scheduled Date" />
+                                <Text text="{
+                                    path: 'dialogModel>/scheduledDate',
+                                    type: 'sap.ui.model.type.DateTime',
+                                    formatOptions: {pattern: 'MMM dd, yyyy HH:mm'}
+                                }" />
+                            </form:content>
+                        </form:SimpleForm>
+                    </content>
+                </Panel>
+
+                <!-- Ratings -->
+                <Panel headerText="Ratings" class="sapUiSmallMarginBottom">
+                    <content>
+                        <VBox class="sapUiSmallMargin">
+                            <!-- Overall Rating -->
+                            <VBox class="sapUiSmallMarginBottom">
+                                <Label text="Overall Impression" required="true" />
+                                <HBox alignItems="Center">
+                                    <RatingIndicator
+                                        value="{dialogModel>/overallRating}"
+                                        maxValue="5"
+                                        change=".onRatingChange"
+                                        class="sapUiMediumMarginEnd" />
+                                    <Text text="{dialogModel>/overallRating} / 5" />
+                                </HBox>
+                            </VBox>
+
+                            <!-- Technical Rating -->
+                            <VBox class="sapUiSmallMarginBottom">
+                                <Label text="Technical Skills" />
+                                <HBox alignItems="Center">
+                                    <RatingIndicator
+                                        value="{dialogModel>/technicalRating}"
+                                        maxValue="5"
+                                        class="sapUiMediumMarginEnd" />
+                                    <Text text="{dialogModel>/technicalRating} / 5" />
+                                </HBox>
+                            </VBox>
+
+                            <!-- Communication Rating -->
+                            <VBox class="sapUiSmallMarginBottom">
+                                <Label text="Communication Skills" />
+                                <HBox alignItems="Center">
+                                    <RatingIndicator
+                                        value="{dialogModel>/communicationRating}"
+                                        maxValue="5"
+                                        class="sapUiMediumMarginEnd" />
+                                    <Text text="{dialogModel>/communicationRating} / 5" />
+                                </HBox>
+                            </VBox>
+
+                            <!-- Culture Fit Rating -->
+                            <VBox class="sapUiSmallMarginBottom">
+                                <Label text="Culture Fit" />
+                                <HBox alignItems="Center">
+                                    <RatingIndicator
+                                        value="{dialogModel>/cultureFitRating}"
+                                        maxValue="5"
+                                        class="sapUiMediumMarginEnd" />
+                                    <Text text="{dialogModel>/cultureFitRating} / 5" />
+                                </HBox>
+                            </VBox>
+                        </VBox>
+                    </content>
+                </Panel>
+
+                <!-- Feedback Text -->
+                <Panel headerText="Detailed Feedback" class="sapUiSmallMarginBottom">
+                    <content>
+                        <VBox class="sapUiSmallMargin">
+                            <Label text="Strengths" required="true" />
+                            <TextArea
+                                value="{dialogModel>/strengths}"
+                                rows="3"
+                                width="100%"
+                                placeholder="What did the candidate do well?"
+                                class="sapUiTinyMarginBottom" />
+
+                            <Label text="Areas for Improvement" />
+                            <TextArea
+                                value="{dialogModel>/improvements}"
+                                rows="3"
+                                width="100%"
+                                placeholder="What could the candidate improve on?"
+                                class="sapUiTinyMarginBottom" />
+
+                            <Label text="Next Steps" />
+                            <TextArea
+                                value="{dialogModel>/nextSteps}"
+                                rows="2"
+                                width="100%"
+                                placeholder="Recommended next steps..."
+                                class="sapUiTinyMarginBottom" />
+
+                            <Label text="Additional Comments" />
+                            <TextArea
+                                value="{dialogModel>/additionalComments}"
+                                rows="3"
+                                width="100%"
+                                placeholder="Any other observations or notes..." />
+                        </VBox>
+                    </content>
+                </Panel>
+
+                <!-- Recommendation -->
+                <Panel headerText="Recommendation" class="sapUiSmallMarginBottom">
+                    <content>
+                        <VBox class="sapUiSmallMargin">
+                            <Label text="Hiring Recommendation" required="true" />
+                            <RadioButtonGroup
+                                id="recommendationGroup"
+                                selectedIndex="{dialogModel>/recommendationIndex}"
+                                columns="1">
+                                <buttons>
+                                    <RadioButton text="Strong Yes - Highly recommend to hire" />
+                                    <RadioButton text="Yes - Recommend to hire" />
+                                    <RadioButton text="Maybe - Needs further evaluation" />
+                                    <RadioButton text="No - Do not recommend" />
+                                    <RadioButton text="Strong No - Definitely do not hire" />
+                                </buttons>
+                            </RadioButtonGroup>
+
+                            <CheckBox
+                                selected="{dialogModel>/moveToNextRound}"
+                                text="Move candidate to next interview round"
+                                class="sapUiSmallMarginTop" />
+                        </VBox>
+                    </content>
+                </Panel>
+            </VBox>
+        </content>
+
+        <beginButton>
+            <Button
+                text="Submit Feedback"
+                type="Emphasized"
+                press=".onConfirmInterviewFeedback" />
+        </beginButton>
+
+        <endButton>
+            <Button
+                text="Cancel"
+                press=".onCancelDialog" />
+        </endButton>
+    </Dialog>
+
+</core:FragmentDefinition>

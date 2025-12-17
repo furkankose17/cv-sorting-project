@@ -1,0 +1,198 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:micro="sap.suite.ui.microchart">
+
+    <Dialog
+        id="matchDetailsDialog"
+        title="Match Details - {dialogModel>/candidateName}"
+        contentWidth="600px"
+        contentHeight="70%"
+        resizable="true"
+        draggable="true">
+
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <!-- Overall Score -->
+                <Panel headerText="Overall Match Score" class="sapUiSmallMarginBottom">
+                    <content>
+                        <VBox class="sapUiSmallMargin">
+                            <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                                <VBox class="sapUiMediumMarginEnd">
+                                    <Label text="Overall Score" />
+                                    <ObjectNumber
+                                        number="{dialogModel>/overallScore}"
+                                        unit="%"
+                                        emphasized="true"
+                                        state="{
+                                            path: 'dialogModel>/overallScore',
+                                            formatter: '.formatScoreState'
+                                        }" />
+                                </VBox>
+
+                                <VBox class="sapUiMediumMarginEnd">
+                                    <Label text="Skills Score" />
+                                    <ObjectNumber
+                                        number="{dialogModel>/skillScore}"
+                                        unit="%" />
+                                </VBox>
+
+                                <VBox>
+                                    <Label text="Semantic Score" />
+                                    <ObjectNumber
+                                        number="{dialogModel>/semanticScore}"
+                                        unit="%" />
+                                </VBox>
+                            </HBox>
+
+                            <ProgressIndicator
+                                percentValue="{dialogModel>/overallScore}"
+                                displayValue="{dialogModel>/overallScore}%"
+                                state="{
+                                    path: 'dialogModel>/overallScore',
+                                    formatter: '.formatScoreState'
+                                }" />
+                        </VBox>
+                    </content>
+                </Panel>
+
+                <!-- Score Breakdown -->
+                <Panel headerText="Score Breakdown" class="sapUiSmallMarginBottom">
+                    <content>
+                        <List
+                            id="scoreBreakdownList"
+                            items="{dialogModel>/scoreBreakdown}">
+                            <CustomListItem>
+                                <HBox justifyContent="SpaceBetween" alignItems="Center">
+                                    <VBox>
+                                        <Text text="{dialogModel>category}" />
+                                        <Text text="{dialogModel>description}" class="sapUiTinyText" />
+                                    </VBox>
+                                    <HBox alignItems="Center">
+                                        <ObjectNumber
+                                            number="{dialogModel>points}"
+                                            unit="pts"
+                                            class="sapUiMediumMarginEnd" />
+                                        <ProgressIndicator
+                                            percentValue="{dialogModel>score}"
+                                            displayValue="{dialogModel>score}%"
+                                            width="100px"
+                                            state="{
+                                                path: 'dialogModel>score',
+                                                formatter: '.formatScoreState'
+                                            }" />
+                                    </HBox>
+                                </HBox>
+                            </CustomListItem>
+                        </List>
+                    </content>
+                </Panel>
+
+                <!-- Matched Skills -->
+                <Panel headerText="Skills Match" class="sapUiSmallMarginBottom">
+                    <content>
+                        <Table
+                            id="matchedSkillsTable"
+                            items="{dialogModel>/matchedSkills}">
+                            <columns>
+                                <Column>
+                                    <Text text="Skill" />
+                                </Column>
+                                <Column width="8em">
+                                    <Text text="Required Level" />
+                                </Column>
+                                <Column width="8em">
+                                    <Text text="Candidate Level" />
+                                </Column>
+                                <Column width="6em">
+                                    <Text text="Match" />
+                                </Column>
+                            </columns>
+                            <items>
+                                <ColumnListItem>
+                                    <cells>
+                                        <Text text="{dialogModel>skillName}" />
+                                        <ObjectStatus
+                                            text="{dialogModel>requiredLevel}"
+                                            state="Information" />
+                                        <ObjectStatus
+                                            text="{dialogModel>candidateLevel}"
+                                            state="{
+                                                path: 'dialogModel>isMatch',
+                                                formatter: '.formatMatchState'
+                                            }" />
+                                        <core:Icon
+                                            src="{
+                                                path: 'dialogModel>isMatch',
+                                                formatter: '.formatMatchIcon'
+                                            }"
+                                            color="{
+                                                path: 'dialogModel>isMatch',
+                                                formatter: '.formatMatchIconColor'
+                                            }" />
+                                    </cells>
+                                </ColumnListItem>
+                            </items>
+                        </Table>
+                    </content>
+                </Panel>
+
+                <!-- Experience Fit -->
+                <Panel headerText="Experience Fit" class="sapUiSmallMarginBottom">
+                    <content>
+                        <VBox class="sapUiSmallMargin">
+                            <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                                <Label text="Required Experience:" class="sapUiMediumMarginEnd" />
+                                <Text text="{dialogModel>/requiredExperience} years" />
+                            </HBox>
+                            <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                                <Label text="Candidate Experience:" class="sapUiMediumMarginEnd" />
+                                <Text text="{dialogModel>/candidateExperience} years" />
+                            </HBox>
+                            <HBox alignItems="Center">
+                                <Label text="Experience Match:" class="sapUiMediumMarginEnd" />
+                                <ObjectStatus
+                                    text="{dialogModel>/experienceFit}"
+                                    state="{
+                                        path: 'dialogModel>/experienceFitScore',
+                                        formatter: '.formatScoreState'
+                                    }" />
+                            </HBox>
+                        </VBox>
+                    </content>
+                </Panel>
+
+                <!-- AI Explanation -->
+                <Panel headerText="AI Match Explanation" class="sapUiSmallMarginBottom">
+                    <content>
+                        <VBox class="sapUiSmallMargin">
+                            <MessageStrip
+                                text="{dialogModel>/aiExplanation}"
+                                type="Information"
+                                showIcon="true" />
+                            <Button
+                                text="Get Detailed Explanation"
+                                icon="sap-icon://lightbulb"
+                                press=".onGetMatchExplanation"
+                                class="sapUiSmallMarginTop" />
+                        </VBox>
+                    </content>
+                </Panel>
+            </VBox>
+        </content>
+
+        <buttons>
+            <Button
+                text="Review Match"
+                type="Emphasized"
+                press=".onOpenMatchReview" />
+            <Button
+                text="View Candidate"
+                press=".onViewCandidateFromMatch" />
+            <Button
+                text="Close"
+                press=".onCancelDialog" />
+        </buttons>
+    </Dialog>
+
+</core:FragmentDefinition>

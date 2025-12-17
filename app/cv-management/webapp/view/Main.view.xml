@@ -1,0 +1,71 @@
+<mvc:View
+    controllerName="cvmanagement.controller.Main"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    displayBlock="true">
+
+    <Page
+        id="mainPage"
+        title="CV Management System"
+        showNavButton="false">
+
+        <headerContent>
+            <SearchField
+                id="globalSearch"
+                placeholder="Search candidates and jobs..."
+                width="350px"
+                search=".onGlobalSearch"
+                liveChange=".onGlobalSearchLiveChange"
+                suggest=".onGlobalSearchSuggest" />
+            <Button
+                id="refreshButton"
+                icon="sap-icon://refresh"
+                tooltip="Refresh (Ctrl+R)"
+                press=".onRefresh" />
+        </headerContent>
+
+        <content>
+            <IconTabBar
+                id="mainTabBar"
+                select=".onTabSelect"
+                class="sapUiResponsiveContentPadding">
+
+                <items>
+                    <!-- Candidates Tab -->
+                    <IconTabFilter
+                        id="candidatesTab"
+                        icon="sap-icon://employee"
+                        text="Candidates"
+                        key="candidates">
+                        <core:Fragment
+                            fragmentName="cvmanagement.fragment.CandidatesSection"
+                            type="XML" />
+                    </IconTabFilter>
+
+                    <!-- Job Postings Tab -->
+                    <IconTabFilter
+                        id="jobsTab"
+                        icon="sap-icon://work-history"
+                        text="Job Postings"
+                        key="jobs">
+                        <core:Fragment
+                            fragmentName="cvmanagement.fragment.JobsSection"
+                            type="XML" />
+                    </IconTabFilter>
+
+                    <!-- Dashboard Tab -->
+                    <IconTabFilter
+                        id="dashboardTab"
+                        icon="sap-icon://business-objects-experience"
+                        text="Analytics"
+                        key="dashboard">
+                        <core:Fragment
+                            fragmentName="cvmanagement.fragment.DashboardSection"
+                            type="XML" />
+                    </IconTabFilter>
+                </items>
+            </IconTabBar>
+        </content>
+    </Page>
+</mvc:View>

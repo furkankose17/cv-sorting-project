@@ -1,0 +1,122 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:layout="sap.ui.layout">
+
+    <Dialog
+        id="bestMatchPopover"
+        title="Job Matches for {dialogModel>/candidateName}"
+        contentWidth="600px"
+        afterClose=".onAfterCloseDialog">
+
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <!-- Header Info -->
+                <MessageStrip
+                    text="Showing all matched jobs ranked by overall score"
+                    type="Information"
+                    showIcon="true"
+                    class="sapUiTinyMarginBottom" />
+
+                <!-- Match Results List -->
+                <List
+                    id="matchResultsList"
+                    items="{dialogModel>/matchResults}"
+                    noDataText="No job matches found for this candidate">
+                    <CustomListItem>
+                        <VBox class="sapUiSmallMarginTopBottom">
+                            <!-- Job Title and Score -->
+                            <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiTinyMarginBottom">
+                                <VBox width="70%">
+                                    <Link
+                                        text="{dialogModel>jobPosting/title}"
+                                        press=".onNavigateToJob"
+                                        class="sapUiTinyMarginBottom" />
+                                    <Text
+                                        text="{dialogModel>jobPosting/department} · {dialogModel>jobPosting/location}"
+                                        class="sapUiSmallText" />
+                                </VBox>
+                                <ObjectNumber
+                                    number="{
+                                        path: 'dialogModel>overallScore',
+                                        formatter: '.DataFormatter.formatScore'
+                                    }"
+                                    unit="%"
+                                    state="{
+                                        path: 'dialogModel>overallScore',
+                                        formatter: '.StatusFormatter.formatScoreState'
+                                    }"
+                                    emphasized="true" />
+                            </HBox>
+
+                            <!-- Score Breakdown -->
+                            <layout:HorizontalLayout class="sapUiTinyMarginTop">
+                                <layout:VerticalLayout class="sapUiTinyMarginEnd">
+                                    <Label text="Skills" class="sapUiTinyText" />
+                                    <Text
+                                        text="{
+                                            path: 'dialogModel>skillScore',
+                                            formatter: '.DataFormatter.formatScore'
+                                        }%"
+                                        class="sapUiSmallText" />
+                                </layout:VerticalLayout>
+
+                                <layout:VerticalLayout class="sapUiTinyMarginEnd">
+                                    <Label text="Experience" class="sapUiTinyText" />
+                                    <Text
+                                        text="{
+                                            path: 'dialogModel>experienceScore',
+                                            formatter: '.DataFormatter.formatScore'
+                                        }%"
+                                        class="sapUiSmallText" />
+                                </layout:VerticalLayout>
+
+                                <layout:VerticalLayout class="sapUiTinyMarginEnd">
+                                    <Label text="Education" class="sapUiTinyText" />
+                                    <Text
+                                        text="{
+                                            path: 'dialogModel>educationScore',
+                                            formatter: '.DataFormatter.formatScore'
+                                        }%"
+                                        class="sapUiSmallText" />
+                                </layout:VerticalLayout>
+
+                                <layout:VerticalLayout class="sapUiTinyMarginEnd" visible="{
+                                    path: 'dialogModel>semanticScore',
+                                    targetType: 'any',
+                                    formatter: '.DataFormatter.hasValue'
+                                }">
+                                    <Label text="Semantic" class="sapUiTinyText" />
+                                    <Text
+                                        text="{
+                                            path: 'dialogModel>semanticScore',
+                                            formatter: '.DataFormatter.formatScore'
+                                        }%"
+                                        class="sapUiSmallText" />
+                                </layout:VerticalLayout>
+                            </layout:HorizontalLayout>
+
+                            <!-- Match Date -->
+                            <Text
+                                text="Matched on {
+                                    path: 'dialogModel>createdAt',
+                                    type: 'sap.ui.model.type.DateTime',
+                                    formatOptions: {
+                                        style: 'medium'
+                                    }
+                                }"
+                                class="sapUiTinyText sapUiTinyMarginTop" />
+                        </VBox>
+                    </CustomListItem>
+                </List>
+            </VBox>
+        </content>
+
+        <endButton>
+            <Button
+                text="Close"
+                press=".onCancelDialog" />
+        </endButton>
+    </Dialog>
+
+</core:FragmentDefinition>

@@ -1,0 +1,83 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:form="sap.ui.layout.form">
+
+    <Dialog
+        id="bulkStatusDialog"
+        title="Bulk Update Status"
+        contentWidth="500px">
+
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <MessageStrip
+                    text="You are about to update the status for {dialogModel>/selectedCount} candidates"
+                    type="Information"
+                    showIcon="true"
+                    class="sapUiSmallMarginBottom" />
+
+                <form:SimpleForm
+                    layout="ResponsiveGridLayout"
+                    editable="true">
+                    <form:content>
+                        <Label text="Selected Candidates" />
+                        <Text text="{dialogModel>/selectedCount} candidates selected" />
+
+                        <Label text="New Status" required="true" />
+                        <Select
+                            id="bulkStatusSelect"
+                            selectedKey="{dialogModel>/newStatus}"
+                            width="100%">
+                            <items>
+                                <core:Item key="new" text="New" />
+                                <core:Item key="screening" text="Screening" />
+                                <core:Item key="interviewing" text="Interviewing" />
+                                <core:Item key="offered" text="Offered" />
+                                <core:Item key="hired" text="Hired" />
+                                <core:Item key="rejected" text="Rejected" />
+                                <core:Item key="withdrawn" text="Withdrawn" />
+                            </items>
+                        </Select>
+
+                        <Label text="Notes" />
+                        <TextArea
+                            value="{dialogModel>/notes}"
+                            rows="4"
+                            width="100%"
+                            placeholder="Optional notes (will be added to all selected candidates)..." />
+
+                        <Label text="Notify Candidates" />
+                        <CheckBox
+                            selected="{dialogModel>/notifyCandidate}"
+                            text="Send email notification to all candidates" />
+                    </form:content>
+                </form:SimpleForm>
+
+                <!-- Progress Bar (shown during operation) -->
+                <ProgressIndicator
+                    id="bulkUpdateProgress"
+                    percentValue="{dialogModel>/progress}"
+                    displayValue="{dialogModel>/progressText}"
+                    state="Information"
+                    visible="{dialogModel>/isProcessing}"
+                    class="sapUiSmallMarginTop" />
+            </VBox>
+        </content>
+
+        <beginButton>
+            <Button
+                text="Update All"
+                type="Emphasized"
+                press=".onConfirmBulkUpdate"
+                enabled="{= !${dialogModel>/isProcessing} }" />
+        </beginButton>
+
+        <endButton>
+            <Button
+                text="Cancel"
+                press=".onCancelDialog"
+                enabled="{= !${dialogModel>/isProcessing} }" />
+        </endButton>
+    </Dialog>
+
+</core:FragmentDefinition>

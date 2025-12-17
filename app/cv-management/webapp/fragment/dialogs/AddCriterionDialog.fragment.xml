@@ -1,0 +1,70 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:form="sap.ui.layout.form">
+
+    <Dialog
+        id="addCriterionDialog"
+        title="Add Scoring Criterion"
+        contentWidth="400px">
+
+        <content>
+            <form:SimpleForm
+                layout="ResponsiveGridLayout"
+                editable="true">
+                <form:content>
+                    <Label text="Criterion Type" />
+                    <Text text="{dialogModel>/criterionType}" />
+
+                    <Label text="Value" required="true" />
+                    <Input
+                        value="{dialogModel>/value}"
+                        placeholder="e.g., JavaScript, 5+ years, Bachelor's Degree..." />
+
+                    <Label text="Points" required="true" />
+                    <StepInput
+                        value="{dialogModel>/points}"
+                        min="0"
+                        max="100"
+                        step="5"
+                        width="100%" />
+
+                    <Label text="Weight" />
+                    <StepInput
+                        value="{dialogModel>/weight}"
+                        min="0.1"
+                        max="5.0"
+                        step="0.1"
+                        displayValuePrecision="1"
+                        width="100%" />
+
+                    <Label text="Required" />
+                    <CheckBox
+                        selected="{dialogModel>/required}"
+                        text="This criterion is required" />
+
+                    <Label text="Notes" />
+                    <TextArea
+                        value="{dialogModel>/notes}"
+                        rows="2"
+                        width="100%"
+                        placeholder="Optional notes about this criterion..." />
+                </form:content>
+            </form:SimpleForm>
+        </content>
+
+        <beginButton>
+            <Button
+                text="Add"
+                type="Emphasized"
+                press=".onConfirmAddCriterion" />
+        </beginButton>
+
+        <endButton>
+            <Button
+                text="Cancel"
+                press=".onCancelDialog" />
+        </endButton>
+    </Dialog>
+
+</core:FragmentDefinition>

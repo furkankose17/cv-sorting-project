@@ -1,0 +1,105 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:form="sap.ui.layout.form">
+
+    <Dialog
+        id="matchReviewDialog"
+        title="Review Match"
+        contentWidth="500px">
+
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <!-- Match Info -->
+                <Panel headerText="Match Information" class="sapUiSmallMarginBottom">
+                    <content>
+                        <form:SimpleForm
+                            layout="ResponsiveGridLayout"
+                            editable="false"
+                            columnsXL="2"
+                            columnsL="2"
+                            columnsM="1">
+                            <form:content>
+                                <Label text="Candidate" />
+                                <Text text="{dialogModel>/candidateName}" />
+
+                                <Label text="Job Title" />
+                                <Text text="{dialogModel>/jobTitle}" />
+
+                                <Label text="Overall Score" />
+                                <ObjectNumber
+                                    number="{dialogModel>/overallScore}"
+                                    unit="%"
+                                    state="{
+                                        path: 'dialogModel>/overallScore',
+                                        formatter: '.formatScoreState'
+                                    }" />
+
+                                <Label text="Skills Score" />
+                                <ObjectNumber
+                                    number="{dialogModel>/skillScore}"
+                                    unit="%" />
+
+                                <Label text="Semantic Score" />
+                                <ObjectNumber
+                                    number="{dialogModel>/semanticScore}"
+                                    unit="%" />
+
+                                <Label text="Matched At" />
+                                <Text text="{
+                                    path: 'dialogModel>/matchedAt',
+                                    type: 'sap.ui.model.type.DateTime',
+                                    formatOptions: {pattern: 'MMM dd, yyyy HH:mm'}
+                                }" />
+                            </form:content>
+                        </form:SimpleForm>
+                    </content>
+                </Panel>
+
+                <!-- Review Section -->
+                <Panel headerText="Review" class="sapUiSmallMarginBottom">
+                    <content>
+                        <VBox class="sapUiSmallMargin">
+                            <Label text="Review Status" required="true" />
+                            <SegmentedButton
+                                id="reviewStatusSegment"
+                                selectedKey="{dialogModel>/reviewStatus}">
+                                <items>
+                                    <SegmentedButtonItem key="approved" text="Approve" icon="sap-icon://accept" />
+                                    <SegmentedButtonItem key="pending" text="Pending" icon="sap-icon://pending" />
+                                    <SegmentedButtonItem key="rejected" text="Reject" icon="sap-icon://decline" />
+                                </items>
+                            </SegmentedButton>
+
+                            <Label text="Review Notes" class="sapUiSmallMarginTop" />
+                            <TextArea
+                                value="{dialogModel>/reviewNotes}"
+                                rows="4"
+                                width="100%"
+                                placeholder="Enter your review notes..." />
+
+                            <CheckBox
+                                selected="{dialogModel>/contactCandidate}"
+                                text="Contact this candidate for interview"
+                                class="sapUiSmallMarginTop" />
+                        </VBox>
+                    </content>
+                </Panel>
+            </VBox>
+        </content>
+
+        <beginButton>
+            <Button
+                text="Submit Review"
+                type="Emphasized"
+                press=".onConfirmMatchReview" />
+        </beginButton>
+
+        <endButton>
+            <Button
+                text="Cancel"
+                press=".onCancelDialog" />
+        </endButton>
+    </Dialog>
+
+</core:FragmentDefinition>

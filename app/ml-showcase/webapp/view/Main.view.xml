@@ -1,0 +1,397 @@
+<mvc:View
+    controllerName="mlshowcase.controller.Main"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.f"
+    xmlns:card="sap.f.cards"
+    displayBlock="true"
+    height="100%">
+
+    <Page
+        id="mainPage"
+        showHeader="false"
+        class="sapUiResponsiveContentPadding">
+
+        <content>
+            <!-- Page Header -->
+            <VBox class="mlPageHeader">
+                <Title text="ML Service Monitor" level="H1" class="mlPageTitle" />
+                <Text text="Test and monitor ML service endpoints for candidate matching and analysis" class="mlPageSubtitle" />
+            </VBox>
+
+            <!-- Service Status Section -->
+            <VBox class="mlStatusSection">
+                <Panel headerText="Service Status" class="sapUiNoContentPadding">
+                    <content>
+                        <VBox class="sapUiSmallMargin">
+                            <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiTinyMarginBottom">
+                                <HBox alignItems="Center">
+                                    <core:Icon
+                                        src="sap-icon://instance"
+                                        size="1rem"
+                                        color="{= ${app>/serviceStatus} === 'healthy' ? 'Success' : 'Error' }"
+                                        class="sapUiTinyMarginEnd" />
+                                    <Label text="ML Service URL:" class="sapUiTinyMarginEnd" />
+                                    <Text text="{app>/mlServiceUrl}" class="sapUiMonospaceFont" />
+                                </HBox>
+                                <HBox alignItems="Center">
+                                    <ObjectStatus
+                                        text="{= ${app>/serviceStatus} === 'healthy' ? 'Operational' : 'Checking...' }"
+                                        state="{= ${app>/serviceStatus} === 'healthy' ? 'Success' : 'None' }"
+                                        class="sapUiTinyMarginEnd" />
+                                    <Button
+                                        icon="sap-icon://refresh"
+                                        press=".onCheckHealth"
+                                        type="Transparent"
+                                        tooltip="Check Health" />
+                                </HBox>
+                            </HBox>
+                            <HBox alignItems="Center">
+                                <Label text="Last Checked:" class="sapUiTinyMarginEnd" />
+                                <Text text="{= ${app>/lastChecked} || 'Not checked yet' }" />
+                            </HBox>
+                        </VBox>
+                    </content>
+                </Panel>
+            </VBox>
+
+            <!-- Endpoints Section -->
+            <VBox class="mlEndpointsSection">
+                <VBox class="mlSectionHeader">
+                    <Title text="API Endpoints" level="H2" class="mlSectionTitle" />
+                    <Text text="Interactive testing interface for ML service endpoints" class="mlSectionDescription" />
+                </VBox>
+
+                <VBox class="mlEndpointGrid">
+
+                    <!-- 1. Health Check -->
+                    <Panel class="mlEndpointCard">
+                        <headerToolbar>
+                            <OverflowToolbar class="mlCardHeader">
+                                <Title text="Service Health" level="H3" class="mlCardTitle" />
+                                <ToolbarSpacer />
+                                <Label text="GET" class="mlCardMethod" />
+                                <Label text="/health" class="mlCardEndpoint" />
+                                <ObjectStatus
+                                    text="{app>/endpoints/health/status}"
+                                    state="{= ${app>/endpoints/health/status} === 'success' ? 'Success' : 'None' }" />
+                            </OverflowToolbar>
+                        </headerToolbar>
+                        <content>
+                            <VBox class="mlCardBody">
+                                <Text text="Check ML service availability and response time" class="sapUiSmallMarginBottom" />
+
+                                <Button
+                                    text="Check Health"
+                                    icon="sap-icon://stethoscope"
+                                    press=".onCheckHealth"
+                                    type="Emphasized"
+                                    width="100%"
+                                    class="mlExecuteButton" />
+
+                                <VBox class="mlResponseSection" visible="{= !!${app>/endpoints/health/response} }">
+                                    <Label text="Response" class="mlResponseLabel" />
+                                    <VBox class="mlResponseViewer">
+                                        <Text text="{app>/endpoints/health/response}" class="mlResponseText" />
+                                    </VBox>
+                                </VBox>
+                            </VBox>
+                        </content>
+                    </Panel>
+
+                    <!-- 2. Embeddings Generator -->
+                    <Panel class="mlEndpointCard">
+                        <headerToolbar>
+                            <OverflowToolbar class="mlCardHeader">
+                                <Title text="Generate Embedding" level="H3" class="mlCardTitle" />
+                                <ToolbarSpacer />
+                                <Label text="POST" class="mlCardMethod" />
+                                <Label text="/api/embeddings/generate" class="mlCardEndpoint" />
+                                <ObjectStatus
+                                    text="{app>/endpoints/embeddings/status}"
+                                    state="{= ${app>/endpoints/embeddings/status} === 'success' ? 'Success' : 'None' }" />
+                            </OverflowToolbar>
+                        </headerToolbar>
+                        <content>
+                            <VBox class="mlCardBody">
+                                <VBox class="mlInputGroup">
+                                    <Label text="Text Content" class="mlInputLabel" required="true" />
+                                    <TextArea
+                                        id="embeddingInput"
+                                        value=""
+                                        rows="3"
+                                        placeholder="Enter CV or job description text (minimum 10 characters)..." />
+                                </VBox>
+
+                                <Button
+                                    text="Generate Embedding"
+                                    icon="sap-icon://generate-shortcut"
+                                    press=".onGenerateEmbedding"
+                                    type="Emphasized"
+                                    width="100%"
+                                    class="mlExecuteButton" />
+
+                                <VBox class="mlResponseSection" visible="{= !!${app>/endpoints/embeddings/response} }">
+                                    <Label text="Response" class="mlResponseLabel" />
+                                    <VBox class="mlResponseViewer">
+                                        <Text text="{app>/endpoints/embeddings/response}" class="mlResponseText" />
+                                    </VBox>
+                                </VBox>
+                            </VBox>
+                        </content>
+                    </Panel>
+
+                    <!-- 3. Semantic Search -->
+                    <Panel class="mlEndpointCard">
+                        <headerToolbar>
+                            <OverflowToolbar class="mlCardHeader">
+                                <Title text="Semantic Search" level="H3" class="mlCardTitle" />
+                                <ToolbarSpacer />
+                                <Label text="POST" class="mlCardMethod" />
+                                <Label text="/api/matching/search" class="mlCardEndpoint" />
+                                <ObjectStatus
+                                    text="{app>/endpoints/search/status}"
+                                    state="{= ${app>/endpoints/search/status} === 'success' ? 'Success' : 'None' }" />
+                            </OverflowToolbar>
+                        </headerToolbar>
+                        <content>
+                            <VBox class="mlCardBody">
+                                <VBox class="mlInputGroup">
+                                    <Label text="Search Query" class="mlInputLabel" required="true" />
+                                    <Input
+                                        id="searchQuery"
+                                        value=""
+                                        placeholder="e.g., Senior developer with React experience" />
+                                </VBox>
+
+                                <HBox class="mlInputRow">
+                                    <VBox class="mlInputGroup">
+                                        <Label text="Minimum Score" class="mlInputLabel" />
+                                        <Input
+                                            id="searchMinScore"
+                                            value="0.3"
+                                            type="Number" />
+                                    </VBox>
+                                    <VBox class="mlInputGroup">
+                                        <Label text="Result Limit" class="mlInputLabel" />
+                                        <Input
+                                            id="searchLimit"
+                                            value="10"
+                                            type="Number" />
+                                    </VBox>
+                                </HBox>
+
+                                <Button
+                                    text="Search Candidates"
+                                    icon="sap-icon://search"
+                                    press=".onSemanticSearch"
+                                    type="Emphasized"
+                                    width="100%"
+                                    class="mlExecuteButton" />
+
+                                <VBox class="mlResponseSection" visible="{= !!${app>/endpoints/search/response} }">
+                                    <Label text="Response" class="mlResponseLabel" />
+                                    <VBox class="mlResponseViewer">
+                                        <Text text="{app>/endpoints/search/response}" class="mlResponseText" />
+                                    </VBox>
+                                </VBox>
+                            </VBox>
+                        </content>
+                    </Panel>
+
+                    <!-- 4. Similar Candidates -->
+                    <Panel class="mlEndpointCard">
+                        <headerToolbar>
+                            <OverflowToolbar class="mlCardHeader">
+                                <Title text="Find Similar Candidates" level="H3" class="mlCardTitle" />
+                                <ToolbarSpacer />
+                                <Label text="POST" class="mlCardMethod" />
+                                <Label text="/api/matching/similar-candidates" class="mlCardEndpoint" />
+                                <ObjectStatus
+                                    text="{app>/endpoints/similar/status}"
+                                    state="{= ${app>/endpoints/similar/status} === 'success' ? 'Success' : 'None' }" />
+                            </OverflowToolbar>
+                        </headerToolbar>
+                        <content>
+                            <VBox class="mlCardBody">
+                                <VBox class="mlInputGroup">
+                                    <Label text="Candidate ID" class="mlInputLabel" required="true" />
+                                    <Input
+                                        id="similarCandidateId"
+                                        value="cand-001"
+                                        placeholder="Enter candidate ID" />
+                                </VBox>
+
+                                <VBox class="mlInputGroup">
+                                    <Label text="Result Limit" class="mlInputLabel" />
+                                    <Input
+                                        id="similarLimit"
+                                        value="10"
+                                        type="Number" />
+                                </VBox>
+
+                                <Button
+                                    text="Find Similar"
+                                    icon="sap-icon://group"
+                                    press=".onFindSimilar"
+                                    type="Emphasized"
+                                    width="100%"
+                                    class="mlExecuteButton" />
+
+                                <VBox class="mlResponseSection" visible="{= !!${app>/endpoints/similar/response} }">
+                                    <Label text="Response" class="mlResponseLabel" />
+                                    <VBox class="mlResponseViewer">
+                                        <Text text="{app>/endpoints/similar/response}" class="mlResponseText" />
+                                    </VBox>
+                                </VBox>
+                            </VBox>
+                        </content>
+                    </Panel>
+
+                    <!-- 5. Job Matching -->
+                    <Panel class="mlEndpointCard">
+                        <headerToolbar>
+                            <OverflowToolbar class="mlCardHeader">
+                                <Title text="Semantic Job Matching" level="H3" class="mlCardTitle" />
+                                <ToolbarSpacer />
+                                <Label text="POST" class="mlCardMethod" />
+                                <Label text="/api/matching/semantic" class="mlCardEndpoint" />
+                                <ObjectStatus
+                                    text="{app>/endpoints/matching/status}"
+                                    state="{= ${app>/endpoints/matching/status} === 'success' ? 'Success' : 'None' }" />
+                            </OverflowToolbar>
+                        </headerToolbar>
+                        <content>
+                            <VBox class="mlCardBody">
+                                <VBox class="mlInputGroup">
+                                    <Label text="Job Posting ID" class="mlInputLabel" required="true" />
+                                    <Input
+                                        id="matchJobId"
+                                        value="f1b2c3d4-e5f6-7890-abcd-ef1234567801"
+                                        placeholder="Enter job posting ID" />
+                                </VBox>
+
+                                <HBox class="mlInputRow">
+                                    <VBox class="mlInputGroup">
+                                        <Label text="Minimum Score" class="mlInputLabel" />
+                                        <Input
+                                            id="matchMinScore"
+                                            value="0.5"
+                                            type="Number" />
+                                    </VBox>
+                                    <VBox class="mlInputGroup">
+                                        <Label text="Result Limit" class="mlInputLabel" />
+                                        <Input
+                                            id="matchLimit"
+                                            value="20"
+                                            type="Number" />
+                                    </VBox>
+                                </HBox>
+
+                                <Button
+                                    text="Find Matches"
+                                    icon="sap-icon://target-group"
+                                    press=".onJobMatching"
+                                    type="Emphasized"
+                                    width="100%"
+                                    class="mlExecuteButton" />
+
+                                <VBox class="mlResponseSection" visible="{= !!${app>/endpoints/matching/response} }">
+                                    <Label text="Response" class="mlResponseLabel" />
+                                    <VBox class="mlResponseViewer">
+                                        <Text text="{app>/endpoints/matching/response}" class="mlResponseText" />
+                                    </VBox>
+                                </VBox>
+                            </VBox>
+                        </content>
+                    </Panel>
+
+                    <!-- 6. OCR Service -->
+                    <Panel class="mlEndpointCard">
+                        <headerToolbar>
+                            <OverflowToolbar class="mlCardHeader">
+                                <Title text="Document OCR" level="H3" class="mlCardTitle" />
+                                <ToolbarSpacer />
+                                <Label text="POST" class="mlCardMethod" />
+                                <Label text="/api/ocr/process" class="mlCardEndpoint" />
+                                <ObjectStatus
+                                    text="{app>/endpoints/ocr/status}"
+                                    state="{= ${app>/endpoints/ocr/status} === 'success' ? 'Success' : 'None' }" />
+                            </OverflowToolbar>
+                        </headerToolbar>
+                        <content>
+                            <VBox class="mlCardBody">
+                                <Text text="Extract text from PDF, PNG, or JPG documents" class="sapUiSmallMarginBottom" />
+                                <MessageStrip
+                                    text="File upload functionality requires multipart form data support"
+                                    type="Information"
+                                    showIcon="true"
+                                    class="sapUiSmallMarginBottom" />
+
+                                <Button
+                                    text="Test OCR"
+                                    icon="sap-icon://document-text"
+                                    press=".onExtractOCR"
+                                    type="Default"
+                                    width="100%"
+                                    enabled="false"
+                                    class="mlExecuteButton" />
+
+                                <VBox class="mlResponseSection" visible="{= !!${app>/endpoints/ocr/response} }">
+                                    <Label text="Response" class="mlResponseLabel" />
+                                    <VBox class="mlResponseViewer">
+                                        <Text text="{app>/endpoints/ocr/response}" class="mlResponseText" />
+                                    </VBox>
+                                </VBox>
+                            </VBox>
+                        </content>
+                    </Panel>
+
+                </VBox>
+            </VBox>
+
+            <!-- Metrics Section -->
+            <VBox class="mlMetricsSection">
+                <VBox class="mlSectionHeader">
+                    <Title text="Performance Metrics" level="H2" class="mlSectionTitle" />
+                    <Text text="Service usage and performance indicators" class="mlSectionDescription" />
+                </VBox>
+
+                <HBox class="mlMetricsGrid">
+                    <Panel class="mlMetricCard">
+                        <content>
+                            <VBox>
+                                <Label text="Average Response Time" class="mlMetricLabel" />
+                                <Title text="245ms" level="H1" class="mlMetricValue" />
+                                <Text text="+12% from baseline" class="mlMetricDelta" />
+                            </VBox>
+                        </content>
+                    </Panel>
+
+                    <Panel class="mlMetricCard">
+                        <content>
+                            <VBox>
+                                <Label text="Total Requests" class="mlMetricLabel" />
+                                <Title text="1,247" level="H1" class="mlMetricValue" />
+                                <Text text="+8% this session" class="mlMetricDelta" />
+                            </VBox>
+                        </content>
+                    </Panel>
+
+                    <Panel class="mlMetricCard">
+                        <content>
+                            <VBox>
+                                <Label text="Success Rate" class="mlMetricLabel" />
+                                <Title text="98.7%" level="H1" class="mlMetricValue" />
+                                <Text text="Optimal performance" class="mlMetricDelta" />
+                            </VBox>
+                        </content>
+                    </Panel>
+                </HBox>
+            </VBox>
+
+        </content>
+    </Page>
+
+</mvc:View>

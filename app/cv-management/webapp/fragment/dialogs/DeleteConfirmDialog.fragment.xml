@@ -1,0 +1,61 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core">
+
+    <Dialog
+        id="deleteConfirmDialog"
+        title="Delete Candidate"
+        type="Message"
+        state="Warning"
+        contentWidth="400px">
+
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <MessageStrip
+                    text="This action cannot be undone!"
+                    type="Warning"
+                    showIcon="true"
+                    class="sapUiSmallMarginBottom" />
+
+                <Text
+                    text="Are you sure you want to delete the following candidate?"
+                    class="sapUiSmallMarginBottom" />
+
+                <HBox class="sapUiSmallMarginTop sapUiSmallMarginBottom">
+                    <core:Icon
+                        src="sap-icon://employee"
+                        color="#0854A0"
+                        size="2rem"
+                        class="sapUiMediumMarginEnd" />
+                    <VBox>
+                        <Text
+                            text="{dialogModel>/candidateName}"
+                            class="sapUiSmallMarginBottom"
+                            renderWhitespace="true" />
+                        <Text
+                            text="ID: {dialogModel>/candidateId}"
+                            class="sapUiTinyText" />
+                    </VBox>
+                </HBox>
+
+                <Text
+                    text="All associated data (skills, education, experience, interviews, match results) will also be deleted."
+                    class="sapUiSmallMarginTop sapUiTinyText" />
+            </VBox>
+        </content>
+
+        <beginButton>
+            <Button
+                text="Delete"
+                type="Reject"
+                press=".onConfirmDelete" />
+        </beginButton>
+
+        <endButton>
+            <Button
+                text="Cancel"
+                press=".onCancelDialog" />
+        </endButton>
+    </Dialog>
+
+</core:FragmentDefinition>

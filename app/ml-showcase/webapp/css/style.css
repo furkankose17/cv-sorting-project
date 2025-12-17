@@ -1,0 +1,349 @@
+/* ============================================================ */
+/* ML Service Monitor - Professional SAP Fiori Styling          */
+/* Clean, minimal, business-focused design                      */
+/* ============================================================ */
+
+/* Professional spacing and typography */
+.sapUiSizeCompact .mlPageHeader {
+    padding: 2rem 3rem 1.5rem 3rem;
+    background: var(--sapPageHeader_Background);
+    border-bottom: 1px solid var(--sapList_BorderColor);
+}
+
+.mlPageTitle {
+    font-size: 1.75rem;
+    font-weight: 400;
+    color: var(--sapGroup_TitleTextColor);
+    margin-bottom: 0.5rem;
+}
+
+.mlPageSubtitle {
+    font-size: 0.875rem;
+    color: var(--sapContent_LabelColor);
+}
+
+/* Status Section - Professional */
+.mlStatusSection {
+    margin: 2rem 3rem 1.5rem 3rem;
+}
+
+.mlStatusCard {
+    background: var(--sapTile_Background);
+    border: 1px solid var(--sapTile_BorderColor);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+}
+
+.mlStatusRow {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.mlStatusText {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--sapContent_LabelColor);
+}
+
+/* Endpoint Cards - Clean SAP Style */
+.mlEndpointsSection {
+    margin: 0 3rem 3rem 3rem;
+}
+
+.mlSectionHeader {
+    margin-bottom: 1.5rem;
+}
+
+.mlSectionTitle {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--sapGroup_TitleTextColor);
+    margin-bottom: 0.5rem;
+}
+
+.mlSectionDescription {
+    font-size: 0.875rem;
+    color: var(--sapContent_LabelColor);
+}
+
+/* Grid layout for endpoint cards */
+.mlEndpointGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+    gap: 1.5rem;
+}
+
+.mlEndpointCard {
+    background: var(--sapTile_Background);
+    border: 1px solid var(--sapTile_BorderColor);
+    border-radius: 0.5rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.mlEndpointCard:hover {
+    border-color: var(--sapTile_BorderColor);
+    box-shadow: var(--sapContent_Shadow1);
+}
+
+/* Card Header */
+.mlCardHeader {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--sapList_BorderColor);
+    background: var(--sapList_HeaderBackground);
+}
+
+.mlCardTitleRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.mlCardTitle {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--sapGroup_TitleTextColor);
+}
+
+.mlCardEndpoint {
+    font-family: "72mono", "72", "72full", Consolas, monospace;
+    font-size: 0.75rem;
+    color: var(--sapContent_LabelColor);
+    background: var(--sapList_Background);
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+}
+
+.mlCardMethod {
+    font-family: "72mono", "72", "72full", Consolas, monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--sapPositiveColor);
+    margin-right: 0.5rem;
+}
+
+/* Card Body */
+.mlCardBody {
+    padding: 1.5rem;
+}
+
+.mlInputGroup {
+    margin-bottom: 1rem;
+}
+
+.mlInputLabel {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--sapContent_LabelColor);
+    margin-bottom: 0.375rem;
+}
+
+.mlInputRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+/* Response Viewer */
+.mlResponseSection {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--sapList_BorderColor);
+}
+
+.mlResponseHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.mlResponseLabel {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--sapContent_LabelColor);
+}
+
+.mlResponseViewer {
+    background: var(--sapList_Background);
+    border: 1px solid var(--sapList_BorderColor);
+    border-radius: 0.25rem;
+    padding: 1rem;
+    max-height: 300px;
+    overflow: auto;
+}
+
+.mlResponseText {
+    font-family: "72mono", "72", "72full", Consolas, monospace;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: var(--sapTextColor);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* Metrics Section */
+.mlMetricsSection {
+    margin: 0 3rem 3rem 3rem;
+}
+
+.mlMetricsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.mlMetricCard {
+    background: var(--sapTile_Background);
+    border: 1px solid var(--sapTile_BorderColor);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+}
+
+.mlMetricLabel {
+    font-size: 0.875rem;
+    color: var(--sapContent_LabelColor);
+    margin-bottom: 0.5rem;
+}
+
+.mlMetricValue {
+    font-size: 2rem;
+    font-weight: 300;
+    color: var(--sapGroup_TitleTextColor);
+    margin-bottom: 0.25rem;
+}
+
+.mlMetricDelta {
+    font-size: 0.75rem;
+    color: var(--sapContent_LabelColor);
+}
+
+/* Action Buttons */
+.mlExecuteButton {
+    margin-top: 1rem;
+}
+
+/* Utility Classes */
+.mlSpacer {
+    flex: 1;
+}
+
+.mlTextCenter {
+    text-align: center;
+}
+
+.mlMarginTop {
+    margin-top: 1rem;
+}
+
+.mlMarginBottom {
+    margin-bottom: 1rem;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .mlPageHeader,
+    .mlStatusSection,
+    .mlEndpointsSection,
+    .mlMetricsSection {
+        margin-left: 1.5rem;
+        margin-right: 1.5rem;
+    }
+
+    .mlEndpointGrid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .mlPageHeader,
+    .mlStatusSection,
+    .mlEndpointsSection,
+    .mlMetricsSection {
+        margin-left: 1rem;
+        margin-right: 1rem;
+    }
+
+    .mlCardHeader,
+    .mlCardBody {
+        padding: 1rem;
+    }
+
+    .mlInputRow {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Custom scrollbar for response viewers */
+.mlResponseViewer::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.mlResponseViewer::-webkit-scrollbar-track {
+    background: var(--sapList_Background);
+}
+
+.mlResponseViewer::-webkit-scrollbar-thumb {
+    background: var(--sapScrollBar_FaceColor);
+    border-radius: 4px;
+}
+
+.mlResponseViewer::-webkit-scrollbar-thumb:hover {
+    background: var(--sapScrollBar_Hover_FaceColor);
+}
+
+/* Loading state */
+.mlCardBody.sapUiBusy {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Status badges */
+.mlStatusBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.mlStatusBadge.success {
+    background: var(--sapSuccessBackground);
+    color: var(--sapSuccessColor);
+}
+
+.mlStatusBadge.error {
+    background: var(--sapErrorBackground);
+    color: var(--sapErrorColor);
+}
+
+.mlStatusBadge.warning {
+    background: var(--sapWarningBackground);
+    color: var(--sapWarningColor);
+}
+
+/* Icon styling */
+.mlIcon {
+    color: var(--sapContent_IconColor);
+}
+
+.mlIconSuccess {
+    color: var(--sapSuccessColor);
+}
+
+.mlIconError {
+    color: var(--sapErrorColor);
+}
+
+.mlIconWarning {
+    color: var(--sapWarningColor);
+}
+
+.mlIconInfo {
+    color: var(--sapInformativeColor);
+}

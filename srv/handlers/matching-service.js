@@ -109,6 +109,10 @@ module.exports = class MatchingService extends cds.ApplicationService {
          */
         this._calculateSkillScore = (candidateSkills, requiredSkills) => {
             if (!requiredSkills || requiredSkills.length === 0) return 100;
+            if (!candidateSkills || candidateSkills.length === 0) {
+                // No candidate skills but job requires them
+                return 0;
+            }
 
             const candidateSkillMap = new Map(
                 candidateSkills.map(s => [s.skill_ID, s])

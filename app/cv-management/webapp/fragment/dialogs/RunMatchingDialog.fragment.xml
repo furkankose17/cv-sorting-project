@@ -1,0 +1,103 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core">
+
+    <Dialog
+        id="runMatchingDialog"
+        title="Running Semantic Matching"
+        contentWidth="500px"
+        type="Message">
+
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <MessageStrip
+                    text="Finding the best candidates using AI-powered semantic matching..."
+                    type="Information"
+                    showIcon="true"
+                    class="sapUiSmallMarginBottom" />
+
+                <!-- Progress Steps -->
+                <List
+                    id="matchingProgressList"
+                    items="{dialogModel>/matchingSteps}">
+                    <CustomListItem>
+                        <HBox alignItems="Center">
+                            <core:Icon
+                                src="{
+                                    path: 'dialogModel>status',
+                                    formatter: '.formatStepIcon'
+                                }"
+                                color="{
+                                    path: 'dialogModel>status',
+                                    formatter: '.formatStepIconColor'
+                                }"
+                                size="1.5rem"
+                                class="sapUiMediumMarginEnd" />
+                            <VBox class="sapUiSmallMarginEnd">
+                                <Text text="{dialogModel>step}" />
+                                <Text text="{dialogModel>description}" class="sapUiTinyText" />
+                            </VBox>
+                            <ToolbarSpacer />
+                            <BusyIndicator
+                                visible="{= ${dialogModel>status} === 'running' }"
+                                size="1rem" />
+                            <core:Icon
+                                src="sap-icon://accept"
+                                color="Success"
+                                visible="{= ${dialogModel>status} === 'completed' }" />
+                        </HBox>
+                    </CustomListItem>
+                </List>
+
+                <!-- Overall Progress -->
+                <ProgressIndicator
+                    id="matchingProgress"
+                    percentValue="{dialogModel>/progress}"
+                    displayValue="{dialogModel>/progressText}"
+                    state="Information"
+                    class="sapUiSmallMarginTop" />
+
+                <!-- Results Summary -->
+                <Panel
+                    headerText="Results"
+                    visible="{dialogModel>/showResults}"
+                    class="sapUiSmallMarginTop">
+                    <content>
+                        <VBox class="sapUiSmallMargin">
+                            <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                                <Label text="Total Matches Found:" class="sapUiMediumMarginEnd" />
+                                <ObjectNumber
+                                    number="{dialogModel>/totalMatches}"
+                                    emphasized="true" />
+                            </HBox>
+                            <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                                <Label text="Top Match Score:" class="sapUiMediumMarginEnd" />
+                                <ObjectNumber
+                                    number="{dialogModel>/topMatchScore}"
+                                    unit="%"
+                                    state="{
+                                        path: 'dialogModel>/topMatchScore',
+                                        formatter: '.formatScoreState'
+                                    }" />
+                            </HBox>
+                            <HBox alignItems="Center">
+                                <Label text="Average Score:" class="sapUiMediumMarginEnd" />
+                                <ObjectNumber
+                                    number="{dialogModel>/averageScore}"
+                                    unit="%" />
+                            </HBox>
+                        </VBox>
+                    </content>
+                </Panel>
+            </VBox>
+        </content>
+
+        <endButton>
+            <Button
+                text="Close"
+                press=".onCancelDialog"
+                enabled="{= ${dialogModel>/progress} === 100 }" />
+        </endButton>
+    </Dialog>
+
+</core:FragmentDefinition>

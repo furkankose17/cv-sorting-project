@@ -1,0 +1,111 @@
+sap.ui.define([], function () {
+    "use strict";
+
+    /**
+     * Formatters for status and state mappings
+     * Provides consistent state colors across the application
+     */
+    return {
+        /**
+         * Format candidate status to UI5 state
+         * @param {string} sStatus - Candidate status
+         * @returns {string} UI5 state (Success, Warning, Error, Information, None)
+         */
+        formatStatusState: function (sStatus) {
+            if (!sStatus) return "None";
+
+            const mStateMap = {
+                "new": "Information",
+                "screening": "Warning",
+                "interviewing": "Success",
+                "offered": "Success",
+                "hired": "Success",
+                "rejected": "Error"
+            };
+            return mStateMap[sStatus.toLowerCase()] || "None";
+        },
+
+        /**
+         * Format proficiency level to UI5 state
+         * @param {string} sProficiency - Proficiency level
+         * @returns {string} UI5 state
+         */
+        formatProficiencyState: function (sProficiency) {
+            if (!sProficiency) return "None";
+
+            const mStateMap = {
+                "beginner": "Error",
+                "intermediate": "Warning",
+                "advanced": "Success",
+                "expert": "Success"
+            };
+            return mStateMap[sProficiency.toLowerCase()] || "None";
+        },
+
+        /**
+         * Format interview status to UI5 state
+         * @param {string} sStatus - Interview status
+         * @returns {string} UI5 state
+         */
+        formatInterviewStatusState: function (sStatus) {
+            if (!sStatus) return "None";
+
+            const mStateMap = {
+                "scheduled": "Information",
+                "completed": "Success",
+                "cancelled": "Error",
+                "rescheduled": "Warning"
+            };
+            return mStateMap[sStatus.toLowerCase()] || "None";
+        },
+
+        /**
+         * Format job status to UI5 state
+         * @param {string} sStatus - Job status
+         * @returns {string} UI5 state
+         */
+        formatJobStatusState: function (sStatus) {
+            if (!sStatus) return "None";
+
+            const mStateMap = {
+                "draft": "Warning",
+                "published": "Success",
+                "open": "Success",
+                "closed": "Error"
+            };
+            return mStateMap[sStatus.toLowerCase()] || "None";
+        },
+
+        /**
+         * Format score to UI5 state based on thresholds
+         * @param {number} nScore - Score value (0-100)
+         * @returns {string} UI5 state
+         */
+        formatScoreState: function (nScore) {
+            const score = parseFloat(nScore);
+            if (isNaN(score)) return "None";
+
+            if (score >= 80) return "Success";
+            if (score >= 60) return "Warning";
+            return "Error";
+        },
+
+        /**
+         * Check if job status is draft
+         * @param {string} sStatus - Job status
+         * @returns {boolean} True if status is 'draft'
+         */
+        isJobDraft: function (sStatus) {
+            return sStatus && sStatus.toLowerCase() === 'draft';
+        },
+
+        /**
+         * Check if job status is open
+         * @param {string} sStatus - Job status
+         * @returns {boolean} True if status is 'open'
+         */
+        isJobOpen: function (sStatus) {
+            return sStatus && sStatus.toLowerCase() === 'open';
+        }
+    };
+});

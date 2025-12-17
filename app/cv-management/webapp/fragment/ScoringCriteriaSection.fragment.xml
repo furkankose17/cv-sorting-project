@@ -1,0 +1,111 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core">
+
+    <VBox class="sapUiNoMargin">
+        <!-- Header Toolbar -->
+        <Toolbar>
+            <Title text="Scoring Rules" level="H2" />
+            <ToolbarSpacer />
+            <Button
+                text="Add Rule"
+                icon="sap-icon://add"
+                type="Emphasized"
+                press=".onAddScoringRule" />
+            <Button
+                text="Load Template"
+                icon="sap-icon://template"
+                press=".onLoadRuleTemplate" />
+        </Toolbar>
+
+        <!-- Strategy Selection -->
+        <Panel
+            headerText="Execution Strategy"
+            class="sapUiSmallMarginTop sapUiSmallMarginBottom">
+            <content>
+                <VBox class="sapUiSmallMargin">
+                    <Label text="Rule Execution Order:" class="sapUiTinyMarginBottom" />
+                    <SegmentedButton
+                        selectedKey="{scoringStrategy}"
+                        selectionChange=".onStrategyChange">
+                        <items>
+                            <SegmentedButtonItem key="PRIORITY" text="Priority-Based" />
+                            <SegmentedButtonItem key="SEQUENTIAL" text="Sequential" />
+                            <SegmentedButtonItem key="GROUPED" text="Grouped by Type" />
+                        </items>
+                    </SegmentedButton>
+
+                    <Label text="ML Weight:" class="sapUiSmallMarginTop sapUiTinyMarginBottom" />
+                    <HBox alignItems="Center">
+                        <Slider
+                            value="{mlWeight}"
+                            min="0"
+                            max="100"
+                            step="5"
+                            width="300px"
+                            enableTickmarks="true"
+                            change=".onMLWeightChange"
+                            class="sapUiMediumMarginEnd" />
+                        <Label text="ML: {mlWeight}%" />
+                    </HBox>
+                </VBox>
+            </content>
+        </Panel>
+
+        <!-- Rules Table (Simplified for MVP) -->
+        <Panel
+            headerText="Active Scoring Rules"
+            class="sapUiSmallMarginBottom">
+            <content>
+                <Table
+                    id="scoringRulesTable"
+                    items="{customRules}">
+                    <headerToolbar>
+                        <OverflowToolbar>
+                            <Title text="Custom Rules" level="H4" />
+                            <ToolbarSpacer />
+                            <Button
+                                text="Dry-Run Test"
+                                icon="sap-icon://simulate"
+                                press=".onDryRunMatching" />
+                        </OverflowToolbar>
+                    </headerToolbar>
+                    <columns>
+                        <Column width="4em">
+                            <Text text="Priority" />
+                        </Column>
+                        <Column>
+                            <Text text="Rule Name" />
+                        </Column>
+                        <Column width="10em">
+                            <Text text="Type" />
+                        </Column>
+                        <Column width="6em">
+                            <Text text="Status" />
+                        </Column>
+                    </columns>
+                    <items>
+                        <ColumnListItem>
+                            <cells>
+                                <ObjectNumber number="{priority}" />
+                                <VBox>
+                                    <Text text="{name}" />
+                                    <Text text="{description}" class="sapUiTinyText" />
+                                </VBox>
+                                <ObjectStatus text="{ruleType}" />
+                                <Switch state="{isActive}" change=".onToggleRuleActive" />
+                            </cells>
+                        </ColumnListItem>
+                    </items>
+                </Table>
+            </content>
+        </Panel>
+
+        <!-- Help Text -->
+        <MessageStrip
+            text="Scoring rules allow you to customize candidate evaluation. Rules will be applied during matching to boost or reduce scores based on conditions."
+            type="Information"
+            showIcon="true" />
+    </VBox>
+
+</core:FragmentDefinition>

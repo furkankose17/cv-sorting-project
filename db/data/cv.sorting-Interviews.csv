@@ -1,0 +1,21 @@
+ID;candidate_ID;jobPosting_ID;title;interviewType_code;status_code;scheduledAt;duration;interviewer;location;overallRating;recommendation
+int-0001;cand-026;job-009;Final with James Brown;final;scheduled;2025-12-25 14:48:20;60;James Brown;Zoom Meeting;;
+int-0002;cand-010;job-002;Behavioral with James Brown;behavioral;scheduled;2025-12-20 14:48:20;60;James Brown;Office Conference Room A;;
+int-0003;cand-010;job-002;Technical with Jennifer Martinez;technical;scheduled;2025-12-16 14:48:20;90;Maria Garcia;Zoom Meeting;;
+int-0004;cand-003;job-008;Behavioral with Lisa Anderson;behavioral;confirmed;2025-12-22 14:48:20;60;Mike Johnson;Office Conference Room A;;
+int-0005;cand-032;job-002;Technical with John Smith;technical;scheduled;2025-12-20 14:48:20;90;Sarah Davis;Zoom Meeting;;
+int-0006;cand-035;job-009;Final with James Brown;final;scheduled;2025-12-14 14:48:20;60;David Lee;Zoom Meeting;;
+int-0007;cand-035;job-002;Final with Jennifer Martinez;final;scheduled;2025-12-15 14:48:20;60;Robert Wilson;Office Conference Room A;;
+int-0008;cand-003;job-008;Behavioral with Robert Wilson;behavioral;scheduled;2025-12-15 14:48:20;60;David Lee;Zoom Meeting;;
+int-0009;cand-038;job-003;Technical with Robert Wilson;technical;scheduled;2025-12-26 14:48:20;90;Jennifer Martinez;Zoom Meeting;;
+int-0010;cand-006;job-008;Technical with James Brown;technical;scheduled;2025-12-13 14:48:20;90;David Lee;Office Conference Room A;;
+int-0011;cand-019;job-001;Behavioral with Maria Garcia;behavioral;scheduled;2025-12-11 14:48:20;60;Jennifer Martinez;Office Conference Room B;;
+int-0012;cand-006;job-006;Technical with Mike Johnson;technical;no_show;2025-12-11 14:48:20;90;Sarah Davis;Zoom Meeting;;
+int-0013;cand-038;job-004;Phone Screen with John Smith;phone_screen;completed;2025-12-05 14:48:20;30;John Smith;Zoom Meeting;4;strong_no_hire
+int-0014;cand-003;job-009;Final with David Lee;final;cancelled;2025-11-17 14:48:20;60;Emily Chen;Zoom Meeting;;
+int-0015;cand-019;job-008;Behavioral with Sarah Davis;behavioral;scheduled;2025-12-01 14:48:20;60;Sarah Davis;Zoom Meeting;;
+int-0016;cand-002;job-004;Final with Mike Johnson;final;cancelled;2025-11-18 14:48:20;60;James Brown;Office Conference Room B;;
+int-0017;cand-006;job-004;Final with John Smith;final;scheduled;2025-12-11 14:48:20;60;Mike Johnson;Zoom Meeting;;
+int-0018;cand-010;job-002;Final with James Brown;final;completed;2025-12-10 14:48:20;60;John Smith;Office Conference Room B;2;strong_no_hire
+int-0019;cand-038;job-008;Phone Screen with John Smith;phone_screen;completed;2025-11-20 14:48:20;30;Robert Wilson;Zoom Meeting;2;no_hire
+int-0020;cand-039;job-002;Phone Screen with Emily Chen;phone_screen;scheduled;2025-12-07 14:48:20;30;Mike Johnson;Office Conference Room B;;

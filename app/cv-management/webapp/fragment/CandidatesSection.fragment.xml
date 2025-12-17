@@ -1,0 +1,191 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.f">
+
+    <VBox class="sapUiSmallMargin">
+        <!-- Header with Search and Actions -->
+        <Toolbar>
+            <Title text="Candidates" level="H2" />
+            <ToolbarSpacer />
+            <SearchField
+                id="candidateSearchField"
+                width="300px"
+                placeholder="Search candidates..."
+                search=".onCandidateSearch" />
+            <Button
+                id="addCandidateButton"
+                text="Add Candidate"
+                icon="sap-icon://add"
+                type="Emphasized"
+                press=".onAddCandidate" />
+        </Toolbar>
+
+        <!-- Status Filter Chips -->
+        <Toolbar class="sapUiTinyMarginTop">
+            <Label text="Filter by Status:" />
+            <SegmentedButton
+                id="statusFilterSegment"
+                selectionChange=".onStatusFilterChange">
+                <items>
+                    <SegmentedButtonItem key="all" text="All" />
+                    <SegmentedButtonItem key="new" text="New" />
+                    <SegmentedButtonItem key="screening" text="Screening" />
+                    <SegmentedButtonItem key="interviewing" text="Interviewing" />
+                    <SegmentedButtonItem key="offered" text="Offered" />
+                    <SegmentedButtonItem key="hired" text="Hired" />
+                    <SegmentedButtonItem key="rejected" text="Rejected" />
+                </items>
+            </SegmentedButton>
+            <ToolbarSpacer />
+            <Button
+                id="advancedSearchButton"
+                text="Advanced Search"
+                icon="sap-icon://search"
+                press=".onOpenAdvancedSearch" />
+        </Toolbar>
+
+        <!-- Candidates Table -->
+        <Table
+            id="candidatesTable"
+            items="{
+                path: '/Candidates',
+                parameters: {
+                    $expand: 'status,country,skills($expand=skill),matchResults($select=ID,overallScore,skillScore,experienceScore,educationScore,semanticScore,createdAt,candidate_ID,jobPosting_ID;$expand=jobPosting;$orderby=overallScore desc)'
+                }
+            }"
+            growing="true"
+            growingScrollToLoad="true"
+            growingThreshold="20"
+            mode="MultiSelect"
+            class="sapUiSmallMarginTop">
+
+            <headerToolbar>
+                <OverflowToolbar>
+                    <Title text="Candidate List" level="H3" />
+                    <ToolbarSpacer />
+                    <Button
+                        text="Bulk Update Status"
+                        icon="sap-icon://multi-select"
+                        press=".onBulkUpdateStatus"
+                        enabled="{= ${view>/selectedCandidatesCount} > 0 }" />
+                    <OverflowToolbarButton
+                        icon="sap-icon://refresh"
+                        tooltip="Refresh"
+                        press=".onRefreshCandidates" />
+                </OverflowToolbar>
+            </headerToolbar>
+
+            <columns>
+                <Column width="12em">
+                    <Text text="Candidate" />
+                </Column>
+                <Column width="8em" minScreenWidth="Tablet" demandPopin="true">
+                    <Text text="Status" />
+                </Column>
+                <Column width="8em" minScreenWidth="Tablet" demandPopin="true">
+                    <Text text="Experience" />
+                </Column>
+                <Column width="15em" minScreenWidth="Desktop" demandPopin="true">
+                    <Text text="Skills" />
+                </Column>
+                <Column width="10em" minScreenWidth="Desktop" demandPopin="true">
+                    <Text text="Location" />
+                </Column>
+                <Column width="14em" minScreenWidth="Desktop" demandPopin="true">
+                    <Text text="Best Match" />
+                </Column>
+                <Column width="8em" hAlign="End">
+                    <Text text="Actions" />
+                </Column>
+            </columns>
+
+            <items>
+                <ColumnListItem type="Navigation" press=".onCandidatePress">
+                    <cells>
+                        <!-- Candidate Name with Avatar -->
+                        <HBox alignItems="Center">
+                            <Avatar
+                                initials="{
+                                    parts: ['firstName', 'lastName'],
+                                    formatter: '.DisplayFormatter.formatInitials'
+                                }"
+                                displaySize="S"
+                                class="sapUiTinyMarginEnd" />
+                            <VBox>
+                                <Text text="{firstName} {lastName}" class="sapUiTinyMarginBottom" />
+                                <Text text="{email}" class="sapUiSmallText" />
+                            </VBox>
+                        </HBox>
+
+                        <!-- Status -->
+                        <ObjectStatus
+                            text="{status/name}"
+                            state="{
+                                path: 'status/name',
+                                formatter: '.StatusFormatter.formatStatusState'
+                            }" />
+
+                        <!-- Experience -->
+                        <Text text="{totalExperienceYears} years" />
+
+                        <!-- Skills (first 3) -->
+                        <VBox>
+                            <Text
+                                text="{
+                                    path: 'skills',
+                                    targetType: 'any',
+                                    formatter: '.DataFormatter.formatSkillsList'
+                                }" />
+                        </VBox>
+
+                        <!-- Location -->
+                        <Text text="{
+                            parts: ['city', 'country/name'],
+                            formatter: '.DataFormatter.formatLocation'
+                        }" />
+
+                        <!-- Best Match -->
+                        <VBox>
+                            <Link
+                                text="{
+                                    path: 'matchResults',
+                                    targetType: 'any',
+                                    formatter: '.DataFormatter.formatBestMatch'
+                                }"
+                                press=".onBestMatchPress"
+                                visible="{
+                                    path: 'matchResults',
+                                    targetType: 'any',
+                                    formatter: '.DataFormatter.hasItems'
+                                }" />
+                            <Text
+                                text="No matches yet"
+                                class="sapUiTinyText"
+                                visible="{
+                                    path: 'matchResults',
+                                    targetType: 'any',
+                                    formatter: '.DataFormatter.isEmpty'
+                                }" />
+                        </VBox>
+
+                        <!-- Actions -->
+                        <HBox justifyContent="End">
+                            <Button
+                                icon="sap-icon://edit"
+                                type="Transparent"
+                                press=".onUpdateStatus"
+                                tooltip="Update Status" />
+                            <Button
+                                icon="sap-icon://delete"
+                                type="Transparent"
+                                press=".onDeleteCandidate"
+                                tooltip="Delete Candidate" />
+                        </HBox>
+                    </cells>
+                </ColumnListItem>
+            </items>
+        </Table>
+    </VBox>
+
+</core:FragmentDefinition>

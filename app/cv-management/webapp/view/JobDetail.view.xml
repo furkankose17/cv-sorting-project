@@ -1,0 +1,298 @@
+<mvc:View
+    controllerName="cvmanagement.controller.JobDetail"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:layout="sap.ui.layout"
+    xmlns:form="sap.ui.layout.form"
+    displayBlock="true">
+
+    <Page
+        id="jobDetailPage"
+        title="{title}"
+        showNavButton="true"
+        navButtonPress=".onNavBack">
+
+        <headerContent>
+            <ObjectStatus
+                text="{status}"
+                state="{
+                    path: 'status',
+                    formatter: '.StatusFormatter.formatJobStatusState'
+                }" />
+        </headerContent>
+
+        <content>
+            <IconTabBar
+                id="jobDetailTabBar"
+                select=".onTabSelect"
+                class="sapUiResponsiveContentPadding">
+
+                <items>
+                    <!-- Overview Tab -->
+                    <IconTabFilter
+                        id="overviewTab"
+                        icon="sap-icon://overview-chart"
+                        text="Overview"
+                        key="overview">
+
+                        <VBox class="sapUiSmallMargin">
+                            <!-- Job Header Info -->
+                            <Panel headerText="Job Information" class="sapUiSmallMarginBottom">
+                                <content>
+                                    <form:SimpleForm
+                                        layout="ResponsiveGridLayout"
+                                        editable="false"
+                                        columnsXL="2"
+                                        columnsL="2"
+                                        columnsM="1">
+                                        <form:content>
+                                            <Label text="Job Title" />
+                                            <Text text="{title}" />
+
+                                            <Label text="Department" />
+                                            <Text text="{department}" />
+
+                                            <Label text="Location" />
+                                            <Text text="{location}" />
+
+                                            <Label text="Employment Type" />
+                                            <Text text="{employmentType}" />
+
+                                            <Label text="Minimum Experience" />
+                                            <Text text="{minimumExperience}" />
+
+                                            <Label text="Salary Range" />
+                                            <Text text="${salaryMin} - ${salaryMax}" />
+
+                                            <Label text="Published Date" />
+                                            <Text text="{
+                                                path: 'publishedAt',
+                                                type: 'sap.ui.model.type.DateTime',
+                                                formatOptions: {pattern: 'MMM dd, yyyy'}
+                                            }" />
+
+                                            <Label text="Closing Date" />
+                                            <Text text="{
+                                                path: 'closingDate',
+                                                type: 'sap.ui.model.type.Date',
+                                                formatOptions: {pattern: 'MMM dd, yyyy'}
+                                            }" />
+
+                                            <Label text="Positions" />
+                                            <ObjectNumber number="{numberOfPositions}" />
+
+                                            <Label text="Location Type" />
+                                            <Text text="{locationType}" />
+                                        </form:content>
+                                    </form:SimpleForm>
+                                </content>
+                            </Panel>
+
+                            <!-- Job Description -->
+                            <Panel headerText="Job Description" class="sapUiSmallMarginBottom">
+                                <content>
+                                    <VBox class="sapUiSmallMargin">
+                                        <Text text="{description}" />
+                                    </VBox>
+                                </content>
+                            </Panel>
+
+                            <!-- Required Skills -->
+                            <Panel headerText="Required Skills" class="sapUiSmallMarginBottom">
+                                <content>
+                                    <Table
+                                        id="requiredSkillsTable"
+                                        items="{
+                                            path: 'requiredSkills',
+                                            parameters: {
+                                                $expand: 'skill'
+                                            }
+                                        }">
+                                        <columns>
+                                            <Column>
+                                                <Text text="Skill" />
+                                            </Column>
+                                            <Column>
+                                                <Text text="Minimum Proficiency" />
+                                            </Column>
+                                            <Column>
+                                                <Text text="Weight" />
+                                            </Column>
+                                        </columns>
+                                        <items>
+                                            <ColumnListItem>
+                                                <cells>
+                                                    <Text text="{skill/name}" />
+                                                    <ObjectStatus
+                                                        text="{minimumProficiency}"
+                                                        state="{
+                                                            path: 'minimumProficiency',
+                                                            formatter: '.StatusFormatter.formatProficiencyState'
+                                                        }" />
+                                                    <ObjectNumber
+                                                        number="{weight}"
+                                                        numberUnit="x" />
+                                                </cells>
+                                            </ColumnListItem>
+                                        </items>
+                                    </Table>
+                                </content>
+                            </Panel>
+
+                            <!-- Actions -->
+                            <Toolbar>
+                                <ToolbarSpacer />
+                                <Button
+                                    text="Publish Job"
+                                    type="Emphasized"
+                                    press=".onPublishJob"
+                                    visible="{
+                                        path: 'status',
+                                        targetType: 'any',
+                                        formatter: '.StatusFormatter.isJobDraft'
+                                    }" />
+                                <Button
+                                    text="Close Job"
+                                    type="Reject"
+                                    press=".onCloseJob"
+                                    visible="{
+                                        path: 'status',
+                                        targetType: 'any',
+                                        formatter: '.StatusFormatter.isJobOpen'
+                                    }" />
+                                <Button
+                                    text="Edit Job"
+                                    press=".onEditJob" />
+                            </Toolbar>
+                        </VBox>
+                    </IconTabFilter>
+
+                    <!-- Scoring Criteria Tab -->
+                    <IconTabFilter
+                        id="scoringTab"
+                        icon="sap-icon://measurement-document"
+                        text="Scoring Criteria"
+                        key="scoring">
+                        <core:Fragment
+                            fragmentName="cvmanagement.fragment.ScoringCriteriaSection"
+                            type="XML" />
+                    </IconTabFilter>
+
+                    <!-- Matches Tab -->
+                    <IconTabFilter
+                        id="matchesTab"
+                        icon="sap-icon://employee-lookup"
+                        text="Candidate Matches"
+                        key="matches">
+
+                        <VBox class="sapUiSmallMargin">
+                            <!-- Match Actions -->
+                            <Toolbar>
+                                <Title text="Matching Candidates" level="H3" />
+                                <ToolbarSpacer />
+                                <Button
+                                    text="Run Matching"
+                                    icon="sap-icon://play"
+                                    type="Emphasized"
+                                    press=".onRunMatching" />
+                                <Button
+                                    icon="sap-icon://refresh"
+                                    tooltip="Refresh Matches"
+                                    press=".onRefreshMatches" />
+                            </Toolbar>
+
+                            <!-- Match Results Table -->
+                            <Table
+                                id="matchResultsTable"
+                                items="{
+                                    path: 'matchResults',
+                                    parameters: {
+                                        $expand: 'candidate($expand=status,country)',
+                                        $orderby: 'overallScore desc'
+                                    }
+                                }"
+                                growing="true"
+                                growingThreshold="20"
+                                class="sapUiSmallMarginTop">
+                                <columns>
+                                    <Column width="3em">
+                                        <Text text="Rank" />
+                                    </Column>
+                                    <Column>
+                                        <Text text="Candidate" />
+                                    </Column>
+                                    <Column width="8em">
+                                        <Text text="Status" />
+                                    </Column>
+                                    <Column width="8em" hAlign="Center">
+                                        <Text text="Overall Score" />
+                                    </Column>
+                                    <Column width="8em" hAlign="Center">
+                                        <Text text="Skills Score" />
+                                    </Column>
+                                    <Column width="8em" hAlign="Center">
+                                        <Text text="Semantic Score" />
+                                    </Column>
+                                    <Column width="10em">
+                                        <Text text="Actions" />
+                                    </Column>
+                                </columns>
+                                <items>
+                                    <ColumnListItem type="Navigation" press=".onMatchPress">
+                                        <cells>
+                                            <Text text="{= ${matchResults>}.indexOf(${matchResults>}) + 1 }" />
+                                            <VBox>
+                                                <Text text="{candidate/firstName} {candidate/lastName}" />
+                                                <Text text="{candidate/email}" class="sapUiTinyText" />
+                                            </VBox>
+                                            <ObjectStatus
+                                                text="{candidate/status/name}"
+                                                state="{
+                                                    path: 'candidate/status/name',
+                                                    formatter: '.StatusFormatter.formatStatusState'
+                                                }" />
+                                            <ObjectNumber
+                                                number="{overallScore}"
+                                                unit="%"
+                                                state="{
+                                                    path: 'overallScore',
+                                                    formatter: '.StatusFormatter.formatScoreState'
+                                                }" />
+                                            <ObjectNumber
+                                                number="{skillScore}"
+                                                unit="%"
+                                                state="{
+                                                    path: 'skillScore',
+                                                    formatter: '.StatusFormatter.formatScoreState'
+                                                }" />
+                                            <ObjectNumber
+                                                number="{semanticScore}"
+                                                unit="%"
+                                                state="{
+                                                    path: 'semanticScore',
+                                                    formatter: '.StatusFormatter.formatScoreState'
+                                                }" />
+                                            <HBox>
+                                                <Button
+                                                    text="View"
+                                                    type="Emphasized"
+                                                    press=".onViewCandidate" />
+                                                <Button
+                                                    icon="sap-icon://detail-view"
+                                                    type="Transparent"
+                                                    press=".onViewMatchDetails"
+                                                    tooltip="Match Details" />
+                                            </HBox>
+                                        </cells>
+                                    </ColumnListItem>
+                                </items>
+                            </Table>
+                        </VBox>
+                    </IconTabFilter>
+
+                </items>
+            </IconTabBar>
+        </content>
+    </Page>
+</mvc:View>

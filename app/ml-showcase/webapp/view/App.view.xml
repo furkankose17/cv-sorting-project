@@ -1,0 +1,8 @@
+<mvc:View
+    controllerName="mlshowcase.controller.App"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    displayBlock="true">
+    <App id="app">
+    </App>
+</mvc:View>
