@@ -3,12 +3,84 @@ Structured data extraction from OCR text.
 """
 import logging
 import re
-from typing import Dict, Any, List, Optional
+from difflib import SequenceMatcher
+from typing import Dict, Any, List, Optional, Tuple
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException
 
 router = APIRouter(prefix="/api/ocr", tags=["OCR Extraction"])
 logger = logging.getLogger(__name__)
+
+# Section header patterns with canonical names
+SECTION_PATTERNS = {
+    "work_experience": ["work experience", "work history", "employment history", "experience", "employment"],
+    "education": ["education", "academic background", "qualifications", "academic"],
+    "skills": ["skills", "technical skills", "competencies", "technologies", "expertise"],
+}
+
+
+def normalize_text(text: str) -> str:
+    """Normalize text for fuzzy matching - lowercase, remove extra spaces."""
+    return ' '.join(text.lower().split())
+
+
+def fuzzy_match(text: str, pattern: str, threshold: float = 0.8) -> bool:
+    """Check if text fuzzy-matches pattern using sequence matcher."""
+    text_norm = normalize_text(text)
+    pattern_norm = normalize_text(pattern)
+
+    # Direct contains check first
+    if pattern_norm in text_norm:
+        return True
+
+    # Handle merged words (e.g., "workexperience")
+    merged_pattern = pattern_norm.replace(' ', '')
+    if merged_pattern in text_norm.replace(' ', ''):
+        return True
+
+    # Fuzzy match using SequenceMatcher
+    ratio = SequenceMatcher(None, text_norm, pattern_norm).ratio()
+    return ratio >= threshold
+
+
+def find_section_headers(text: str) -> Dict[str, Tuple[int, int]]:
+    """
+    Find section headers in OCR text using fuzzy matching.
+
+    Returns dict mapping section name to (start_pos, end_pos) of content.
+    """
+    lines = text.split('\n')
+    sections = {}
+    current_section = None
+    section_start = 0
+
+    for i, line in enumerate(lines):
+        line_stripped = line.strip()
+        if not line_stripped:
+            continue
+
+        # Check if this line is a section header
+        for section_name, patterns in SECTION_PATTERNS.items():
+            for pattern in patterns:
+                if fuzzy_match(line_stripped, pattern, threshold=0.75):
+                    # Found a new section header
+                    if current_section:
+                        # Calculate end position of previous section
+                        end_pos = sum(len(l) + 1 for l in lines[:i])
+                        sections[current_section] = (section_start, end_pos)
+
+                    current_section = section_name
+                    section_start = sum(len(l) + 1 for l in lines[:i+1])
+                    break
+            else:
+                continue
+            break
+
+    # Close the last section
+    if current_section:
+        sections[current_section] = (section_start, len(text))
+
+    return sections
 
 
 class FieldExtraction(BaseModel):
@@ -123,8 +195,9 @@ def extract_tier1_personal_info(text: str) -> Dict[str, FieldExtraction]:
             source="regex_match"
         )
 
-    # Extract phone with word boundaries to prevent false positives
-    phone_pattern = r'\b[\+\(]?[1-9][0-9 .\-\(\)]{8,}[0-9]\b'
+    # Extract phone with stricter pattern to prevent false positives
+    # Matches common phone formats: +1-234-567-8901, (123) 456-7890, 123.456.7890
+    phone_pattern = r'(?:[\+]?[1-9]\d{0,2}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{2,4}[-.\s]?\d{2,6}'
     phone_match = re.search(phone_pattern, text)
     if phone_match:
         tier1["phone"] = FieldExtraction(
