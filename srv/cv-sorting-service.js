@@ -27,6 +27,7 @@ const RuleEngine = require('./lib/rule-engine');
 const cache = require('./lib/cache');
 const { createCapRateLimiter } = require('./middleware/rate-limiter');
 const webhookHelper = require('./lib/webhook-helper');
+const ConfigValidator = require('./lib/config-validator');
 
 const LOG = cds.log('cv-sorting-service');
 
@@ -34,6 +35,14 @@ module.exports = class CVSortingService extends cds.ApplicationService {
 
     async init() {
         LOG.info('Initializing unified CV Sorting Service');
+
+        // Validate email automation configuration
+        try {
+            ConfigValidator.validateAndWarn();
+        } catch (error) {
+            LOG.error('Configuration validation failed:', error.message);
+            // Continue initialization even if validation fails (warnings only)
+        }
 
         // Register rate limiting middleware
         const rateLimiterMiddleware = createCapRateLimiter({

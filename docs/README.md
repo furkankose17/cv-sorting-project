@@ -148,6 +148,13 @@ cf scale cv-sorting-srv -i 3
 - Supported formats (PDF, DOCX, PNG, JPG)
 - CV data extraction
 
+#### [EMAIL_AUTOMATION_CONFIG.md](EMAIL_AUTOMATION_CONFIG.md)
+- Email automation configuration guide
+- Environment variables reference
+- n8n webhook integration
+- Security considerations
+- Troubleshooting common issues
+
 #### [CHANGELOG.md](CHANGELOG.md)
 - Complete change log
 - Development phases
@@ -165,8 +172,9 @@ cf scale cv-sorting-srv -i 3
 
 1. Start with: [README.md](../README.md)
 2. API Reference: [openapi.yaml](openapi.yaml)
-3. Testing: [TESTING.md](TESTING.md)
-4. Security: [SECURITY.md](SECURITY.md)
+3. Configuration: [EMAIL_AUTOMATION_CONFIG.md](EMAIL_AUTOMATION_CONFIG.md)
+4. Testing: [TESTING.md](TESTING.md)
+5. Security: [SECURITY.md](SECURITY.md)
 
 ### For DevOps
 
@@ -207,8 +215,9 @@ cf scale cv-sorting-srv -i 3
 
 3. **Set up environment**:
    ```bash
-   cp .env.example .env
+   npm run config:init
    # Edit .env with your settings
+   # See docs/EMAIL_AUTOMATION_CONFIG.md for details
    ```
 
 4. **Run locally**:

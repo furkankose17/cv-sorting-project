@@ -45,7 +45,9 @@
     "deploy": "cf deploy mta_archives/*.mtar",
     "deploy:hana": "cds deploy --to hana",
     "lint": "cds lint",
-    "clean": "rimraf gen mta_archives *.mtar node_modules"
+    "clean": "rimraf gen mta_archives *.mtar node_modules",
+    "config:validate": "node -e \"require('./srv/lib/config-validator').validateOrThrow()\"",
+    "config:init": "cp .env.example .env && echo '.env file created. Please edit with your values.'"
   },
   "cds": {
     "requires": {
