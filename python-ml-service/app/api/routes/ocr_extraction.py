@@ -227,6 +227,50 @@ def parse_education(text: str) -> List[Dict[str, Any]]:
     return education
 
 
+def parse_skills(text: str) -> List[Dict[str, Any]]:
+    """
+    Parse skills section into individual skill tags.
+
+    Each skill has: name, confidence, matchedSkillId (null for now)
+    """
+    skills = []
+    seen = set()  # Avoid duplicates
+
+    # Normalize text - replace bullets and newlines with commas
+    normalized = text.replace('•', ',').replace('·', ',').replace('-', ',')
+    normalized = re.sub(r'\n+', ',', normalized)
+
+    # Split by comma
+    raw_skills = [s.strip() for s in normalized.split(',')]
+
+    for skill in raw_skills:
+        # Clean up the skill name
+        skill = skill.strip()
+        skill = re.sub(r'^[\-•·]\s*', '', skill)  # Remove leading bullets
+        skill = skill.strip()
+
+        # Skip empty or too short
+        if not skill or len(skill) < 2:
+            continue
+
+        # Skip if it looks like a header or sentence
+        if len(skill.split()) > 4:
+            continue
+
+        # Normalize for dedup
+        skill_lower = skill.lower()
+        if skill_lower in seen:
+            continue
+        seen.add(skill_lower)
+
+        skills.append({
+            "name": {"value": skill, "confidence": 90},
+            "matchedSkillId": None  # Will be matched in a separate step
+        })
+
+    return skills
+
+
 class FieldExtraction(BaseModel):
     """Single field extraction result."""
     value: Optional[str] = None

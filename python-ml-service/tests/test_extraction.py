@@ -1,6 +1,6 @@
 # python-ml-service/tests/test_extraction.py
 import pytest
-from app.api.routes.ocr_extraction import find_section_headers, parse_work_history, parse_education
+from app.api.routes.ocr_extraction import find_section_headers, parse_work_history, parse_education, parse_skills
 
 def test_find_section_headers_normal():
     text = """John Smith
@@ -88,3 +88,27 @@ MIT | 2015
     assert len(education) == 2
     assert education[0]["degree"]["value"] == "Master of Science"
     assert education[1]["degree"]["value"] == "Bachelor of Science"
+
+def test_parse_skills_comma_separated():
+    text = "Python, JavaScript, TypeScript, Java, Go"
+    skills = parse_skills(text)
+    assert len(skills) == 5
+    assert skills[0]["name"]["value"] == "Python"
+    assert skills[1]["name"]["value"] == "JavaScript"
+
+def test_parse_skills_multiline():
+    text = """Python, JavaScript, TypeScript
+React, Node.js, Docker
+AWS, PostgreSQL
+"""
+    skills = parse_skills(text)
+    assert len(skills) >= 8
+    assert any(s["name"]["value"] == "Docker" for s in skills)
+
+def test_parse_skills_bullet_points():
+    text = """• Python
+• JavaScript
+• React
+"""
+    skills = parse_skills(text)
+    assert len(skills) == 3
