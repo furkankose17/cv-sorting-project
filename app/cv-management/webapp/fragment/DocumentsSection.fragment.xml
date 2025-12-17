@@ -167,38 +167,50 @@
                     <cells>
                         <!-- File Type Icon -->
                         <core:Icon
-                            src="{= ${fileType} === 'application/pdf' ? 'sap-icon://pdf-attachment' : 'sap-icon://attachment-photo'}"
+                            src="{= ${mediaType} === 'application/pdf' ? 'sap-icon://pdf-attachment' : 'sap-icon://attachment-photo'}"
                             color="Default" />
 
                         <!-- File Name -->
                         <ObjectIdentifier
                             title="{fileName}"
-                            text="{= ${fileType} || 'Unknown'}" />
+                            text="{mediaType}" />
 
                         <!-- Candidate -->
                         <Link
                             text="{= ${candidate/firstName} + ' ' + ${candidate/lastName}}"
                             press=".onCandidateLinkPress"
-                            visible="{= ${candidate_ID} !== null}" />
+                            visible="{= ${candidate_ID} ? true : false}" />
 
                         <!-- Status -->
                         <ObjectStatus
-                            text="{processingStatus}"
-                            state="{= ${processingStatus} === 'completed' ? 'Success' : ${processingStatus} === 'failed' ? 'Error' : ${processingStatus} === 'review_required' ? 'Warning' : 'None'}"
-                            icon="{= ${processingStatus} === 'completed' ? 'sap-icon://sys-enter-2' : ${processingStatus} === 'failed' ? 'sap-icon://error' : ${processingStatus} === 'review_required' ? 'sap-icon://warning' : 'sap-icon://pending'}" />
+                            text="{ocrStatus}"
+                            state="{= ${ocrStatus} === 'completed' ? 'Success' : ${ocrStatus} === 'failed' ? 'Error' : ${ocrStatus} === 'review_required' ? 'Warning' : 'None'}"
+                            icon="{= ${ocrStatus} === 'completed' ? 'sap-icon://sys-enter-2' : ${ocrStatus} === 'failed' ? 'sap-icon://error' : ${ocrStatus} === 'review_required' ? 'sap-icon://warning' : 'sap-icon://pending'}" />
 
                         <!-- Confidence -->
                         <ObjectNumber
-                            number="{ocrConfidence}"
+                            number="{
+                                path: 'ocrConfidence',
+                                type: 'sap.ui.model.type.Float',
+                                formatOptions: {
+                                    maxFractionDigits: 1
+                                }
+                            }"
                             unit="%"
                             state="{= ${ocrConfidence} >= 85 ? 'Success' : ${ocrConfidence} >= 70 ? 'Warning' : 'Error'}"
-                            visible="{= ${ocrConfidence} !== null}" />
+                            visible="{= !!${ocrConfidence}}" />
 
                         <!-- File Size -->
                         <Text text="{= ${fileSize} ? (${fileSize} / 1024).toFixed(1) + ' KB' : 'N/A'}" />
 
                         <!-- Upload Date -->
-                        <Text text="{path: 'createdAt', type: 'sap.ui.model.type.DateTime', formatOptions: {pattern: 'MMM d, yyyy HH:mm'}}" />
+                        <Text text="{
+                            path: 'createdAt',
+                            type: 'sap.ui.model.type.DateTime',
+                            formatOptions: {
+                                pattern: 'dd MMM yyyy HH:mm'
+                            }
+                        }" />
 
                         <!-- Actions -->
                         <HBox>
