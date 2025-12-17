@@ -63,7 +63,8 @@
                         min="0"
                         max="100"
                         step="5"
-                        range="[50, 100]"
+                        value="50"
+                        value2="100"
                         change=".onFilterChange"
                         width="100%" />
 
@@ -204,7 +205,10 @@
                         <Text text="{= ${fileSize} ? (${fileSize} / 1024).toFixed(1) + ' KB' : 'N/A'}" />
 
                         <!-- Upload Date -->
-                        <Text text="{= %{createdAt} ? ${path: 'createdAt', type: 'sap.ui.model.type.DateTime', formatOptions: {pattern: 'dd MMM yyyy HH:mm'}} : '-' }" />
+                        <Text text="{
+                            parts: ['createdAt'],
+                            formatter: '.formatDateTime'
+                        }" />
 
                         <!-- Actions -->
                         <HBox>

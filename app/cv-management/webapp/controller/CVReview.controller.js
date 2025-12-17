@@ -69,17 +69,14 @@ sap.ui.define([
             try {
                 this.getView().setBusy(true);
 
-                // Read document with expanded data
+                // Read document with OData v4 API
                 const sPath = `/CVDocuments('${sDocumentId}')`;
-                const oDocument = await new Promise((resolve, reject) => {
-                    oModel.read(sPath, {
-                        urlParameters: {
-                            "$select": "ID,fileName,mediaType,fileContent,ocrConfidence,ocrMethod,ocrProcessedAt,structuredData,extractedText"
-                        },
-                        success: resolve,
-                        error: reject
-                    });
+                const oBinding = oModel.bindContext(sPath, null, {
+                    $select: "ID,fileName,mediaType,fileContent,ocrConfidence,ocrMethod,ocrProcessedAt,structuredData,extractedText"
                 });
+
+                await oBinding.getBoundContext().requestObject();
+                const oDocument = oBinding.getBoundContext().getObject();
 
                 if (!oDocument) {
                     throw new Error("Document not found");
@@ -300,19 +297,15 @@ sap.ui.define([
                     }
                 };
 
-                // Call reviewAndCreateCandidate action
+                // Call reviewAndCreateCandidate action (OData v4)
                 const sDocumentId = oReviewModel.getProperty("/documentId");
-                const oResult = await new Promise((resolve, reject) => {
-                    oModel.callFunction("/reviewAndCreateCandidate", {
-                        method: "POST",
-                        urlParameters: {
-                            documentId: sDocumentId,
-                            editedData: JSON.stringify(oEditedData)
-                        },
-                        success: resolve,
-                        error: reject
-                    });
+                const oAction = oModel.bindContext(`/reviewAndCreateCandidate(...)`, null, {
+                    documentId: sDocumentId,
+                    editedData: JSON.stringify(oEditedData)
                 });
+
+                await oAction.execute();
+                const oResult = oAction.getBoundContext().getObject();
 
                 MessageBox.success(
                     `Candidate created successfully!\n\nLinked Skills: ${oResult.linkedSkillsCount}\nEmbedding Generated: ${oResult.embeddingGenerated ? 'Yes' : 'No'}`,

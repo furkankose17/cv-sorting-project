@@ -1223,6 +1223,29 @@ sap.ui.define([
             return mIconMap[sEventType] || "sap-icon://activity-individual";
         },
 
+        /**
+         * Format date time with null check
+         * @param {Date|string} vDate The date value
+         * @returns {string} Formatted date or '-'
+         */
+        formatDateTime: function (vDate) {
+            if (!vDate) {
+                return '-';
+            }
+            try {
+                const oDate = vDate instanceof Date ? vDate : new Date(vDate);
+                if (isNaN(oDate.getTime())) {
+                    return '-';
+                }
+                const oDateFormat = sap.ui.core.format.DateFormat.getDateTimeInstance({
+                    pattern: "dd MMM yyyy HH:mm"
+                });
+                return oDateFormat.format(oDate);
+            } catch (e) {
+                return '-';
+            }
+        },
+
         // ==================== Job Section Handlers ====================
 
         /**
