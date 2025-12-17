@@ -209,6 +209,11 @@
                         <!-- Actions -->
                         <HBox>
                             <Button
+                                icon="sap-icon://edit"
+                                tooltip="Review & Edit"
+                                press=".onReviewDocument"
+                                visible="{= ${ocrStatus} === 'completed' || ${ocrStatus} === 'review_required'}" />
+                            <Button
                                 icon="sap-icon://show"
                                 tooltip="View"
                                 press=".onViewDocument" />

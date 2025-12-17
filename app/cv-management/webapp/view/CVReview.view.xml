@@ -1,0 +1,223 @@
+<mvc:View
+    controllerName="cvmanagement.controller.CVReview"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:l="sap.ui.layout"
+    xmlns:f="sap.ui.layout.form"
+    displayBlock="true">
+
+    <Page
+        id="cvReviewPage"
+        title="{i18n>reviewCVTitle}"
+        showNavButton="true"
+        navButtonPress=".onNavBack">
+
+        <content>
+            <!-- CV Processing Complete Banner -->
+            <MessageStrip
+                text="{i18n>reviewCVMessage}"
+                type="Success"
+                showIcon="true"
+                class="sapUiMediumMarginBottom" />
+
+            <!-- Split View: CV Preview + Extracted Data -->
+            <l:Splitter
+                id="reviewSplitter"
+                orientation="Horizontal"
+                height="calc(100vh - 200px)">
+
+                <l:contentAreas>
+                    <!-- LEFT: CV Preview -->
+                    <VBox class="sapUiSmallMargin">
+                        <Toolbar>
+                            <Title text="{i18n>cvPreview}" level="H3" />
+                            <ToolbarSpacer />
+                            <Button
+                                icon="sap-icon://zoom-in"
+                                tooltip="{i18n>zoomIn}"
+                                press=".onZoomIn" />
+                            <Button
+                                icon="sap-icon://zoom-out"
+                                tooltip="{i18n>zoomOut}"
+                                press=".onZoomOut" />
+                            <Button
+                                icon="sap-icon://download"
+                                tooltip="{i18n>downloadCV}"
+                                press=".onDownloadCV" />
+                        </Toolbar>
+
+                        <FlexBox
+                            id="cvPreviewContainer"
+                            height="100%"
+                            width="100%"
+                            justifyContent="Center"
+                            alignItems="Start"
+                            class="sapUiSmallMarginTop"
+                            backgroundDesign="Solid">
+
+                            <!-- PDF Preview -->
+                            <ScrollContainer
+                                id="pdfPreviewScroll"
+                                width="100%"
+                                height="100%"
+                                vertical="true"
+                                horizontal="true"
+                                visible="{= ${review>/fileType} === 'pdf'}">
+                                <core:HTML
+                                    id="cvPreviewPdf"
+                                    content="{review>/pdfContent}" />
+                            </ScrollContainer>
+
+                            <!-- Image Preview -->
+                            <Image
+                                id="cvPreviewImage"
+                                src="{review>/previewUrl}"
+                                width="100%"
+                                densityAware="false"
+                                visible="{= ${review>/fileType} !== 'pdf'}" />
+                        </FlexBox>
+                    </VBox>
+
+                    <!-- RIGHT: Extracted Data Form -->
+                    <ScrollContainer height="100%" vertical="true">
+                        <VBox class="sapUiSmallMargin">
+                            <ObjectHeader
+                                title="{i18n>extractedData}"
+                                number="{review>/confidence}"
+                                numberUnit="%"
+                                numberState="{= ${review>/confidence} >= 85 ? 'Success' : ${review>/confidence} >= 70 ? 'Warning' : 'Error'}">
+                                <attributes>
+                                    <ObjectAttribute text="{i18n>ocrMethod}: {review>/ocrMethod}" />
+                                    <ObjectAttribute text="{i18n>processedAt}: {review>/processedAt}" />
+                                </attributes>
+                            </ObjectHeader>
+
+                            <!-- Tier 1: Personal Information -->
+                            <Panel
+                                headerText="{i18n>personalInformation}"
+                                expanded="true"
+                                class="sapUiSmallMarginTop">
+                                <f:SimpleForm
+                                    editable="true"
+                                    layout="ResponsiveGridLayout"
+                                    labelSpanXL="4"
+                                    labelSpanL="4"
+                                    labelSpanM="12"
+                                    emptySpanXL="0"
+                                    emptySpanL="0"
+                                    columnsXL="2"
+                                    columnsL="2"
+                                    columnsM="1">
+                                    <f:content>
+                                        <Label text="{i18n>firstName}" required="true" />
+                                        <HBox alignItems="Center">
+                                            <Input
+                                                value="{review>/tier1/firstName/value}"
+                                                width="70%"
+                                                required="true" />
+                                            <ObjectStatus
+                                                text="{review>/tier1/firstName/confidence}%"
+                                                state="{= ${review>/tier1/firstName/confidence} >= 90 ? 'Success' : 'Warning'}"
+                                                class="sapUiTinyMarginBegin" />
+                                        </HBox>
+
+                                        <Label text="{i18n>lastName}" required="true" />
+                                        <HBox alignItems="Center">
+                                            <Input
+                                                value="{review>/tier1/lastName/value}"
+                                                width="70%"
+                                                required="true" />
+                                            <ObjectStatus
+                                                text="{review>/tier1/lastName/confidence}%"
+                                                state="{= ${review>/tier1/lastName/confidence} >= 90 ? 'Success' : 'Warning'}"
+                                                class="sapUiTinyMarginBegin" />
+                                        </HBox>
+
+                                        <Label text="{i18n>email}" required="true" />
+                                        <HBox alignItems="Center">
+                                            <Input
+                                                value="{review>/tier1/email/value}"
+                                                width="70%"
+                                                type="Email"
+                                                required="true" />
+                                            <ObjectStatus
+                                                text="{review>/tier1/email/confidence}%"
+                                                state="{= ${review>/tier1/email/confidence} >= 90 ? 'Success' : 'Warning'}"
+                                                class="sapUiTinyMarginBegin" />
+                                        </HBox>
+
+                                        <Label text="{i18n>phone}" />
+                                        <HBox alignItems="Center">
+                                            <Input
+                                                value="{review>/tier1/phone/value}"
+                                                width="70%"
+                                                type="Tel" />
+                                            <ObjectStatus
+                                                text="{review>/tier1/phone/confidence}%"
+                                                state="{= ${review>/tier1/phone/confidence} >= 90 ? 'Success' : 'Warning'}"
+                                                class="sapUiTinyMarginBegin" />
+                                        </HBox>
+
+                                        <Label text="{i18n>location}" />
+                                        <HBox alignItems="Center">
+                                            <Input
+                                                value="{review>/tier1/location/value}"
+                                                width="70%" />
+                                            <ObjectStatus
+                                                text="{review>/tier1/location/confidence}%"
+                                                state="{= ${review>/tier1/location/confidence} >= 90 ? 'Success' : 'Warning'}"
+                                                class="sapUiTinyMarginBegin" />
+                                        </HBox>
+                                    </f:content>
+                                </f:SimpleForm>
+                            </Panel>
+
+                            <!-- Tier 2: Professional Background -->
+                            <Panel
+                                headerText="{i18n>professionalBackground}"
+                                expanded="false"
+                                expandable="true"
+                                class="sapUiSmallMarginTop">
+                                <VBox class="sapUiSmallMargin">
+                                    <MessageStrip
+                                        text="{i18n>tier2ManualEntry}"
+                                        type="Information"
+                                        showIcon="true" />
+
+                                    <Label text="{i18n>workHistory}" class="sapUiSmallMarginTop" />
+                                    <TextArea
+                                        value="{review>/rawSections/experience_section}"
+                                        rows="5"
+                                        width="100%"
+                                        editable="false" />
+
+                                    <Label text="{i18n>education}" class="sapUiSmallMarginTop" />
+                                    <TextArea
+                                        value="{review>/rawSections/education_section}"
+                                        rows="5"
+                                        width="100%"
+                                        editable="false" />
+                                </VBox>
+                            </Panel>
+
+                            <!-- Action Buttons -->
+                            <Toolbar class="sapUiMediumMarginTop">
+                                <ToolbarSpacer />
+                                <Button
+                                    text="{i18n>discardAndClose}"
+                                    press=".onDiscard" />
+                                <Button
+                                    text="{i18n>createCandidate}"
+                                    type="Emphasized"
+                                    icon="sap-icon://add"
+                                    press=".onCreateCandidate"
+                                    enabled="{= !!${review>/tier1/firstName/value} &amp;&amp; !!${review>/tier1/email/value}}" />
+                            </Toolbar>
+                        </VBox>
+                    </ScrollContainer>
+                </l:contentAreas>
+            </l:Splitter>
+        </content>
+    </Page>
+</mvc:View>

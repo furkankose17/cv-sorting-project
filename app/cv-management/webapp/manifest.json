@@ -131,6 +131,13 @@
           "target": [
             "Upload"
           ]
+        },
+        {
+          "name": "cvReview",
+          "pattern": "cv-review/{documentId}",
+          "target": [
+            "cvReview"
+          ]
         }
       ],
       "targets": {
@@ -154,6 +161,12 @@
           "viewType": "XML",
           "viewName": "Upload",
           "viewId": "upload",
+          "viewLevel": 1
+        },
+        "cvReview": {
+          "id": "CVReview",
+          "name": "CVReview",
+          "viewType": "XML",
           "viewLevel": 1
         }
       }

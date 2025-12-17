@@ -1628,6 +1628,96 @@ sap.ui.define([
         onViewInterviews: function () {
             this.showInfo("Interviews view coming soon - will show all scheduled interviews");
             // TODO: Implement interviews overview
+        },
+
+        // ============================================================
+        // DOCUMENT HANDLERS
+        // ============================================================
+
+        /**
+         * Navigate to CV review page
+         * @param {object} oEvent Press event
+         */
+        onReviewDocument: function (oEvent) {
+            const oContext = oEvent.getSource().getBindingContext();
+            if (!oContext) {
+                this.showError("Cannot determine document");
+                return;
+            }
+
+            const sDocumentId = oContext.getProperty("ID");
+            this.getRouter().navTo("cvReview", {
+                documentId: sDocumentId
+            });
+        },
+
+        /**
+         * View document (preview)
+         * @param {object} oEvent Press event
+         */
+        onViewDocument: function (oEvent) {
+            this.showInfo("Document preview coming soon");
+            // TODO: Implement document preview in dialog
+        },
+
+        /**
+         * Download document
+         * @param {object} oEvent Press event
+         */
+        onDownloadDocument: function (oEvent) {
+            const oContext = oEvent.getSource().getBindingContext();
+            if (!oContext) {
+                this.showError("Cannot determine document");
+                return;
+            }
+
+            const sDocumentId = oContext.getProperty("ID");
+            const sFileName = oContext.getProperty("fileName");
+
+            // Trigger download
+            const sUrl = `${this.getModel().sServiceUrl}/CVDocuments('${sDocumentId}')/fileContent`;
+            const a = document.createElement("a");
+            a.href = sUrl;
+            a.download = sFileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        },
+
+        /**
+         * Delete document
+         * @param {object} oEvent Press event
+         */
+        onDeleteDocument: function (oEvent) {
+            const oContext = oEvent.getSource().getBindingContext();
+            if (!oContext) {
+                this.showError("Cannot determine document");
+                return;
+            }
+
+            const sDocumentId = oContext.getProperty("ID");
+            const sFileName = oContext.getProperty("fileName");
+
+            sap.m.MessageBox.confirm(
+                `Delete document "${sFileName}"?`,
+                {
+                    title: "Confirm Deletion",
+                    onClose: async (sAction) => {
+                        if (sAction === sap.m.MessageBox.Action.OK) {
+                            try {
+                                await new Promise((resolve, reject) => {
+                                    oContext.delete().then(resolve).catch(reject);
+                                });
+                                this.showSuccess("Document deleted successfully");
+                                this.getModel().refresh(true);
+                            } catch (error) {
+                                console.error("Failed to delete document:", error);
+                                this.showError("Failed to delete document: " + error.message);
+                            }
+                        }
+                    }
+                }
+            );
         }
 
     });
