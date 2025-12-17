@@ -30,8 +30,8 @@ module.exports = {
     ],
 
     // Timeouts and performance
-    testTimeout: 30000, // 30 seconds for integration tests
-    maxWorkers: '50%', // Use half of available CPU cores
+    testTimeout: 90000, // 90 seconds for integration tests (CAP server startup is slow)
+    maxWorkers: 1, // Run tests serially to avoid port conflicts with CAP server
 
     // Output configuration
     verbose: true,
