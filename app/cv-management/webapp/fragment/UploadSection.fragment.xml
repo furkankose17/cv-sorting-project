@@ -47,7 +47,7 @@
 
                 <Text
                     text="Supported: PDF, PNG, JPG, TIFF, DOC, DOCX (Max 10MB per file)"
-                    class="sapUiTinyMarginTop sapUiTinyMarginBottom" />
+                    class="sapUiTinyMargin" />
 
                 <!-- Selected Files Display -->
                 <VBox
@@ -141,13 +141,18 @@
                             <ObjectIdentifier
                                 title="{fileName}"
                                 text="{mediaType}" />
-                            <Text text="{
-                                path: 'createdAt',
-                                type: 'sap.ui.model.type.DateTime',
-                                formatOptions: {
-                                    pattern: 'dd MMM yyyy HH:mm'
-                                }
-                            }" />
+                            <Text
+                                text="{
+                                    path: 'createdAt',
+                                    type: 'sap.ui.model.type.DateTime',
+                                    formatOptions: {
+                                        pattern: 'dd MMM yyyy HH:mm'
+                                    },
+                                    constraints: {
+                                        nullable: true
+                                    }
+                                }"
+                                visible="{= %{createdAt} ? true : false}" />
                             <ObjectStatus
                                 text="{ocrStatus}"
                                 state="{= ${ocrStatus} === 'completed' ? 'Success' : ${ocrStatus} === 'processing' ? 'Information' : ${ocrStatus} === 'failed' ? 'Error' : 'Warning' }" />

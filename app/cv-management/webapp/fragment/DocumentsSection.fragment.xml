@@ -179,7 +179,7 @@
                         <Link
                             text="{= ${candidate/firstName} + ' ' + ${candidate/lastName}}"
                             press=".onCandidateLinkPress"
-                            visible="{= ${candidate_ID} ? true : false}" />
+                            visible="{= %{candidate_ID} ? true : false}" />
 
                         <!-- Status -->
                         <ObjectStatus
@@ -198,19 +198,24 @@
                             }"
                             unit="%"
                             state="{= ${ocrConfidence} >= 85 ? 'Success' : ${ocrConfidence} >= 70 ? 'Warning' : 'Error'}"
-                            visible="{= !!${ocrConfidence}}" />
+                            visible="{= %{ocrConfidence} ? true : false}" />
 
                         <!-- File Size -->
                         <Text text="{= ${fileSize} ? (${fileSize} / 1024).toFixed(1) + ' KB' : 'N/A'}" />
 
                         <!-- Upload Date -->
-                        <Text text="{
-                            path: 'createdAt',
-                            type: 'sap.ui.model.type.DateTime',
-                            formatOptions: {
-                                pattern: 'dd MMM yyyy HH:mm'
-                            }
-                        }" />
+                        <Text
+                            text="{
+                                path: 'createdAt',
+                                type: 'sap.ui.model.type.DateTime',
+                                formatOptions: {
+                                    pattern: 'dd MMM yyyy HH:mm'
+                                },
+                                constraints: {
+                                    nullable: true
+                                }
+                            }"
+                            visible="{= %{createdAt} ? true : false}" />
 
                         <!-- Actions -->
                         <HBox>
