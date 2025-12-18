@@ -1069,6 +1069,31 @@ service CVSortingService {
         clickRate: Decimal(5,2);
     };
 
+    function getRecentNotifications(limit: Integer) returns array of {
+        ID: UUID;
+        notificationType: String;
+        recipientEmail: String;
+        candidateFirstName: String;
+        candidateLastName: String;
+        jobTitle: String;
+        sentAt: Timestamp;
+        deliveryStatus: String;
+        createdAt: Timestamp;
+    };
+
+    action retryFailedNotification(notificationId: UUID) returns Boolean;
+
+    action testWebhookConnection() returns {
+        connected: Boolean;
+        message: String;
+        responseTime: Integer;
+    };
+
+    action updateNotificationSettings(settings: array of {
+        settingKey: String;
+        settingValue: String;
+    }) returns Boolean;
+
     function getScoringCriteria(
         jobPostingId: UUID
     ) returns array of ScoringCriteria;

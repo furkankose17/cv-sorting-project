@@ -2389,6 +2389,137 @@ module.exports = class CVSortingService extends cds.ApplicationService {
             }
         });
 
+        // Get recent notifications
+        this.on('getRecentNotifications', async (req) => {
+            const { EmailNotifications } = this.entities;
+            const limit = req.data.limit || 10;
+
+            try {
+                const notifications = await SELECT.from(EmailNotifications)
+                    .columns('ID', 'notificationType', 'recipientEmail', 'sentAt', 'deliveryStatus', 'createdAt',
+                             'candidate_ID', 'jobPosting_ID')
+                    .orderBy('createdAt desc')
+                    .limit(limit);
+
+                // Enrich with candidate and job data
+                const { Candidates, JobPostings } = this.entities;
+                const enriched = await Promise.all(notifications.map(async (n) => {
+                    let candidateFirstName = '', candidateLastName = '', jobTitle = '';
+
+                    if (n.candidate_ID) {
+                        const candidate = await SELECT.one.from(Candidates).where({ ID: n.candidate_ID });
+                        if (candidate) {
+                            candidateFirstName = candidate.firstName || '';
+                            candidateLastName = candidate.lastName || '';
+                        }
+                    }
+
+                    if (n.jobPosting_ID) {
+                        const job = await SELECT.one.from(JobPostings).where({ ID: n.jobPosting_ID });
+                        if (job) {
+                            jobTitle = job.title || '';
+                        }
+                    }
+
+                    return {
+                        ID: n.ID,
+                        notificationType: n.notificationType,
+                        recipientEmail: n.recipientEmail,
+                        candidateFirstName,
+                        candidateLastName,
+                        jobTitle,
+                        sentAt: n.sentAt,
+                        deliveryStatus: n.deliveryStatus,
+                        createdAt: n.createdAt
+                    };
+                }));
+
+                return enriched;
+            } catch (error) {
+                LOG.error('Error getting recent notifications:', error);
+                return [];
+            }
+        });
+
+        // Retry failed notification
+        this.on('retryFailedNotification', async (req) => {
+            const { notificationId } = req.data;
+            const { EmailNotifications } = this.entities;
+
+            try {
+                const notification = await SELECT.one.from(EmailNotifications).where({ ID: notificationId });
+                if (!notification) {
+                    req.error(404, 'Notification not found');
+                    return false;
+                }
+
+                if (notification.deliveryStatus !== 'failed' && notification.deliveryStatus !== 'bounced') {
+                    req.error(400, 'Can only retry failed or bounced notifications');
+                    return false;
+                }
+
+                // Reset status to queued and trigger webhook
+                await UPDATE(EmailNotifications).set({ deliveryStatus: 'queued' }).where({ ID: notificationId });
+
+                // Re-trigger webhook based on notification type
+                const helper = new webhookHelper();
+
+                await helper.sendWebhook(notification.notificationType.replace('_', '-'), {
+                    notificationId: notification.ID,
+                    recipientEmail: notification.recipientEmail,
+                    retry: true
+                });
+
+                return true;
+            } catch (error) {
+                LOG.error('Error retrying notification:', error);
+                return false;
+            }
+        });
+
+        // Test webhook connection
+        this.on('testWebhookConnection', async (req) => {
+            const axios = require('axios');
+            const webhookUrl = process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/webhook';
+            const healthUrl = webhookUrl.replace('/webhook', '/healthz');
+
+            const startTime = Date.now();
+            try {
+                await axios.get(healthUrl, { timeout: 5000 });
+                const responseTime = Date.now() - startTime;
+                return {
+                    connected: true,
+                    message: 'n8n is connected and healthy',
+                    responseTime
+                };
+            } catch (error) {
+                const responseTime = Date.now() - startTime;
+                return {
+                    connected: false,
+                    message: error.message || 'Connection failed',
+                    responseTime
+                };
+            }
+        });
+
+        // Update notification settings
+        this.on('updateNotificationSettings', async (req) => {
+            const { settings } = req.data;
+            const { NotificationSettings } = this.entities;
+
+            try {
+                for (const setting of settings) {
+                    await UPDATE(NotificationSettings)
+                        .set({ settingValue: setting.settingValue })
+                        .where({ settingKey: setting.settingKey });
+                }
+                return true;
+            } catch (error) {
+                LOG.error('Error updating settings:', error);
+                return false;
+            }
+        });
+
         LOG.info('Email notification handlers registered');
     }
 
