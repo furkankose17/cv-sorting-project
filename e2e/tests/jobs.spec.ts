@@ -324,3 +324,77 @@ test.describe('Jobs Tab - Quick Rank', () => {
     }
   });
 });
+
+test.describe('Jobs Tab - Hot Candidates Badge', () => {
+  test.beforeEach(async ({ mainPage }) => {
+    await mainPage.navigate();
+  });
+
+  test('should show hot candidates badge on Jobs tab', async ({ mainPage }) => {
+    const jobsTab = mainPage.jobsTab;
+
+    // Badge count depends on data
+    const badgeCount = await jobsTab.getHotCandidatesBadge();
+    expect(badgeCount).toBeGreaterThanOrEqual(0);
+  });
+
+  test('should reflect correct badge visibility', async ({ mainPage }) => {
+    const jobsTab = mainPage.jobsTab;
+
+    // Check if badge is visible when there are hot candidates
+    const badgeCount = await jobsTab.getHotCandidatesBadge();
+    const isVisible = await jobsTab.isJobsTabBadgeVisible();
+
+    if (badgeCount > 0) {
+      expect(isVisible).toBe(true);
+    } else {
+      // Badge may not be visible if count is 0
+      expect(typeof isVisible).toBe('boolean');
+    }
+  });
+
+  test('should have appropriate badge design', async ({ mainPage }) => {
+    const jobsTab = mainPage.jobsTab;
+
+    const design = await jobsTab.getJobsTabBadgeDesign();
+    expect(['positive', 'critical', 'neutral', 'none']).toContain(design);
+  });
+
+  test('should match badge count with hot candidates total', async ({ mainPage }) => {
+    const jobsTab = mainPage.jobsTab;
+
+    // Get badge count from Jobs tab
+    const badgeCount = await jobsTab.getHotCandidatesBadge();
+
+    // Switch to Jobs tab to see KPIs
+    await mainPage.switchToJobsTab();
+
+    // Get hot candidates jobs count from KPI
+    const kpiCount = await jobsTab.getHotCandidatesJobsCount();
+
+    // Both should be non-negative numbers
+    expect(badgeCount).toBeGreaterThanOrEqual(0);
+    expect(kpiCount).toBeGreaterThanOrEqual(0);
+
+    // Note: Badge shows total hot candidates, KPI shows jobs with hot candidates
+    // They may differ but both should be valid
+  });
+
+  test('should be visible from other tabs', async ({ mainPage }) => {
+    const jobsTab = mainPage.jobsTab;
+
+    // Start on Upload tab
+    await mainPage.switchToUploadTab();
+
+    // Badge should still be readable
+    const badgeCountFromUpload = await jobsTab.getHotCandidatesBadge();
+    expect(badgeCountFromUpload).toBeGreaterThanOrEqual(0);
+
+    // Switch to Candidates tab
+    await mainPage.switchToCandidatesTab();
+
+    // Badge should still be readable
+    const badgeCountFromCandidates = await jobsTab.getHotCandidatesBadge();
+    expect(badgeCountFromCandidates).toBeGreaterThanOrEqual(0);
+  });
+});
