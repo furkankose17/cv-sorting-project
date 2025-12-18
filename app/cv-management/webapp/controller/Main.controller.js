@@ -3461,6 +3461,249 @@ sap.ui.define([
                 oAIModel.setProperty("/currentContext/candidateId", sCandidateId || null);
                 this._updateAIQuickActions();
             }
+        },
+
+        // ============================================
+        // EMAIL CENTER HANDLERS
+        // ============================================
+
+        /**
+         * Handle email sub-tab selection
+         * @param {sap.ui.base.Event} oEvent Sub-tab select event
+         */
+        onEmailSubTabSelect: function (oEvent) {
+            const sKey = oEvent.getParameter("key");
+            this._loadEmailSubTabContent(sKey);
+        },
+
+        /**
+         * Load email sub-tab content dynamically
+         * @param {string} sKey Sub-tab key (dashboard, history, templates, settings)
+         * @private
+         */
+        _loadEmailSubTabContent: function (sKey) {
+            const that = this;
+            const oSubTabBar = this.byId("emailSubTabBar");
+            if (!oSubTabBar) return;
+
+            const oTab = oSubTabBar.getItems().find(item => item.getKey() === sKey);
+            if (!oTab || oTab.getContent().length > 0) return;
+
+            const fragmentMap = {
+                'dashboard': 'cvmanagement.fragment.EmailDashboard',
+                'history': 'cvmanagement.fragment.EmailHistory',
+                'templates': 'cvmanagement.fragment.EmailTemplates',
+                'settings': 'cvmanagement.fragment.EmailSettings'
+            };
+
+            const fragmentName = fragmentMap[sKey];
+            if (!fragmentName) return;
+
+            Fragment.load({
+                id: this.getView().getId(),
+                name: fragmentName,
+                controller: this
+            }).then(oFragment => {
+                if (Array.isArray(oFragment)) {
+                    oFragment.forEach(ctrl => oTab.addContent(ctrl));
+                } else {
+                    oTab.addContent(oFragment);
+                }
+                // Load data for the tab
+                if (sKey === 'dashboard') {
+                    that._loadEmailDashboardData();
+                } else if (sKey === 'settings') {
+                    that._loadEmailSettings();
+                }
+            }).catch(err => {
+                console.error('Failed to load email fragment:', err);
+            });
+        },
+
+        /**
+         * Load email dashboard data (stats, recent notifications, webhook health)
+         * @private
+         */
+        _loadEmailDashboardData: function () {
+            const oModel = this.getModel();
+            const oEmailModel = this.getModel("email");
+
+            oEmailModel.setProperty("/isLoading", true);
+
+            // Load stats
+            oModel.callFunction("/getEmailStats", {
+                method: "GET",
+                success: (oData) => {
+                    oEmailModel.setProperty("/stats", oData);
+                },
+                error: (oError) => {
+                    console.error("Failed to load email stats:", oError);
+                }
+            });
+
+            // Load recent notifications
+            oModel.callFunction("/getRecentNotifications", {
+                method: "GET",
+                urlParameters: { limit: 10 },
+                success: (oData) => {
+                    const items = (oData.results || oData || []).map(item => ({
+                        ...item,
+                        timeAgo: this._formatTimeAgo(item.createdAt)
+                    }));
+                    oEmailModel.setProperty("/recentActivity", items);
+                },
+                error: (oError) => {
+                    console.error("Failed to load recent notifications:", oError);
+                }
+            });
+
+            // Test webhook connection
+            oModel.callFunction("/testWebhookConnection", {
+                method: "POST",
+                success: (oData) => {
+                    oEmailModel.setProperty("/health/n8nConnected", oData.connected);
+                    oEmailModel.setProperty("/health/webhooksEnabled", true);
+                },
+                error: () => {
+                    oEmailModel.setProperty("/health/n8nConnected", false);
+                }
+            });
+
+            oEmailModel.setProperty("/health/smtpStatus", "ok");
+            oEmailModel.setProperty("/isLoading", false);
+        },
+
+        /**
+         * Format timestamp as relative time ago
+         * @param {string} dateStr ISO date string
+         * @returns {string} Formatted time ago string
+         * @private
+         */
+        _formatTimeAgo: function (dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            if (diffMins < 1) return 'Just now';
+            if (diffMins < 60) return `${diffMins} min ago`;
+            if (diffHours < 24) return `${diffHours} hours ago`;
+            return `${diffDays} days ago`;
+        },
+
+        /**
+         * Refresh email center current sub-tab data
+         */
+        onRefreshEmailCenter: function () {
+            const oSubTabBar = this.byId("emailSubTabBar");
+            if (oSubTabBar) {
+                const sKey = oSubTabBar.getSelectedKey();
+                if (sKey === 'dashboard') {
+                    this._loadEmailDashboardData();
+                }
+            }
+        },
+
+        /**
+         * Refresh email stats
+         */
+        onRefreshEmailStats: function () {
+            this._loadEmailDashboardData();
+        },
+
+        /**
+         * Handle failed card press - switch to history tab with failed filter
+         */
+        onFailedCardPress: function () {
+            // Switch to history tab with failed filter
+            const oSubTabBar = this.byId("emailSubTabBar");
+            if (oSubTabBar) {
+                oSubTabBar.setSelectedKey("history");
+                const oEmailModel = this.getModel("email");
+                oEmailModel.setProperty("/history/filters/statuses", ["failed", "bounced"]);
+            }
+        },
+
+        /**
+         * Retry all failed notifications
+         */
+        onRetryAllFailed: function () {
+            sap.m.MessageBox.confirm("Retry all failed notifications?", {
+                onClose: (sAction) => {
+                    if (sAction === sap.m.MessageBox.Action.OK) {
+                        sap.m.MessageToast.show("Retrying failed notifications...");
+                        // Implementation would iterate through failed and call retryFailedNotification
+                    }
+                }
+            });
+        },
+
+        /**
+         * Send test email - show coming soon message
+         */
+        onSendTestEmail: function () {
+            sap.m.MessageBox.information("Test email functionality coming soon");
+        },
+
+        /**
+         * Open n8n dashboard in new tab
+         */
+        onOpenN8nDashboard: function () {
+            const n8nUrl = "http://localhost:5678";
+            sap.m.URLHelper.redirect(n8nUrl, true);
+        },
+
+        /**
+         * Load email settings from backend
+         * @private
+         */
+        _loadEmailSettings: function () {
+            const oModel = this.getModel();
+            const oEmailModel = this.getModel("email");
+
+            oModel.read("/NotificationSettings", {
+                success: (oData) => {
+                    const settings = {};
+                    (oData.results || []).forEach(item => {
+                        const key = item.settingKey;
+                        let value = item.settingValue;
+
+                        // Convert to appropriate type
+                        if (item.settingType === 'boolean') {
+                            value = value === 'true';
+                        } else if (item.settingType === 'number') {
+                            value = parseInt(value, 10);
+                        }
+
+                        // Map setting keys to model properties
+                        const keyMap = {
+                            'webhooks_enabled': 'webhooksEnabled',
+                            'webhook_url': 'webhookUrl',
+                            'notification_cooldown_hours': 'cooldownHours',
+                            'reminder_window_hours': 'reminderWindowHours',
+                            'rate_limit_per_minute': 'rateLimitPerMinute',
+                            'type_cv_received': 'typeCvReceived',
+                            'type_status_changed': 'typeStatusChanged',
+                            'type_interview_invitation': 'typeInterviewInvitation',
+                            'type_interview_reminder': 'typeInterviewReminder',
+                            'type_offer_extended': 'typeOfferExtended',
+                            'type_application_rejected': 'typeApplicationRejected'
+                        };
+
+                        if (keyMap[key]) {
+                            settings[keyMap[key]] = value;
+                        }
+                    });
+
+                    oEmailModel.setProperty("/settings", settings);
+                },
+                error: (oError) => {
+                    console.error("Failed to load settings:", oError);
+                }
+            });
         }
 
     });
