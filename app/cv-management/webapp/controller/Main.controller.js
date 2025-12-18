@@ -123,7 +123,19 @@ sap.ui.define([
                     webhooksEnabled: false
                 },
                 recentActivity: [],
-                settings: [],
+                settings: {
+                    webhooksEnabled: true,
+                    webhookUrl: 'http://localhost:5678/webhook',
+                    cooldownHours: 24,
+                    reminderWindowHours: 24,
+                    rateLimitPerMinute: 50,
+                    typeCvReceived: true,
+                    typeStatusChanged: true,
+                    typeInterviewInvitation: true,
+                    typeInterviewReminder: true,
+                    typeOfferExtended: false,
+                    typeApplicationRejected: false
+                },
                 templates: [
                     { key: 'cv_received', name: 'CV Received', subject: 'Your CV has been received for {jobTitle}', lastEdited: '2024-12-15' },
                     { key: 'status_changed', name: 'Status Changed', subject: 'Application Update for {jobTitle}', lastEdited: '2024-12-10' },

@@ -2504,10 +2504,15 @@ module.exports = class CVSortingService extends cds.ApplicationService {
 
         // Update notification settings
         this.on('updateNotificationSettings', async (req) => {
-            const { settings } = req.data;
+            let { settings } = req.data;
             const { NotificationSettings } = this.entities;
 
             try {
+                // Parse JSON string if passed as URL parameter
+                if (typeof settings === 'string') {
+                    settings = JSON.parse(settings);
+                }
+
                 for (const setting of settings) {
                     await UPDATE(NotificationSettings)
                         .set({ settingValue: setting.settingValue })
