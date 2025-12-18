@@ -1870,6 +1870,63 @@ module.exports = class CVSortingService extends cds.ApplicationService {
             }
         });
 
+        // Handler for n8n polling - get interviews needing reminders
+        this.on('getPendingInterviewReminders', async (req) => {
+            const { Interviews, Candidates, JobPostings } = this.entities;
+
+            try {
+                // Get interviews scheduled 24-48 hours from now that haven't had reminders sent
+                const now = new Date();
+                const in24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                const in48Hours = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+
+                const interviews = await SELECT.from(Interviews)
+                    .where({
+                        scheduledAt: { '>=': in24Hours.toISOString(), '<=': in48Hours.toISOString() },
+                        status_code: { in: ['scheduled', 'confirmed'] },
+                        reminderSent: { '=': false, or: { '=': null } }
+                    });
+
+                // Expand with candidate and job details
+                const results = [];
+                for (const interview of interviews) {
+                    const candidate = await SELECT.one.from(Candidates)
+                        .where({ ID: interview.candidate_ID });
+
+                    let jobTitle = null;
+                    if (interview.jobPosting_ID) {
+                        const job = await SELECT.one.from(JobPostings)
+                            .columns('title')
+                            .where({ ID: interview.jobPosting_ID });
+                        jobTitle = job?.title;
+                    }
+
+                    if (candidate?.email) {
+                        results.push({
+                            interviewId: interview.ID,
+                            candidateId: candidate.ID,
+                            candidateEmail: candidate.email,
+                            candidateName: `${candidate.firstName} ${candidate.lastName}`,
+                            jobTitle: jobTitle,
+                            scheduledAt: interview.scheduledAt,
+                            interviewTitle: interview.title,
+                            location: interview.location,
+                            meetingLink: interview.meetingLink,
+                            interviewerName: interview.interviewer,
+                            interviewerEmail: interview.interviewerEmail
+                        });
+                    }
+                }
+
+                LOG.info(`Found ${results.length} interviews pending reminders`);
+                return results;
+
+            } catch (error) {
+                LOG.error('Error in getPendingInterviewReminders:', error);
+                throw error;
+            }
+        });
+
         LOG.info('Email notification handlers registered');
     }
 
