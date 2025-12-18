@@ -48,6 +48,16 @@
                         key="candidates">
                     </IconTabFilter>
 
+                    <!-- Jobs Tab -->
+                    <IconTabFilter
+                        id="jobsTab"
+                        icon="sap-icon://factory"
+                        text="Jobs"
+                        key="jobs"
+                        count="{dashboard>/priorityData/totalHotCandidates}"
+                        design="{= ${dashboard>/priorityData/totalHotCandidates} > 0 ? 'Positive' : 'Neutral' }">
+                    </IconTabFilter>
+
                     <!-- Documents Tab -->
                     <IconTabFilter
                         id="documentsTab"
