@@ -1058,6 +1058,17 @@ service CVSortingService {
 
     entity NotificationSettings as projection on db.NotificationSettings;
 
+    function getEmailStats() returns {
+        sentToday: Integer;
+        sentYesterday: Integer;
+        deliveryRate: Decimal(5,2);
+        failedCount: Integer;
+        pendingCount: Integer;
+        totalSent: Integer;
+        openRate: Decimal(5,2);
+        clickRate: Decimal(5,2);
+    };
+
     function getScoringCriteria(
         jobPostingId: UUID
     ) returns array of ScoringCriteria;

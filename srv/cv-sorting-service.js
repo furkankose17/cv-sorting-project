@@ -2327,6 +2327,68 @@ module.exports = class CVSortingService extends cds.ApplicationService {
             }
         });
 
+        // Email Stats handler
+        this.on('getEmailStats', async (req) => {
+            const { EmailNotifications } = this.entities;
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const todayStr = today.toISOString();
+            const yesterdayStr = yesterday.toISOString();
+
+            try {
+                // Get counts by status
+                const allNotifications = await SELECT.from(EmailNotifications);
+
+                const sentToday = allNotifications.filter(n =>
+                    n.sentAt && new Date(n.sentAt) >= today && n.deliveryStatus === 'sent'
+                ).length;
+
+                const sentYesterday = allNotifications.filter(n =>
+                    n.sentAt && new Date(n.sentAt) >= yesterday && new Date(n.sentAt) < today && n.deliveryStatus === 'sent'
+                ).length;
+
+                const totalSent = allNotifications.filter(n => n.deliveryStatus === 'sent').length;
+                const failedCount = allNotifications.filter(n =>
+                    n.deliveryStatus === 'failed' || n.deliveryStatus === 'bounced'
+                ).length;
+                const pendingCount = allNotifications.filter(n => n.deliveryStatus === 'queued').length;
+
+                const totalAttempted = totalSent + failedCount;
+                const deliveryRate = totalAttempted > 0 ? (totalSent / totalAttempted * 100) : 100;
+
+                const openedCount = allNotifications.filter(n => n.openedAt).length;
+                const clickedCount = allNotifications.filter(n => n.clickedAt).length;
+                const openRate = totalSent > 0 ? (openedCount / totalSent * 100) : 0;
+                const clickRate = totalSent > 0 ? (clickedCount / totalSent * 100) : 0;
+
+                return {
+                    sentToday,
+                    sentYesterday,
+                    deliveryRate: Math.round(deliveryRate * 100) / 100,
+                    failedCount,
+                    pendingCount,
+                    totalSent,
+                    openRate: Math.round(openRate * 100) / 100,
+                    clickRate: Math.round(clickRate * 100) / 100
+                };
+            } catch (error) {
+                LOG.error('Error getting email stats:', error);
+                return {
+                    sentToday: 0,
+                    sentYesterday: 0,
+                    deliveryRate: 0,
+                    failedCount: 0,
+                    pendingCount: 0,
+                    totalSent: 0,
+                    openRate: 0,
+                    clickRate: 0
+                };
+            }
+        });
+
         LOG.info('Email notification handlers registered');
     }
 
