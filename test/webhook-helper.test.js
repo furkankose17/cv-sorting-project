@@ -217,6 +217,32 @@ describe('WebhookHelper', () => {
         });
     });
 
+    describe('sendCVReceivedWebhook', () => {
+        test('should send cv-received webhook with document details', async () => {
+            const documentId = 'doc-123';
+            const candidateId = 'candidate-456';
+            const fileName = 'john_doe_resume.pdf';
+
+            const scope = nock(mockN8nUrl)
+                .post('/cv-received', (body) => {
+                    expect(body.eventType).toBe('cv-received');
+                    expect(body.payload).toMatchObject({
+                        documentId,
+                        candidateId,
+                        fileName
+                    });
+                    return true;
+                })
+                .reply(200, { success: true, webhookId: 'cv-received-123' });
+
+            const result = await webhookHelper.sendCVReceivedWebhook(documentId, candidateId, fileName);
+
+            expect(result.success).toBe(true);
+            expect(result.webhookId).toBe('cv-received-123');
+            expect(scope.isDone()).toBe(true);
+        });
+    });
+
     describe('Configuration', () => {
         test('should use default values when env vars not set', async () => {
             delete process.env.N8N_WEBHOOK_URL;

@@ -110,6 +110,23 @@ class WebhookHelper {
     }
 
     /**
+     * Send CV received webhook
+     * @param {string} documentId - Document ID
+     * @param {string} candidateId - Candidate ID
+     * @param {string} fileName - Original file name
+     * @returns {Promise<{success: boolean, webhookId: string|null, error: string|null}>}
+     */
+    async sendCVReceivedWebhook(documentId, candidateId, fileName) {
+        const payload = {
+            documentId,
+            candidateId,
+            fileName
+        };
+
+        return this.sendWebhook('cv-received', payload);
+    }
+
+    /**
      * Sleep helper for retry backoff
      * @param {number} ms - Milliseconds to sleep
      * @returns {Promise<void>}
