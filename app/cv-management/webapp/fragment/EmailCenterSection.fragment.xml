@@ -1,0 +1,64 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.f"
+    xmlns:card="sap.f.cards"
+    xmlns:layout="sap.ui.layout">
+
+    <VBox class="sapUiSmallMargin">
+        <!-- Email Center Header -->
+        <Toolbar>
+            <Title text="{i18n>emailCenterTitle}" level="H2" />
+            <ToolbarSpacer />
+            <Button
+                id="emailRefreshBtn"
+                icon="sap-icon://refresh"
+                tooltip="{i18n>refresh}"
+                press=".onRefreshEmailCenter" />
+        </Toolbar>
+
+        <!-- Sub-Tabs -->
+        <IconTabBar
+            id="emailSubTabBar"
+            select=".onEmailSubTabSelect"
+            class="sapUiResponsiveContentPadding sapUiSmallMarginTop"
+            stretchContentHeight="true"
+            applyContentPadding="true">
+
+            <items>
+                <!-- Dashboard Sub-Tab -->
+                <IconTabFilter
+                    id="emailDashboardSubTab"
+                    icon="sap-icon://home"
+                    text="{i18n>dashboard}"
+                    key="dashboard">
+                </IconTabFilter>
+
+                <!-- History Sub-Tab -->
+                <IconTabFilter
+                    id="emailHistorySubTab"
+                    icon="sap-icon://history"
+                    text="{i18n>history}"
+                    key="history">
+                </IconTabFilter>
+
+                <!-- Templates Sub-Tab -->
+                <IconTabFilter
+                    id="emailTemplatesSubTab"
+                    icon="sap-icon://document-text"
+                    text="{i18n>templates}"
+                    key="templates">
+                </IconTabFilter>
+
+                <!-- Settings Sub-Tab -->
+                <IconTabFilter
+                    id="emailSettingsSubTab"
+                    icon="sap-icon://action-settings"
+                    text="{i18n>settings}"
+                    key="settings">
+                </IconTabFilter>
+            </items>
+        </IconTabBar>
+    </VBox>
+
+</core:FragmentDefinition>
