@@ -1883,9 +1883,10 @@ module.exports = class CVSortingService extends cds.ApplicationService {
                 const interviews = await SELECT.from(Interviews)
                     .where({
                         scheduledAt: { '>=': in24Hours.toISOString(), '<=': in48Hours.toISOString() },
-                        status_code: { in: ['scheduled', 'confirmed'] },
-                        reminderSent: { '=': false, or: { '=': null } }
-                    });
+                        status_code: { in: ['scheduled', 'confirmed'] }
+                    })
+                    .and({ reminderSent: false })
+                    .or({ reminderSent: null });
 
                 // Expand with candidate and job details
                 const results = [];
@@ -1986,7 +1987,8 @@ module.exports = class CVSortingService extends cds.ApplicationService {
                     deliveryStatus
                 });
 
-                return result.req.data.ID || notification.ID;
+                // CAP INSERT returns the entries; get ID from notification object
+                return notification.ID;
             } catch (error) {
                 LOG.error('Error logging email notification:', error);
                 throw error;

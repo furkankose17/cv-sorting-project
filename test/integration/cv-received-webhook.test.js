@@ -17,8 +17,12 @@ const N8N_URL = process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/webhook';
 
 describe('CV Received Webhook Flow', () => {
     beforeEach(async () => {
-        // Clear Mailhog
-        await mailhog.deleteAll();
+        // Clear Mailhog if available
+        try {
+            await mailhog.deleteAll();
+        } catch (error) {
+            // Mailhog not running, skip cleanup
+        }
     });
 
     test.skip('should send confirmation email when CV is processed', async () => {
