@@ -81,6 +81,20 @@ sap.ui.define([
                     recommendations: [],
                     lastUpdated: null
                 },
+                priorityData: {
+                    isLoading: false,
+                    jobsWithHotCandidates: [],
+                    totalHotCandidates: 0,
+                    totalWarmCandidates: 0
+                },
+                jobsKPI: {
+                    totalJobs: 0,
+                    publishedJobs: 0,
+                    jobsWithHotCandidates: 0,
+                    jobsNeedingMatches: 0
+                },
+                jobsList: [],
+                jobsListFilter: "all",
                 dateFilter: {
                     fromDate: null,
                     toDate: null
@@ -103,14 +117,39 @@ sap.ui.define([
             if (oModel) {
                 oModel.attachEventOnce("dataReceived", () => {
                     this._loadDashboardStats();
+                    this._loadPriorityDashboard();
                 });
                 // Also try immediately in case model is already loaded
                 setTimeout(() => {
                     if (oModel.getServiceUrl()) {
                         this._loadDashboardStats();
+                        this._loadPriorityDashboard();
                     }
                 }, 500);
             }
+
+            // Initialize AI Assistant model
+            const oAIAssistantModel = new JSONModel({
+                isOpen: false,
+                messages: [],
+                isLoading: false,
+                inputValue: "",
+                quickActions: [
+                    { text: "Top candidates", query: "Top candidates for Senior Developer" },
+                    { text: "Find React devs", query: "Find React developers" },
+                    { text: "Best matches", query: "Show best candidate matches" }
+                ],
+                currentContext: {
+                    jobId: null,
+                    candidateId: null
+                }
+            });
+            this.setModel(oAIAssistantModel, "aiAssistant");
+
+            // Create FAB after a short delay to not interfere with initial render
+            setTimeout(() => {
+                this._createAIFAB();
+            }, 1000);
         },
 
         /**
@@ -121,6 +160,7 @@ sap.ui.define([
             const aFragments = [
                 { id: "uploadTab", fragmentName: "cvmanagement.fragment.UploadSection" },
                 { id: "candidatesTab", fragmentName: "cvmanagement.fragment.CandidatesSection" },
+                { id: "jobsTab", fragmentName: "cvmanagement.fragment.JobsSection" },
                 { id: "documentsTab", fragmentName: "cvmanagement.fragment.DocumentsSection" },
                 { id: "analyticsTab", fragmentName: "cvmanagement.fragment.AnalyticsSection" }
             ];
@@ -235,6 +275,11 @@ sap.ui.define([
             // Load analytics data when analytics tab is selected
             if (sKey === "analytics") {
                 this._loadAnalyticsDashboardData();
+            }
+
+            // Load jobs data when jobs tab is selected
+            if (sKey === "jobs") {
+                this._loadJobsSectionData();
             }
 
             // Update URL hash with selected tab
@@ -800,6 +845,235 @@ sap.ui.define([
                 candidateId: oContext.getProperty("ID"),
                 candidateName: oContext.getProperty("firstName") + " " + oContext.getProperty("lastName")
             });
+        },
+
+        /**
+         * Handle match candidate from list button press
+         * @param {sap.ui.base.Event} oEvent The press event
+         */
+        onMatchCandidateFromList: async function (oEvent) {
+            const oButton = oEvent.getSource();
+            const oContext = oButton.getBindingContext();
+            const sCandidateId = oContext.getProperty("ID");
+            const sCandidateName = oContext.getProperty("firstName") + " " + oContext.getProperty("lastName");
+
+            oButton.setBusy(true);
+
+            try {
+                const oResult = await this._runCandidateMatching(sCandidateId);
+                this._showMatchResultsDialog(sCandidateName, sCandidateId, oResult);
+
+                // Refresh candidates table
+                this.onRefreshCandidates();
+
+            } catch (error) {
+                console.error("Match with jobs failed:", error);
+                this.showError("Failed to match with jobs: " + (error.message || "Unknown error"));
+            } finally {
+                oButton.setBusy(false);
+            }
+        },
+
+        /**
+         * Handle bulk match candidates button press
+         */
+        onBulkMatchCandidates: async function () {
+            const oTable = this.byId("candidatesTable");
+            if (!oTable) return;
+
+            const aSelectedItems = oTable.getSelectedItems();
+            if (aSelectedItems.length === 0) {
+                this.showWarning("Please select at least one candidate");
+                return;
+            }
+
+            // Confirmation dialog
+            sap.m.MessageBox.confirm(
+                `Match ${aSelectedItems.length} candidate(s) with all published jobs?`,
+                {
+                    title: "Bulk Match Candidates",
+                    onClose: async (sAction) => {
+                        if (sAction === sap.m.MessageBox.Action.OK) {
+                            await this._executeBulkMatching(aSelectedItems);
+                        }
+                    }
+                }
+            );
+        },
+
+        /**
+         * Execute bulk matching for selected candidates
+         * @param {Array} aSelectedItems Selected table items
+         * @private
+         */
+        _executeBulkMatching: async function (aSelectedItems) {
+            this.setBusy(true);
+
+            let iSuccessCount = 0;
+            let iFailCount = 0;
+            let iTotalMatches = 0;
+
+            for (const oItem of aSelectedItems) {
+                const oContext = oItem.getBindingContext();
+                const sCandidateId = oContext.getProperty("ID");
+
+                try {
+                    const oResult = await this._runCandidateMatching(sCandidateId);
+                    iSuccessCount++;
+                    iTotalMatches += oResult.matchesCreated + oResult.matchesUpdated;
+                } catch (error) {
+                    console.error("Matching failed for candidate:", sCandidateId, error);
+                    iFailCount++;
+                }
+            }
+
+            this.setBusy(false);
+
+            // Show summary
+            if (iFailCount === 0) {
+                this.showSuccess(`Successfully matched ${iSuccessCount} candidate(s). Total matches: ${iTotalMatches}`);
+            } else {
+                this.showWarning(`Matched ${iSuccessCount} candidate(s), ${iFailCount} failed. Total matches: ${iTotalMatches}`);
+            }
+
+            // Refresh and clear selection
+            this.onRefreshCandidates();
+            const oTable = this.byId("candidatesTable");
+            if (oTable) {
+                oTable.removeSelections(true);
+            }
+        },
+
+        /**
+         * Run candidate matching action
+         * @param {string} sCandidateId Candidate ID
+         * @returns {Promise<Object>} Match result
+         * @private
+         */
+        _runCandidateMatching: async function (sCandidateId) {
+            const oModel = this.getModel();
+            const oAction = oModel.bindContext("/matchCandidateWithAllJobs(...)");
+            oAction.setParameter("candidateId", sCandidateId);
+            oAction.setParameter("minScore", 0);
+            oAction.setParameter("useSemanticMatching", true);
+
+            await oAction.execute();
+            return oAction.getBoundContext().getObject();
+        },
+
+        /**
+         * Show match results dialog
+         * @param {string} sCandidateName Candidate name
+         * @param {string} sCandidateId Candidate ID
+         * @param {Object} oResult Match result from backend
+         * @private
+         */
+        _showMatchResultsDialog: async function (sCandidateName, sCandidateId, oResult) {
+            // Prepare match results for display
+            const aTopMatches = (oResult.topMatches || []).map((match, idx) => ({
+                rank: idx + 1,
+                jobPostingId: match.jobPostingId,
+                jobTitle: match.jobTitle,
+                overallScore: Math.round(match.overallScore),
+                semanticScore: match.semanticScore
+            }));
+
+            // Create model for dialog
+            const oMatchResultsModel = new JSONModel({
+                candidateName: sCandidateName,
+                candidateId: sCandidateId,
+                totalJobsProcessed: oResult.totalJobsProcessed,
+                matchesCreated: oResult.matchesCreated,
+                matchesUpdated: oResult.matchesUpdated,
+                processingTime: oResult.processingTime,
+                topMatches: aTopMatches
+            });
+
+            // Load and open dialog
+            if (!this._oMatchResultsDialog) {
+                this._oMatchResultsDialog = await Fragment.load({
+                    id: this.getView().getId(),
+                    name: "cvmanagement.fragment.MatchResultsDialog",
+                    controller: this
+                });
+                this.getView().addDependent(this._oMatchResultsDialog);
+            }
+
+            this._oMatchResultsDialog.setModel(oMatchResultsModel, "matchResults");
+            this._oMatchResultsDialog.open();
+        },
+
+        /**
+         * Handle match result item press - navigate to job detail
+         * @param {sap.ui.base.Event} oEvent Press event
+         */
+        onMatchResultItemPress: function (oEvent) {
+            const oItem = oEvent.getSource();
+            const oContext = oItem.getBindingContext("matchResults");
+            const sJobId = oContext.getProperty("jobPostingId");
+
+            if (this._oMatchResultsDialog) {
+                this._oMatchResultsDialog.close();
+            }
+            this.getRouter().navTo("jobDetail", { jobId: sJobId });
+        },
+
+        /**
+         * Handle view all matches button press
+         */
+        onViewAllMatchesPress: function () {
+            if (this._oMatchResultsDialog) {
+                this._oMatchResultsDialog.close();
+                const sCandidateId = this._oMatchResultsDialog.getModel("matchResults").getProperty("/candidateId");
+                this.navigateToCandidateDetail(sCandidateId);
+            }
+        },
+
+        /**
+         * Handle dialog close button
+         */
+        onMatchResultsDialogClose: function () {
+            if (this._oMatchResultsDialog) {
+                this._oMatchResultsDialog.close();
+            }
+        },
+
+        /**
+         * Format semantic score value
+         * @param {number} nScore Semantic score
+         * @returns {string} Formatted score or "N/A"
+         */
+        formatSemanticScore: function (nScore) {
+            if (nScore === null || nScore === undefined) {
+                return "N/A";
+            }
+            return Math.round(nScore);
+        },
+
+        /**
+         * Format semantic score unit
+         * @param {number} nScore Semantic score
+         * @returns {string} Unit or empty string
+         */
+        formatSemanticScoreUnit: function (nScore) {
+            if (nScore === null || nScore === undefined) {
+                return "";
+            }
+            return "%";
+        },
+
+        /**
+         * Format semantic score state
+         * @param {number} nScore Semantic score
+         * @returns {string} State or None
+         */
+        formatSemanticScoreState: function (nScore) {
+            if (nScore === null || nScore === undefined) {
+                return "None";
+            }
+            if (nScore >= 80) return "Success";
+            if (nScore >= 60) return "Warning";
+            return "Error";
         },
 
         /**
@@ -1633,6 +1907,56 @@ sap.ui.define([
         },
 
         /**
+         * Load priority dashboard data - jobs with hot candidates
+         * @private
+         */
+        _loadPriorityDashboard: function () {
+            const oDashboardModel = this.getModel("dashboard");
+            oDashboardModel.setProperty("/priorityData/isLoading", true);
+
+            const oModel = this.getModel();
+
+            // Fetch jobs with hot candidates (score >= 80%)
+            oModel.bindList("/JobPostings", undefined, undefined, undefined, {
+                $expand: "matchResults($filter=overallScore ge 80;$orderby=overallScore desc;$top=5)",
+                $filter: "status eq 'published'"
+            }).requestContexts(0, 100).then(aContexts => {
+                const aJobsWithHot = [];
+                let totalHot = 0;
+                let totalWarm = 0;
+
+                aContexts.forEach(oContext => {
+                    const oJob = oContext.getObject();
+                    const aMatches = oJob.matchResults || [];
+
+                    // Count hot (>=80) and warm (60-79) candidates
+                    const hotCount = aMatches.filter(m => m.overallScore >= 80).length;
+                    const warmCount = aMatches.filter(m => m.overallScore >= 60 && m.overallScore < 80).length;
+
+                    if (hotCount > 0) {
+                        aJobsWithHot.push({
+                            ID: oJob.ID,
+                            title: oJob.title,
+                            department: oJob.department,
+                            hotCount: hotCount,
+                            warmCount: warmCount
+                        });
+                        totalHot += hotCount;
+                        totalWarm += warmCount;
+                    }
+                });
+
+                oDashboardModel.setProperty("/priorityData/jobsWithHotCandidates", aJobsWithHot);
+                oDashboardModel.setProperty("/priorityData/totalHotCandidates", totalHot);
+                oDashboardModel.setProperty("/priorityData/totalWarmCandidates", totalWarm);
+                oDashboardModel.setProperty("/priorityData/isLoading", false);
+            }).catch(oError => {
+                console.error("Failed to load priority dashboard:", oError);
+                oDashboardModel.setProperty("/priorityData/isLoading", false);
+            });
+        },
+
+        /**
          * Handle run bulk matching button press
          */
         onRunBulkMatching: function () {
@@ -1796,6 +2120,9 @@ sap.ui.define([
 
             // Load AI insights
             this._loadAIInsights();
+
+            // Load priority candidates (Smart Screening Assistant)
+            this._loadPriorityCandidatesData();
 
             oDashboardModel.setProperty("/isLoading", false);
         },
@@ -2300,6 +2627,765 @@ sap.ui.define([
             sap.m.MessageBox.information(oRecommendation.description, {
                 title: oRecommendation.title
             });
+        },
+
+        // ============================================================
+        // JOBS TAB HANDLERS
+        // ============================================================
+
+        /**
+         * Load jobs section data - jobs list with Hot/Warm counts and KPIs
+         * @private
+         */
+        _loadJobsSectionData: async function () {
+            const oDashboardModel = this.getModel("dashboard");
+            const oModel = this.getModel();
+
+            if (!oModel) {
+                return;
+            }
+
+            try {
+                // Get all jobs with their match results
+                const oJobsBinding = oModel.bindList("/JobPostings", null, null, null, {
+                    $expand: "matchResults"
+                });
+
+                const aJobContexts = await oJobsBinding.requestContexts(0, 200);
+                const aJobsList = [];
+                let iTotalJobs = 0;
+                let iPublishedJobs = 0;
+                let iJobsWithHotCandidates = 0;
+                let iJobsNeedingMatches = 0;
+
+                for (const oJobContext of aJobContexts) {
+                    const oJob = oJobContext.getObject();
+                    const aMatches = oJob.matchResults || [];
+
+                    // Count Hot (>=80) and Warm (60-79) candidates
+                    let iHotCount = 0;
+                    let iWarmCount = 0;
+                    let nTopMatchScore = 0;
+
+                    aMatches.forEach(oMatch => {
+                        const nScore = oMatch.overallScore || 0;
+                        if (nScore >= 80) {
+                            iHotCount++;
+                        } else if (nScore >= 60) {
+                            iWarmCount++;
+                        }
+                        if (nScore > nTopMatchScore) {
+                            nTopMatchScore = nScore;
+                        }
+                    });
+
+                    // Build job list item
+                    aJobsList.push({
+                        ID: oJob.ID,
+                        title: oJob.title,
+                        department: oJob.department || "",
+                        location: oJob.location || "",
+                        status: oJob.status,
+                        employmentType: oJob.employmentType || "",
+                        hotCount: iHotCount,
+                        warmCount: iWarmCount,
+                        topMatchScore: nTopMatchScore > 0 ? Math.round(nTopMatchScore) : 0,
+                        totalMatches: aMatches.length
+                    });
+
+                    // Update KPI counts
+                    iTotalJobs++;
+                    if (oJob.status === "published") {
+                        iPublishedJobs++;
+                        if (aMatches.length === 0) {
+                            iJobsNeedingMatches++;
+                        }
+                    }
+                    if (iHotCount > 0) {
+                        iJobsWithHotCandidates++;
+                    }
+                }
+
+                // Sort by hot count descending, then by title
+                aJobsList.sort((a, b) => {
+                    if (b.hotCount !== a.hotCount) return b.hotCount - a.hotCount;
+                    return a.title.localeCompare(b.title);
+                });
+
+                // Update model
+                oDashboardModel.setProperty("/jobsList", aJobsList);
+                oDashboardModel.setProperty("/jobsKPI", {
+                    totalJobs: iTotalJobs,
+                    publishedJobs: iPublishedJobs,
+                    jobsWithHotCandidates: iJobsWithHotCandidates,
+                    jobsNeedingMatches: iJobsNeedingMatches
+                });
+
+                // Store original list for filtering
+                this._aOriginalJobsList = aJobsList;
+
+            } catch (error) {
+                console.error("Failed to load jobs section data:", error);
+                oDashboardModel.setProperty("/jobsList", []);
+            }
+        },
+
+        /**
+         * Handle KPI card press - Total Jobs (reset filter)
+         */
+        onJobsKPICardPress: function () {
+            this._filterJobsList("all");
+            this._updateJobStatusFilter("all");
+        },
+
+        /**
+         * Handle KPI card press - Published Jobs
+         */
+        onJobsKPIPublishedPress: function () {
+            this._filterJobsList("published");
+            this._updateJobStatusFilter("published");
+        },
+
+        /**
+         * Handle KPI card press - Jobs with Hot Candidates
+         */
+        onJobsKPIHotPress: function () {
+            this._filterJobsList("withHot");
+            this._updateJobStatusFilter("all");
+        },
+
+        /**
+         * Handle KPI card press - Jobs Needing Matches
+         */
+        onJobsKPINeedingMatchesPress: function () {
+            this._filterJobsList("needingMatches");
+            this._updateJobStatusFilter("published");
+        },
+
+        /**
+         * Filter jobs list based on filter key
+         * @param {string} sFilterKey Filter key
+         * @private
+         */
+        _filterJobsList: function (sFilterKey) {
+            const oDashboardModel = this.getModel("dashboard");
+            const aOriginalList = this._aOriginalJobsList || [];
+
+            let aFilteredList = aOriginalList;
+
+            switch (sFilterKey) {
+                case "published":
+                    aFilteredList = aOriginalList.filter(oJob => oJob.status === "published");
+                    break;
+                case "draft":
+                    aFilteredList = aOriginalList.filter(oJob => oJob.status === "draft");
+                    break;
+                case "closed":
+                    aFilteredList = aOriginalList.filter(oJob => oJob.status === "closed");
+                    break;
+                case "withHot":
+                    aFilteredList = aOriginalList.filter(oJob => oJob.hotCount > 0);
+                    break;
+                case "needingMatches":
+                    aFilteredList = aOriginalList.filter(oJob =>
+                        oJob.status === "published" && oJob.totalMatches === 0
+                    );
+                    break;
+                // "all" - no filter
+            }
+
+            oDashboardModel.setProperty("/jobsList", aFilteredList);
+            oDashboardModel.setProperty("/jobsListFilter", sFilterKey);
+        },
+
+        /**
+         * Update the status filter segmented button
+         * @param {string} sKey Selected key
+         * @private
+         */
+        _updateJobStatusFilter: function (sKey) {
+            const oSegmentedButton = this.byId("jobStatusFilterSegment");
+            if (oSegmentedButton) {
+                oSegmentedButton.setSelectedKey(sKey);
+            }
+        },
+
+        /**
+         * Handle job status filter change
+         * @param {sap.ui.base.Event} oEvent Selection change event
+         */
+        onJobStatusFilterChange: function (oEvent) {
+            const sKey = oEvent.getParameter("item").getKey();
+            this._filterJobsList(sKey);
+        },
+
+        /**
+         * Handle department filter change
+         * @param {sap.ui.base.Event} oEvent Selection change event
+         */
+        onDepartmentFilterChange: function (oEvent) {
+            const sSelectedKey = oEvent.getParameter("selectedItem")?.getKey() || "";
+            const oDashboardModel = this.getModel("dashboard");
+            const aOriginalList = this._aOriginalJobsList || [];
+
+            let aFilteredList = aOriginalList;
+            if (sSelectedKey) {
+                aFilteredList = aOriginalList.filter(oJob => oJob.department === sSelectedKey);
+            }
+
+            oDashboardModel.setProperty("/jobsList", aFilteredList);
+        },
+
+        /**
+         * Handle job search
+         * @param {sap.ui.base.Event} oEvent Search event
+         */
+        onJobSearch: function (oEvent) {
+            const sQuery = oEvent.getParameter("query")?.toLowerCase() || "";
+            const oDashboardModel = this.getModel("dashboard");
+            const aOriginalList = this._aOriginalJobsList || [];
+
+            if (!sQuery) {
+                oDashboardModel.setProperty("/jobsList", aOriginalList);
+                return;
+            }
+
+            const aFilteredList = aOriginalList.filter(oJob =>
+                oJob.title.toLowerCase().includes(sQuery) ||
+                oJob.department.toLowerCase().includes(sQuery) ||
+                oJob.location.toLowerCase().includes(sQuery)
+            );
+
+            oDashboardModel.setProperty("/jobsList", aFilteredList);
+        },
+
+        /**
+         * Handle job row press - navigate to job detail
+         * @param {sap.ui.base.Event} oEvent Press event
+         */
+        onJobPress: function (oEvent) {
+            const oItem = oEvent.getSource();
+            const oContext = oItem.getBindingContext("dashboard");
+            const sJobId = oContext.getProperty("ID");
+
+            this.getRouter().navTo("jobDetail", {
+                jobId: sJobId
+            });
+        },
+
+        /**
+         * Handle review hot candidates button
+         * @param {sap.ui.base.Event} oEvent Press event
+         */
+        onReviewJobCandidates: function (oEvent) {
+            const oButton = oEvent.getSource();
+            const oContext = oButton.getBindingContext("dashboard");
+            const sJobId = oContext.getProperty("ID");
+
+            // Navigate to job detail - Hot filter will be applied there
+            this.getRouter().navTo("jobDetail", {
+                jobId: sJobId
+            });
+        },
+
+        /**
+         * Handle run matching button
+         * @param {sap.ui.base.Event} oEvent Press event
+         */
+        onRunJobMatching: async function (oEvent) {
+            const oButton = oEvent.getSource();
+            const oContext = oButton.getBindingContext("dashboard");
+            const sJobId = oContext.getProperty("ID");
+            const sJobTitle = oContext.getProperty("title");
+
+            oButton.setBusy(true);
+
+            try {
+                const oModel = this.getModel();
+                const oAction = oModel.bindContext("/runMatchingForJob(...)");
+                oAction.setParameter("jobPostingId", sJobId);
+
+                await oAction.execute();
+                const oResult = oAction.getBoundContext().getObject();
+
+                this.showSuccess(`Matching complete: ${oResult.matchesCreated} new matches for "${sJobTitle}"`);
+
+                // Refresh the jobs list
+                this._loadJobsSectionData();
+
+            } catch (error) {
+                console.error("Matching failed:", error);
+                this.showError("Failed to run matching: " + (error.message || "Unknown error"));
+            } finally {
+                oButton.setBusy(false);
+            }
+        },
+
+        /**
+         * Handle edit job button
+         * @param {sap.ui.base.Event} oEvent Press event
+         */
+        onEditJob: function (oEvent) {
+            const oButton = oEvent.getSource();
+            const oContext = oButton.getBindingContext("dashboard");
+            const sJobId = oContext.getProperty("ID");
+
+            // Navigate to job detail for editing
+            this.getRouter().navTo("jobDetail", {
+                jobId: sJobId
+            });
+        },
+
+        /**
+         * Handle refresh jobs button
+         */
+        onRefreshJobs: function () {
+            this._loadJobsSectionData();
+            this.showSuccess("Jobs refreshed");
+        },
+
+        // ============================================================
+        // PRIORITY CANDIDATES (SMART SCREENING ASSISTANT) HANDLERS
+        // ============================================================
+
+        /**
+         * Load priority candidates data - jobs with Hot/Warm candidates
+         * @private
+         */
+        _loadPriorityCandidatesData: async function () {
+            const oDashboardModel = this.getModel("dashboard");
+            const oModel = this.getModel();
+
+            if (!oModel) {
+                oDashboardModel.setProperty("/priorityData/isLoading", false);
+                return;
+            }
+
+            oDashboardModel.setProperty("/priorityData/isLoading", true);
+
+            try {
+                // Get all published jobs with their match results
+                const oJobsBinding = oModel.bindList("/JobPostings", null, null,
+                    [new Filter("status", FilterOperator.EQ, "published")], {
+                    $expand: "matchResults"
+                });
+
+                const aJobContexts = await oJobsBinding.requestContexts(0, 100);
+                const aJobsWithHotCandidates = [];
+                let iTotalHot = 0;
+                let iTotalWarm = 0;
+
+                for (const oJobContext of aJobContexts) {
+                    const oJob = oJobContext.getObject();
+                    const aMatches = oJob.matchResults || [];
+
+                    // Count Hot (>=80) and Warm (60-79) candidates
+                    let iHotCount = 0;
+                    let iWarmCount = 0;
+
+                    aMatches.forEach(oMatch => {
+                        const nScore = oMatch.overallScore || 0;
+                        if (nScore >= 80) {
+                            iHotCount++;
+                        } else if (nScore >= 60) {
+                            iWarmCount++;
+                        }
+                    });
+
+                    // Only include jobs with Hot or Warm candidates
+                    if (iHotCount > 0 || iWarmCount > 0) {
+                        aJobsWithHotCandidates.push({
+                            jobId: oJob.ID,
+                            jobTitle: oJob.title,
+                            department: oJob.department || "",
+                            hotCount: iHotCount,
+                            warmCount: iWarmCount,
+                            totalMatches: aMatches.length
+                        });
+                    }
+
+                    iTotalHot += iHotCount;
+                    iTotalWarm += iWarmCount;
+                }
+
+                // Sort by hot count descending
+                aJobsWithHotCandidates.sort((a, b) => b.hotCount - a.hotCount);
+
+                oDashboardModel.setProperty("/priorityData/jobsWithHotCandidates", aJobsWithHotCandidates);
+                oDashboardModel.setProperty("/priorityData/totalHotCandidates", iTotalHot);
+                oDashboardModel.setProperty("/priorityData/totalWarmCandidates", iTotalWarm);
+
+            } catch (error) {
+                console.error("Failed to load priority candidates:", error);
+                oDashboardModel.setProperty("/priorityData/jobsWithHotCandidates", []);
+            } finally {
+                oDashboardModel.setProperty("/priorityData/isLoading", false);
+            }
+        },
+
+        /**
+         * Refresh priority candidates
+         */
+        onRefreshPriorityCandidates: function () {
+            this._loadPriorityCandidatesData();
+            this.showSuccess("Priority candidates refreshed");
+        },
+
+        /**
+         * Handle priority job row press
+         * @param {sap.ui.base.Event} oEvent Press event
+         */
+        onPriorityJobPress: function (oEvent) {
+            const oItem = oEvent.getSource();
+            const oContext = oItem.getBindingContext("dashboard");
+            const sJobId = oContext.getProperty("jobId");
+
+            this.navigateToJobDetail(sJobId);
+        },
+
+        /**
+         * Handle review priority candidates button
+         * @param {sap.ui.base.Event} oEvent Press event
+         */
+        onReviewPriorityCandidates: function (oEvent) {
+            const oButton = oEvent.getSource();
+            const oContext = oButton.getBindingContext("dashboard");
+            const sJobId = oContext.getProperty("jobId");
+
+            // Navigate to job detail matches tab
+            this.getRouter().navTo("jobDetail", {
+                jobId: sJobId
+            });
+        },
+
+        /**
+         * Refresh priority dashboard
+         */
+        onRefreshPriorityDashboard: function () {
+            this._loadPriorityDashboard();
+        },
+
+        /**
+         * Navigate directly to job's candidate matches tab
+         * @param {sap.ui.base.Event} oEvent - The press event
+         */
+        onReviewPriorityJob: function (oEvent) {
+            oEvent.stopPropagation(); // Prevent row click
+            const oButton = oEvent.getSource();
+            const oListItem = oButton.getParent().getParent(); // HBox -> CustomListItem
+            const sJobId = oListItem.data("jobId");
+            if (sJobId) {
+                this.getRouter().navTo("jobDetail", {
+                    jobId: sJobId,
+                    "?query": { tab: "matches" }
+                });
+            }
+        },
+
+        /**
+         * Handle view all jobs button
+         */
+        onViewAllJobs: function () {
+            // Navigate to jobs management - for now show info
+            this.showInfo("Jobs management page coming soon");
+        },
+
+        // ============================================================
+        // AI SEARCH ASSISTANT HANDLERS
+        // ============================================================
+
+        /**
+         * Create the AI FAB button programmatically
+         * @private
+         */
+        _createAIFAB: function () {
+            if (this._fabCreated) {
+                return;
+            }
+            this._fabCreated = true;
+
+            // Create a container div for the FAB
+            let oContainer = document.getElementById("aiFabContainer");
+            if (!oContainer) {
+                oContainer = document.createElement("div");
+                oContainer.id = "aiFabContainer";
+                document.body.appendChild(oContainer);
+            }
+
+            // Create FAB button
+            const oFAB = new sap.m.Button({
+                icon: "sap-icon://da-2",
+                tooltip: this.getModel("i18n").getResourceBundle().getText("aiAssistantTooltip"),
+                type: "Emphasized",
+                press: this.onAIAssistantOpen.bind(this)
+            });
+            oFAB.addStyleClass("aiAssistantFAB");
+
+            // Place in the dedicated container
+            oFAB.placeAt(oContainer);
+        },
+
+        /**
+         * Open AI Assistant dialog
+         */
+        onAIAssistantOpen: async function () {
+            // Load dialog fragment if not already loaded
+            if (!this._oAIAssistantDialog) {
+                this._oAIAssistantDialog = await Fragment.load({
+                    id: this.getView().getId(),
+                    name: "cvmanagement.fragment.AIAssistantDialog",
+                    controller: this
+                });
+                this.getView().addDependent(this._oAIAssistantDialog);
+            }
+
+            this._oAIAssistantDialog.open();
+            this.getModel("aiAssistant").setProperty("/isOpen", true);
+
+            // Update quick actions based on current context
+            this._updateAIQuickActions();
+
+            // Focus input field
+            setTimeout(() => {
+                const oInput = this.byId("aiChatInput");
+                if (oInput) {
+                    oInput.focus();
+                }
+            }, 300);
+        },
+
+        /**
+         * Close AI Assistant dialog
+         */
+        onAIAssistantClose: function () {
+            if (this._oAIAssistantDialog) {
+                this._oAIAssistantDialog.close();
+                this.getModel("aiAssistant").setProperty("/isOpen", false);
+            }
+        },
+
+        /**
+         * Handle AI message send
+         */
+        onAISendMessage: async function () {
+            const oAIModel = this.getModel("aiAssistant");
+            const sQuery = oAIModel.getProperty("/inputValue");
+
+            if (!sQuery || !sQuery.trim()) {
+                return;
+            }
+
+            // Clear input
+            oAIModel.setProperty("/inputValue", "");
+
+            // Add user message
+            const aMessages = oAIModel.getProperty("/messages") || [];
+            aMessages.push({
+                type: "user",
+                text: sQuery,
+                timestamp: new Date()
+            });
+            oAIModel.setProperty("/messages", aMessages);
+
+            // Scroll to bottom
+            this._scrollAIChatToBottom();
+
+            // Set loading
+            oAIModel.setProperty("/isLoading", true);
+
+            try {
+                // Call AI search action
+                const oModel = this.getModel();
+                const oContext = oAIModel.getProperty("/currentContext");
+
+                const oActionBinding = oModel.bindContext("/aiSearch(...)");
+                oActionBinding.setParameter("query", sQuery);
+                if (oContext.jobId) {
+                    oActionBinding.setParameter("contextJobId", oContext.jobId);
+                }
+                if (oContext.candidateId) {
+                    oActionBinding.setParameter("contextCandidateId", oContext.candidateId);
+                }
+
+                await oActionBinding.execute();
+                const oResult = oActionBinding.getBoundContext().getObject();
+
+                // Add AI response
+                const aUpdatedMessages = oAIModel.getProperty("/messages");
+                aUpdatedMessages.push({
+                    type: "assistant",
+                    text: oResult.message || "Here are the results:",
+                    results: (oResult.results || []).slice(0, 3).map(r => ({
+                        type: r.type,
+                        id: r.id,
+                        title: r.title,
+                        subtitle: r.subtitle,
+                        score: r.score
+                    })),
+                    totalCount: oResult.totalCount || 0,
+                    intent: oResult.intent,
+                    allResults: oResult.results || [],
+                    timestamp: new Date()
+                });
+                oAIModel.setProperty("/messages", aUpdatedMessages);
+
+            } catch (error) {
+                console.error("AI Search error:", error);
+
+                // Add error message
+                const aErrorMessages = oAIModel.getProperty("/messages");
+                aErrorMessages.push({
+                    type: "assistant",
+                    text: "Sorry, I couldn't process your request. Please try again.",
+                    timestamp: new Date()
+                });
+                oAIModel.setProperty("/messages", aErrorMessages);
+            } finally {
+                oAIModel.setProperty("/isLoading", false);
+                this._scrollAIChatToBottom();
+            }
+        },
+
+        /**
+         * Clear chat history
+         */
+        onClearChat: function () {
+            const oAIModel = this.getModel("aiAssistant");
+            oAIModel.setProperty("/messages", []);
+            oAIModel.setProperty("/inputValue", "");
+        },
+
+        /**
+         * Handle quick action press
+         * @param {sap.ui.base.Event} oEvent Press event
+         */
+        onAIQuickAction: function (oEvent) {
+            const oSource = oEvent.getSource();
+            const oContext = oSource.getBindingContext("aiAssistant");
+
+            if (oContext) {
+                const sQuery = oContext.getProperty("query");
+                const oAIModel = this.getModel("aiAssistant");
+                oAIModel.setProperty("/inputValue", sQuery);
+
+                // Trigger send
+                this.onAISendMessage();
+            }
+        },
+
+        /**
+         * Navigate to AI result item
+         * @param {sap.ui.base.Event} oEvent Press event
+         */
+        onAIResultNavigate: function (oEvent) {
+            const oSource = oEvent.getSource();
+            // Get the parent HBox which has the binding context
+            const oResultCard = oSource.getParent();
+            const oContext = oResultCard.getBindingContext("aiAssistant");
+
+            if (oContext) {
+                const sType = oContext.getProperty("type");
+                const sId = oContext.getProperty("id");
+
+                // Close dialog
+                this.onAIAssistantClose();
+
+                // Navigate based on type
+                if (sType === "candidate") {
+                    this.navigateToCandidateDetail(sId);
+                } else if (sType === "job") {
+                    this.navigateToJobDetail(sId);
+                }
+            }
+        },
+
+        /**
+         * Handle see all results link
+         * @param {sap.ui.base.Event} oEvent Press event
+         */
+        onAISeeAllResults: function (oEvent) {
+            const oSource = oEvent.getSource();
+            const oMessageContext = oSource.getParent().getParent().getBindingContext("aiAssistant");
+
+            if (oMessageContext) {
+                const sIntent = oMessageContext.getProperty("intent");
+                const aAllResults = oMessageContext.getProperty("allResults") || [];
+
+                // Close dialog
+                this.onAIAssistantClose();
+
+                // Navigate to appropriate tab with filter applied
+                if (sIntent === "candidate_search" || sIntent === "similar_candidates") {
+                    // Switch to candidates tab
+                    this._selectTab("candidates");
+                    this.showInfo(`Found ${aAllResults.length} candidates`);
+                } else if (sIntent === "job_matches" || sIntent === "job_fit") {
+                    // Could navigate to job detail with matches
+                    this.showInfo(`Found ${aAllResults.length} results`);
+                }
+            }
+        },
+
+        /**
+         * Update quick actions based on current context
+         * @private
+         */
+        _updateAIQuickActions: function () {
+            const oAIModel = this.getModel("aiAssistant");
+            const oContext = oAIModel.getProperty("/currentContext");
+
+            const aQuickActions = [
+                { text: "Top candidates", query: "Top candidates for Senior Developer" },
+                { text: "Find React devs", query: "Find React developers" },
+                { text: "Best matches", query: "Show best candidate matches" }
+            ];
+
+            // Add context-specific actions
+            if (oContext.jobId) {
+                aQuickActions.unshift({
+                    text: "Top for this job",
+                    query: "Top candidates for this job"
+                });
+            }
+
+            if (oContext.candidateId) {
+                aQuickActions.unshift({
+                    text: "Similar candidates",
+                    query: "Find similar candidates"
+                });
+            }
+
+            oAIModel.setProperty("/quickActions", aQuickActions.slice(0, 4));
+        },
+
+        /**
+         * Scroll AI chat to bottom
+         * @private
+         */
+        _scrollAIChatToBottom: function () {
+            setTimeout(() => {
+                const oScrollContainer = this.byId("aiChatScroll");
+                if (oScrollContainer) {
+                    const oDomRef = oScrollContainer.getDomRef();
+                    if (oDomRef) {
+                        oDomRef.scrollTop = oDomRef.scrollHeight;
+                    }
+                }
+            }, 100);
+        },
+
+        /**
+         * Set AI assistant context
+         * @param {string} sJobId Job ID
+         * @param {string} sCandidateId Candidate ID
+         */
+        setAIAssistantContext: function (sJobId, sCandidateId) {
+            const oAIModel = this.getModel("aiAssistant");
+            if (oAIModel) {
+                oAIModel.setProperty("/currentContext/jobId", sJobId || null);
+                oAIModel.setProperty("/currentContext/candidateId", sCandidateId || null);
+                this._updateAIQuickActions();
+            }
         }
 
     });
