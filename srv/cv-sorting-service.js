@@ -438,6 +438,38 @@ module.exports = class CVSortingService extends cds.ApplicationService {
             return SELECT.one.from(Interviews).where({ ID: interviewId });
         });
 
+        // Send webhook when interview is created
+        this.after('CREATE', 'Interviews', async (data, req) => {
+            if (process.env.ENABLE_WEBHOOKS !== 'true') return;
+
+            try {
+                const result = await webhookHelper.sendInterviewScheduledWebhook(
+                    data.ID,
+                    data.candidate_ID,
+                    data.jobPosting_ID || null,
+                    data.scheduledAt,
+                    data.interviewerEmail || null
+                );
+
+                if (result.success) {
+                    LOG.info('Interview scheduled webhook sent successfully', {
+                        interviewId: data.ID,
+                        webhookId: result.webhookId
+                    });
+                } else {
+                    LOG.warn('Interview scheduled webhook failed (non-blocking)', {
+                        interviewId: data.ID,
+                        error: result.error
+                    });
+                }
+            } catch (webhookError) {
+                LOG.error('Unexpected interview webhook error (non-blocking)', {
+                    interviewId: data.ID,
+                    error: webhookError.message
+                });
+            }
+        });
+
         // ----- Candidate Functions -----
 
         this.on('searchCandidates', async (req) => {
