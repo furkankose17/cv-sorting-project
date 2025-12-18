@@ -178,7 +178,7 @@
 
                         <!-- Candidate -->
                         <Link
-                            text="{= ${candidate/firstName} + ' ' + ${candidate/lastName}}"
+                            text="{= %{candidate/firstName} + ' ' + %{candidate/lastName}}"
                             press=".onCandidateLinkPress"
                             visible="{= %{candidate_ID} ? true : false}" />
 

@@ -27,7 +27,7 @@ def test_process_with_structured_extraction():
         'text': 'John Doe\njohn@example.com\n+1234567890',
         'pages': 1,
         'confidence': 85.0,
-        'method': 'paddleocr',
+        'method': 'rapidocr',
         'language': 'en',
         'text_length': 35,
         'content_hash': 'abc123'

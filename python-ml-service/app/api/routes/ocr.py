@@ -8,7 +8,14 @@ from typing import Dict, Any, List, Optional
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
-from app.api.routes.ocr_extraction import extract_structured_data, ExtractStructuredRequest
+from app.api.routes.ocr_extraction import (
+    ExtractStructuredRequest,
+    extract_tier1_personal_info,
+    extract_tier2_professional,
+    extract_raw_sections,
+    separate_columns,
+    extract_from_columns
+)
 
 router = APIRouter(prefix="/api/ocr", tags=["OCR"])
 logger = logging.getLogger(__name__)
@@ -24,6 +31,14 @@ class ProcessBase64Request(BaseModel):
     extract_structured: bool = Field(True, description="Extract structured data from CV")
 
 
+class OCRLineData(BaseModel):
+    """Line data with bounding box coordinates."""
+    text: str
+    confidence: float
+    bbox: List[Any]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]] format
+    page: Optional[int] = 1
+
+
 class OCRResponse(BaseModel):
     """Response model for OCR processing."""
     text: str
@@ -34,6 +49,9 @@ class OCRResponse(BaseModel):
     text_length: int
     content_hash: str
     structured_data: Optional[Dict[str, Any]] = None
+    lines: Optional[List[OCRLineData]] = None  # Lines with bounding boxes for highlighting
+    preview_image: Optional[str] = None  # Base64-encoded first page image for overlay
+    preview_dimensions: Optional[Dict[str, int]] = None  # Width/height of preview image
 
 
 class SupportedFormatsResponse(BaseModel):
@@ -85,13 +103,43 @@ async def process_document(request: ProcessBase64Request) -> Dict[str, Any]:
         # Extract structured data if requested
         structured_data = None
         if request.extract_structured and result.get('text'):
-            # Call the structured extraction endpoint function
-            extraction_request = ExtractStructuredRequest(
-                text=result['text'],
-                language=request.language
-            )
-            structured_result = await extract_structured_data(extraction_request)
-            structured_data = structured_result
+            # Call extraction utility functions directly (avoid circular import)
+            text = result['text']
+            lines = result.get('lines', [])
+
+            # Tier 1: Always from full text
+            tier1 = extract_tier1_personal_info(text)
+
+            # Tier 2: Use column-aware extraction if lines with bounding boxes are available
+            if lines and len(lines) > 0:
+                # Separate columns based on x-coordinates
+                left_text, right_text = separate_columns(lines)
+                logger.info(f"Column separation: left={len(left_text)} chars, right={len(right_text)} chars")
+
+                # Extract from separated columns
+                tier2 = extract_from_columns(left_text, right_text)
+
+                # Fall back to full text if column extraction yields nothing
+                if not tier2.get("workHistory") and not tier2.get("education") and not tier2.get("skills"):
+                    logger.info("Column extraction yielded no results, falling back to full text")
+                    tier2 = extract_tier2_professional(text)
+            else:
+                # No lines available, use traditional extraction
+                tier2 = extract_tier2_professional(text)
+
+            raw_sections = extract_raw_sections(text)
+
+            # Calculate overall confidence
+            confidences = [f.confidence for f in tier1.values() if hasattr(f, 'confidence')]
+            overall_confidence = sum(confidences) / len(confidences) if confidences else 0
+
+            structured_data = {
+                "overall_confidence": overall_confidence,
+                "tier1": {k: {"value": v.value, "confidence": v.confidence} for k, v in tier1.items()},
+                "tier2": tier2,
+                "tier3": {"references": {"value": None, "confidence": 0}, "certifications": []},
+                "raw_sections": raw_sections
+            }
 
         return {
             "text": result['text'],
@@ -101,7 +149,10 @@ async def process_document(request: ProcessBase64Request) -> Dict[str, Any]:
             "language": result['language'],
             "text_length": result['text_length'],
             "content_hash": result['content_hash'],
-            "structured_data": structured_data
+            "structured_data": structured_data,
+            "lines": result.get('lines', []),  # Include lines with bounding boxes
+            "preview_image": result.get('preview_image'),  # Base64 first page for highlighting
+            "preview_dimensions": result.get('preview_dimensions'),  # Image dimensions
         }
 
     except ValueError as e:
@@ -172,13 +223,43 @@ async def process_uploaded_file(
         # Extract structured data if requested
         structured_data = None
         if extract_structured and result.get('text'):
-            # Call the structured extraction endpoint function
-            extraction_request = ExtractStructuredRequest(
-                text=result['text'],
-                language=language
-            )
-            structured_result = await extract_structured_data(extraction_request)
-            structured_data = structured_result
+            # Call extraction utility functions directly (avoid circular import)
+            text = result['text']
+            lines = result.get('lines', [])
+
+            # Tier 1: Always from full text
+            tier1 = extract_tier1_personal_info(text)
+
+            # Tier 2: Use column-aware extraction if lines with bounding boxes are available
+            if lines and len(lines) > 0:
+                # Separate columns based on x-coordinates
+                left_text, right_text = separate_columns(lines)
+                logger.info(f"Column separation: left={len(left_text)} chars, right={len(right_text)} chars")
+
+                # Extract from separated columns
+                tier2 = extract_from_columns(left_text, right_text)
+
+                # Fall back to full text if column extraction yields nothing
+                if not tier2.get("workHistory") and not tier2.get("education") and not tier2.get("skills"):
+                    logger.info("Column extraction yielded no results, falling back to full text")
+                    tier2 = extract_tier2_professional(text)
+            else:
+                # No lines available, use traditional extraction
+                tier2 = extract_tier2_professional(text)
+
+            raw_sections = extract_raw_sections(text)
+
+            # Calculate overall confidence
+            confidences = [f.confidence for f in tier1.values() if hasattr(f, 'confidence')]
+            overall_confidence = sum(confidences) / len(confidences) if confidences else 0
+
+            structured_data = {
+                "overall_confidence": overall_confidence,
+                "tier1": {k: {"value": v.value, "confidence": v.confidence} for k, v in tier1.items()},
+                "tier2": tier2,
+                "tier3": {"references": {"value": None, "confidence": 0}, "certifications": []},
+                "raw_sections": raw_sections
+            }
 
         return {
             "text": result['text'],
@@ -188,7 +269,10 @@ async def process_uploaded_file(
             "language": result['language'],
             "text_length": result['text_length'],
             "content_hash": result['content_hash'],
-            "structured_data": structured_data
+            "structured_data": structured_data,
+            "lines": result.get('lines', []),  # Include lines with bounding boxes
+            "preview_image": result.get('preview_image'),  # Base64 first page for highlighting
+            "preview_dimensions": result.get('preview_dimensions'),  # Image dimensions
         }
 
     except ValueError as e:

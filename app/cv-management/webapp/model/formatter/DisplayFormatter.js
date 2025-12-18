@@ -51,6 +51,27 @@ sap.ui.define([], function () {
         },
 
         /**
+         * Format datetime for display (e.g., interviews)
+         * @param {string|Date} vDate - Date value
+         * @returns {string} Formatted datetime (e.g., "Dec 15, 2024 14:30")
+         */
+        formatDateTime: function (vDate) {
+            if (!vDate) return "-";
+
+            const oDate = vDate instanceof Date ? vDate : new Date(vDate);
+            if (isNaN(oDate.getTime())) return "-";
+
+            return oDate.toLocaleDateString('en-US', {
+                month: 'short',
+                day: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
+        },
+
+        /**
          * Format education with institution and year range
          * @param {string} sInstitution - Institution name
          * @param {string} sStartDate - Start date (ISO format)

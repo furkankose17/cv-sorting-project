@@ -1,11 +1,12 @@
 sap.ui.define([
     "./BaseController",
     "sap/ui/model/json/JSONModel",
+    "sap/ui/core/Fragment",
     "../utils/MLServiceClient",
     "../model/formatter/DataFormatter",
     "../model/formatter/StatusFormatter",
     "../model/formatter/DisplayFormatter"
-], function (BaseController, JSONModel, MLServiceClient,
+], function (BaseController, JSONModel, Fragment, MLServiceClient,
              DataFormatter, StatusFormatter, DisplayFormatter) {
     "use strict";
 
@@ -31,7 +32,7 @@ sap.ui.define([
 
             // Bind the view to the candidate (using composite key for draft-enabled entity)
             this.getView().bindElement({
-                path: "/Candidates(ID='" + sCandidateId + "',IsActiveEntity=true)",
+                path: "/Candidates(ID=" + sCandidateId + ",IsActiveEntity=true)",
                 parameters: {
                     $expand: "status,country,skills($expand=skill),educations,experiences,interviews,matchResults($expand=jobPosting)"
                 }
@@ -95,10 +96,165 @@ sap.ui.define([
             this.openDialog("dialogs/FindSimilarDialog", {
                 candidateId: oContext.getProperty("ID"),
                 candidateName: sFirstName + " " + sLastName,
-                candidateInitials: this.formatInitials(sFirstName, sLastName),
+                candidateInitials: this.DisplayFormatter.formatInitials(sFirstName, sLastName),
                 email: oContext.getProperty("email"),
                 yearsOfExperience: oContext.getProperty("totalExperienceYears")
             });
+        },
+
+        /**
+         * Handle match with jobs button press
+         * Matches candidate against all published jobs
+         */
+        onMatchWithJobs: async function () {
+            const oContext = this.getView().getBindingContext();
+            const sCandidateId = oContext.getProperty("ID");
+            const sCandidateName = oContext.getProperty("firstName") + " " + oContext.getProperty("lastName");
+
+            this.setBusy(true);
+            try {
+                // Call the matchCandidateWithAllJobs action
+                const oModel = this.getModel();
+                const oAction = oModel.bindContext("/matchCandidateWithAllJobs(...)");
+                oAction.setParameter("candidateId", sCandidateId);
+                oAction.setParameter("minScore", 0);
+                oAction.setParameter("useSemanticMatching", true);
+
+                await oAction.execute();
+                const oResult = oAction.getBoundContext().getObject();
+
+                // Prepare match results for display
+                const aTopMatches = (oResult.topMatches || []).map((match, idx) => ({
+                    rank: idx + 1,
+                    jobPostingId: match.jobPostingId,
+                    jobTitle: match.jobTitle,
+                    overallScore: Math.round(match.overallScore),
+                    semanticScore: match.semanticScore
+                }));
+
+                // Create model for dialog
+                const oMatchResultsModel = new JSONModel({
+                    candidateName: sCandidateName,
+                    candidateId: sCandidateId,
+                    totalJobsProcessed: oResult.totalJobsProcessed,
+                    matchesCreated: oResult.matchesCreated,
+                    matchesUpdated: oResult.matchesUpdated,
+                    processingTime: oResult.processingTime,
+                    topMatches: aTopMatches
+                });
+
+                // Open the results dialog
+                this._openMatchResultsDialog(oMatchResultsModel);
+
+            } catch (error) {
+                console.error("Match with jobs failed:", error);
+                sap.m.MessageBox.error("Failed to match with jobs: " + (error.message || "Unknown error"));
+            } finally {
+                this.setBusy(false);
+            }
+        },
+
+        /**
+         * Open the match results dialog
+         * @param {sap.ui.model.json.JSONModel} oModel The match results model
+         * @private
+         */
+        _openMatchResultsDialog: async function (oModel) {
+            if (!this._oMatchResultsDialog) {
+                this._oMatchResultsDialog = await Fragment.load({
+                    id: this.getView().getId(),
+                    name: "cvmanagement.fragment.MatchResultsDialog",
+                    controller: this
+                });
+                this.getView().addDependent(this._oMatchResultsDialog);
+            }
+
+            this._oMatchResultsDialog.setModel(oModel, "matchResults");
+            this._oMatchResultsDialog.open();
+        },
+
+        /**
+         * Handle match result item press - navigate to job detail
+         * @param {sap.ui.base.Event} oEvent Press event
+         */
+        onMatchResultItemPress: function (oEvent) {
+            const oItem = oEvent.getSource();
+            const oContext = oItem.getBindingContext("matchResults");
+            const sJobId = oContext.getProperty("jobPostingId");
+
+            this._oMatchResultsDialog.close();
+            this.getRouter().navTo("jobDetail", { jobId: sJobId });
+        },
+
+        /**
+         * Handle view all matches button press
+         */
+        onViewAllMatchesPress: function () {
+            this._oMatchResultsDialog.close();
+            // Scroll to match results section
+            const oMatchSection = this.byId("matchResultsSection");
+            if (oMatchSection) {
+                oMatchSection.focus();
+            }
+            // Refresh the view to show new matches
+            this.getView().getBindingContext().refresh();
+        },
+
+        /**
+         * Handle dialog close button
+         */
+        onMatchResultsDialogClose: function () {
+            this._oMatchResultsDialog.close();
+            // Refresh the view to show new matches
+            this.getView().getBindingContext().refresh();
+        },
+
+        /**
+         * Format semantic score value
+         * @param {number} nScore Semantic score
+         * @returns {string} Formatted score or "N/A"
+         */
+        formatSemanticScore: function (nScore) {
+            if (nScore === null || nScore === undefined) {
+                return "N/A";
+            }
+            return Math.round(nScore);
+        },
+
+        /**
+         * Format semantic score unit
+         * @param {number} nScore Semantic score
+         * @returns {string} Unit or empty string
+         */
+        formatSemanticScoreUnit: function (nScore) {
+            if (nScore === null || nScore === undefined) {
+                return "";
+            }
+            return "%";
+        },
+
+        /**
+         * Format semantic score state
+         * @param {number} nScore Semantic score
+         * @returns {string} State or None
+         */
+        formatSemanticScoreState: function (nScore) {
+            if (nScore === null || nScore === undefined) {
+                return "None";
+            }
+            if (nScore >= 80) return "Success";
+            if (nScore >= 60) return "Warning";
+            return "Error";
+        },
+
+        /**
+         * Format visibility of Add Feedback button
+         * @param {string} sStatus Interview status
+         * @param {boolean} bFeedbackSubmitted Whether feedback was submitted
+         * @returns {boolean} True if button should be visible
+         */
+        formatShowFeedbackButton: function (sStatus, bFeedbackSubmitted) {
+            return sStatus === "completed" && !bFeedbackSubmitted;
         },
 
         /**
@@ -218,7 +374,7 @@ sap.ui.define([
             this.setBusy(true);
             try {
                 // Call the updateStatus action
-                await this.callAction("/Candidates(ID='" + sCandidateId + "',IsActiveEntity=true)/CVSortingService.updateStatus", {
+                await this.callAction("/Candidates(ID=" + sCandidateId + ",IsActiveEntity=true)/CVSortingService.updateStatus", {
                     newStatus: sNewStatus,
                     notes: sNotes || "",
                     notifyCandidate: bNotify || false
@@ -259,7 +415,7 @@ sap.ui.define([
             this.setBusy(true);
             try {
                 // Call the addSkill action
-                await this.callAction("/Candidates(ID='" + sCandidateId + "',IsActiveEntity=true)/CVSortingService.addSkill", {
+                await this.callAction("/Candidates(ID=" + sCandidateId + ",IsActiveEntity=true)/CVSortingService.addSkill", {
                     skillId: sSkillId,
                     proficiencyLevel: sProficiency,
                     yearsOfExperience: nYears || 0
@@ -288,7 +444,7 @@ sap.ui.define([
             try {
                 // Delete the candidate
                 const oModel = this.getModel();
-                const sPath = "/Candidates(ID='" + sCandidateId + "',IsActiveEntity=true)";
+                const sPath = "/Candidates(ID=" + sCandidateId + ",IsActiveEntity=true)";
                 oModel.delete(sPath);
                 await oModel.submitBatch("candidateGroup");
 
@@ -386,7 +542,7 @@ sap.ui.define([
             try {
                 // Call scheduleInterview action
                 const oModel = this.getModel();
-                const oContext = oModel.bindContext("/Candidates(ID='" + sCandidateId + "',IsActiveEntity=true)/CVSortingService.scheduleInterview");
+                const oContext = oModel.bindContext("/Candidates(ID=" + sCandidateId + ",IsActiveEntity=true)/CVSortingService.scheduleInterview");
 
                 oContext.setParameter("interviewType", oDialogModel.getProperty("/interviewType"));
                 oContext.setParameter("scheduledDate", oDialogModel.getProperty("/scheduledDate"));

@@ -91,6 +91,34 @@ sap.ui.define([], function () {
         },
 
         /**
+         * Format score to Hot/Warm/Cold badge text
+         * @param {number} nScore - Score value (0-100)
+         * @returns {string} Badge text (Hot, Warm, Cold)
+         */
+        formatScoreBadge: function (nScore) {
+            const score = parseFloat(nScore);
+            if (isNaN(score)) return "";
+
+            if (score >= 80) return "Hot";
+            if (score >= 60) return "Warm";
+            return "Cold";
+        },
+
+        /**
+         * Format score to badge icon
+         * @param {number} nScore - Score value (0-100)
+         * @returns {string} Icon URI
+         */
+        formatScoreBadgeIcon: function (nScore) {
+            const score = parseFloat(nScore);
+            if (isNaN(score)) return "";
+
+            if (score >= 80) return "sap-icon://status-positive";
+            if (score >= 60) return "sap-icon://status-critical";
+            return "sap-icon://status-negative";
+        },
+
+        /**
          * Check if job status is draft
          * @param {string} sStatus - Job status
          * @returns {boolean} True if status is 'draft'
@@ -100,12 +128,64 @@ sap.ui.define([], function () {
         },
 
         /**
-         * Check if job status is open
+         * Check if job status is open/published
          * @param {string} sStatus - Job status
-         * @returns {boolean} True if status is 'open'
+         * @returns {boolean} True if status is 'open' or 'published'
          */
         isJobOpen: function (sStatus) {
-            return sStatus && sStatus.toLowerCase() === 'open';
+            if (!sStatus) return false;
+            const status = sStatus.toLowerCase();
+            return status === 'open' || status === 'published';
+        },
+
+        /**
+         * Format semantic score value - returns "N/A" for null/undefined
+         * @param {number} nScore - Semantic score value
+         * @returns {string} Formatted score or "N/A"
+         */
+        formatSemanticScoreValue: function (nScore) {
+            if (nScore === null || nScore === undefined) {
+                return "N/A";
+            }
+            return Math.round(nScore);
+        },
+
+        /**
+         * Format semantic score unit - returns empty for null/undefined
+         * @param {number} nScore - Semantic score value
+         * @returns {string} "%" or empty string
+         */
+        formatSemanticScoreUnit: function (nScore) {
+            if (nScore === null || nScore === undefined) {
+                return "";
+            }
+            return "%";
+        },
+
+        /**
+         * Format semantic score state
+         * @param {number} nScore - Semantic score value
+         * @returns {string} UI5 state
+         */
+        formatSemanticScoreState: function (nScore) {
+            if (nScore === null || nScore === undefined) {
+                return "None";
+            }
+            const score = parseFloat(nScore);
+            if (isNaN(score)) return "None";
+
+            if (score >= 80) return "Success";
+            if (score >= 60) return "Warning";
+            return "Error";
+        },
+
+        /**
+         * Check if semantic score is available
+         * @param {number} nScore - Semantic score value
+         * @returns {boolean} True if score is available
+         */
+        hasSemanticScore: function (nScore) {
+            return nScore !== null && nScore !== undefined && !isNaN(parseFloat(nScore));
         }
     };
 });

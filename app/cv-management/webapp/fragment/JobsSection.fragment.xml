@@ -1,20 +1,98 @@
 <core:FragmentDefinition
     xmlns="sap.m"
-    xmlns:core="sap.ui.core">
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.f"
+    xmlns:card="sap.f.cards"
+    xmlns:layout="sap.ui.layout">
 
     <VBox class="sapUiSmallMargin">
+        <!-- KPI Cards Row -->
+        <layout:HorizontalLayout allowWrapping="true" class="sapUiMediumMarginBottom">
+            <!-- Total Jobs Card -->
+            <f:Card class="sapUiSmallMarginEnd" width="200px">
+                <f:header>
+                    <card:Header
+                        title="{i18n>totalJobs}"
+                        subtitle="{i18n>allStatuses}" />
+                </f:header>
+                <f:content>
+                    <NumericContent
+                        value="{dashboard>/jobsKPI/totalJobs}"
+                        scale=""
+                        valueColor="Neutral"
+                        icon="sap-icon://factory"
+                        class="sapUiSmallMargin"
+                        press=".onJobsKPICardPress" />
+                </f:content>
+            </f:Card>
+
+            <!-- Published Jobs Card -->
+            <f:Card class="sapUiSmallMarginEnd" width="200px">
+                <f:header>
+                    <card:Header
+                        title="{i18n>publishedJobs}"
+                        subtitle="{i18n>activeHiring}" />
+                </f:header>
+                <f:content>
+                    <NumericContent
+                        value="{dashboard>/jobsKPI/publishedJobs}"
+                        scale=""
+                        valueColor="Good"
+                        icon="sap-icon://accept"
+                        class="sapUiSmallMargin"
+                        press=".onJobsKPIPublishedPress" />
+                </f:content>
+            </f:Card>
+
+            <!-- Jobs with Hot Candidates Card -->
+            <f:Card class="sapUiSmallMarginEnd" width="200px">
+                <f:header>
+                    <card:Header
+                        title="{i18n>jobsWithHotCandidates}"
+                        subtitle="{i18n>readyToReview}" />
+                </f:header>
+                <f:content>
+                    <NumericContent
+                        value="{dashboard>/jobsKPI/jobsWithHotCandidates}"
+                        scale=""
+                        valueColor="Good"
+                        icon="sap-icon://status-positive"
+                        class="sapUiSmallMargin"
+                        press=".onJobsKPIHotPress" />
+                </f:content>
+            </f:Card>
+
+            <!-- Jobs Needing Matches Card -->
+            <f:Card width="200px">
+                <f:header>
+                    <card:Header
+                        title="{i18n>jobsNeedingMatches}"
+                        subtitle="{i18n>noMatchesYet}" />
+                </f:header>
+                <f:content>
+                    <NumericContent
+                        value="{dashboard>/jobsKPI/jobsNeedingMatches}"
+                        scale=""
+                        valueColor="Critical"
+                        icon="sap-icon://alert"
+                        class="sapUiSmallMargin"
+                        press=".onJobsKPINeedingMatchesPress" />
+                </f:content>
+            </f:Card>
+        </layout:HorizontalLayout>
+
         <!-- Header with Search and Actions -->
         <Toolbar>
-            <Title text="Job Postings" level="H2" />
+            <Title text="{i18n>jobPostings}" level="H2" />
             <ToolbarSpacer />
             <SearchField
                 id="jobSearchField"
                 width="300px"
-                placeholder="Search jobs..."
+                placeholder="{i18n>searchJobs}"
                 search=".onJobSearch" />
             <Button
                 id="createJobButton"
-                text="Create Job"
+                text="{i18n>createJob}"
                 icon="sap-icon://add"
                 type="Emphasized"
                 press=".onCreateJob" />
@@ -22,26 +100,27 @@
 
         <!-- Status Filter Chips -->
         <Toolbar class="sapUiTinyMarginTop">
-            <Label text="Filter by Status:" />
+            <Label text="{i18n>filterByStatus}" />
             <SegmentedButton
                 id="jobStatusFilterSegment"
-                selectionChange=".onJobStatusFilterChange">
+                selectionChange=".onJobStatusFilterChange"
+                selectedKey="all">
                 <items>
-                    <SegmentedButtonItem key="all" text="All" />
-                    <SegmentedButtonItem key="draft" text="Draft" />
-                    <SegmentedButtonItem key="published" text="Published" />
-                    <SegmentedButtonItem key="closed" text="Closed" />
+                    <SegmentedButtonItem key="all" text="{i18n>triageAll}" />
+                    <SegmentedButtonItem key="draft" text="{i18n>statusDraft}" />
+                    <SegmentedButtonItem key="published" text="{i18n>statusPublished}" />
+                    <SegmentedButtonItem key="closed" text="{i18n>statusClosed}" />
                 </items>
             </SegmentedButton>
             <ToolbarSpacer />
-            <Label text="Department:" class="sapUiMediumMarginBegin" />
+            <Label text="{i18n>department}" class="sapUiMediumMarginBegin" />
             <ComboBox
                 id="departmentFilter"
                 width="200px"
                 selectionChange=".onDepartmentFilterChange"
-                placeholder="All Departments">
+                placeholder="{i18n>allDepartments}">
                 <items>
-                    <core:Item key="" text="All Departments" />
+                    <core:Item key="" text="{i18n>allDepartments}" />
                     <core:Item key="Engineering" text="Engineering" />
                     <core:Item key="Sales" text="Sales" />
                     <core:Item key="Marketing" text="Marketing" />
@@ -54,12 +133,7 @@
         <!-- Jobs Table -->
         <Table
             id="jobsTable"
-            items="{
-                path: '/JobPostings',
-                parameters: {
-                    $expand: 'requiredSkills($expand=skill)'
-                }
-            }"
+            items="{dashboard>/jobsList}"
             growing="true"
             growingScrollToLoad="true"
             growingThreshold="20"
@@ -67,36 +141,39 @@
 
             <headerToolbar>
                 <OverflowToolbar>
-                    <Title text="Job Postings" level="H3" />
+                    <Title text="{i18n>jobPostings}" level="H3" />
                     <ToolbarSpacer />
                     <OverflowToolbarButton
                         icon="sap-icon://refresh"
-                        tooltip="Refresh"
+                        tooltip="{i18n>refresh}"
                         press=".onRefreshJobs" />
                 </OverflowToolbar>
             </headerToolbar>
 
             <columns>
                 <Column width="15em">
-                    <Text text="Job Title" />
+                    <Text text="{i18n>jobTitle}" />
                 </Column>
-                <Column width="10em" minScreenWidth="Tablet" demandPopin="true">
-                    <Text text="Department" />
+                <Column width="8em" minScreenWidth="Tablet" demandPopin="true">
+                    <Text text="{i18n>department}" />
                 </Column>
-                <Column width="10em" minScreenWidth="Tablet" demandPopin="true">
-                    <Text text="Location" />
+                <Column width="8em" minScreenWidth="Tablet" demandPopin="true">
+                    <Text text="{i18n>location}" />
                 </Column>
-                <Column width="8em" minScreenWidth="Desktop" demandPopin="true">
-                    <Text text="Status" />
+                <Column width="7em" minScreenWidth="Desktop" demandPopin="true">
+                    <Text text="{i18n>status}" />
                 </Column>
-                <Column width="8em" minScreenWidth="Desktop" demandPopin="true" hAlign="Center">
-                    <Text text="Applications" />
+                <Column width="5em" minScreenWidth="Desktop" demandPopin="true" hAlign="Center">
+                    <Text text="{i18n>hotLabel}" />
                 </Column>
-                <Column width="8em" minScreenWidth="Desktop" demandPopin="true" hAlign="Center">
-                    <Text text="Top Match" />
+                <Column width="5em" minScreenWidth="Desktop" demandPopin="true" hAlign="Center">
+                    <Text text="{i18n>warmLabel}" />
                 </Column>
-                <Column width="12em" hAlign="End">
-                    <Text text="Actions" />
+                <Column width="7em" minScreenWidth="Desktop" demandPopin="true" hAlign="Center">
+                    <Text text="{i18n>topMatch}" />
+                </Column>
+                <Column width="10em" hAlign="End">
+                    <Text text="{i18n>actions}" />
                 </Column>
             </columns>
 
@@ -105,49 +182,69 @@
                     <cells>
                         <!-- Job Title -->
                         <VBox>
-                            <Text text="{title}" class="sapUiTinyMarginBottom" />
-                            <Text text="{employmentType}" class="sapUiTinyText" />
+                            <Text text="{dashboard>title}" class="sapUiTinyMarginBottom" />
+                            <Text text="{dashboard>employmentType}" class="sapUiTinyText" />
                         </VBox>
 
                         <!-- Department -->
-                        <Text text="{department}" />
+                        <Text text="{dashboard>department}" />
 
                         <!-- Location -->
-                        <Text text="{location}" />
+                        <Text text="{dashboard>location}" />
 
                         <!-- Status -->
                         <ObjectStatus
-                            text="{status}"
+                            text="{dashboard>status}"
                             state="{
-                                path: 'status',
+                                path: 'dashboard>status',
                                 formatter: '.StatusFormatter.formatJobStatusState'
                             }" />
 
-                        <!-- Applications Count -->
-                        <ObjectNumber
-                            number="{applicationCount}"
-                            emphasized="false" />
+                        <!-- Hot Count -->
+                        <ObjectStatus
+                            text="{dashboard>hotCount}"
+                            state="Success"
+                            icon="sap-icon://status-positive"
+                            visible="{= ${dashboard>hotCount} > 0 }" />
+
+                        <!-- Warm Count -->
+                        <ObjectStatus
+                            text="{dashboard>warmCount}"
+                            state="Warning"
+                            icon="sap-icon://status-critical"
+                            visible="{= ${dashboard>warmCount} > 0 }" />
 
                         <!-- Top Match Score -->
-                        <Text text="-" />
+                        <HBox alignItems="Center" justifyContent="Center">
+                            <ObjectNumber
+                                number="{dashboard>topMatchScore}"
+                                unit="%"
+                                state="{
+                                    path: 'dashboard>topMatchScore',
+                                    formatter: '.StatusFormatter.formatScoreState'
+                                }"
+                                visible="{= ${dashboard>topMatchScore} > 0 }" />
+                            <Text text="-" visible="{= !${dashboard>topMatchScore} || ${dashboard>topMatchScore} === 0 }" />
+                        </HBox>
 
                         <!-- Actions -->
                         <HBox justifyContent="End">
                             <Button
-                                text="Find Candidates"
+                                text="{i18n>review}"
                                 type="Emphasized"
-                                press=".onFindCandidates"
-                                tooltip="Find matching candidates" />
+                                press=".onReviewJobCandidates"
+                                visible="{= ${dashboard>hotCount} > 0 }"
+                                tooltip="{i18n>reviewHotCandidates}" />
                             <Button
-                                icon="sap-icon://settings"
+                                icon="sap-icon://match"
                                 type="Transparent"
-                                press=".onManageScoring"
-                                tooltip="Manage Scoring Criteria" />
+                                press=".onRunJobMatching"
+                                tooltip="{i18n>runMatching}" />
                             <Button
                                 icon="sap-icon://edit"
                                 type="Transparent"
                                 press=".onEditJob"
-                                tooltip="Edit Job" />
+                                tooltip="{i18n>editJob}" />
                         </HBox>
                     </cells>
                 </ColumnListItem>

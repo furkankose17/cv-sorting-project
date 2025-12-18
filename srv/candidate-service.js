@@ -195,48 +195,54 @@ module.exports = class CandidateService extends cds.ApplicationService {
 
     /**
      * Merge duplicate candidates
+     * Uses transaction to ensure atomicity
      */
     async handleMerge(req) {
         const { primaryId, duplicateIds, mergeStrategy } = req.data;
         const { Candidates, CVDocuments, WorkExperiences, Educations, CandidateSkills } = this.entities;
 
+        // Use transaction to ensure atomic merge operation
+        const tx = cds.tx(req);
+
         try {
             // Move all documents from duplicates to primary
             for (const dupId of duplicateIds) {
-                await UPDATE(CVDocuments).where({ candidate_ID: dupId }).set({
+                await tx.run(UPDATE(CVDocuments).where({ candidate_ID: dupId }).set({
                     candidate_ID: primaryId
-                });
+                }));
 
                 if (mergeStrategy === 'merge-all') {
                     // Move experiences
-                    await UPDATE(WorkExperiences).where({ candidate_ID: dupId }).set({
+                    await tx.run(UPDATE(WorkExperiences).where({ candidate_ID: dupId }).set({
                         candidate_ID: primaryId
-                    });
+                    }));
 
                     // Move education
-                    await UPDATE(Educations).where({ candidate_ID: dupId }).set({
+                    await tx.run(UPDATE(Educations).where({ candidate_ID: dupId }).set({
                         candidate_ID: primaryId
-                    });
+                    }));
 
                     // Move skills (avoiding duplicates)
-                    const dupSkills = await SELECT.from(CandidateSkills).where({ candidate_ID: dupId });
-                    const primarySkills = await SELECT.from(CandidateSkills).where({ candidate_ID: primaryId });
+                    const dupSkills = await tx.run(SELECT.from(CandidateSkills).where({ candidate_ID: dupId }));
+                    const primarySkills = await tx.run(SELECT.from(CandidateSkills).where({ candidate_ID: primaryId }));
                     const primarySkillIds = new Set(primarySkills.map(s => s.skill_ID));
 
                     for (const skill of dupSkills) {
                         if (!primarySkillIds.has(skill.skill_ID)) {
-                            await UPDATE(CandidateSkills).where({ ID: skill.ID }).set({
+                            await tx.run(UPDATE(CandidateSkills).where({ ID: skill.ID }).set({
                                 candidate_ID: primaryId
-                            });
+                            }));
                         }
                     }
                 }
 
                 // Archive duplicate
-                await UPDATE(Candidates).where({ ID: dupId }).set({
+                await tx.run(UPDATE(Candidates).where({ ID: dupId }).set({
                     status_code: 'merged'
-                });
+                }));
             }
+
+            await tx.commit();
 
             return {
                 success: true,
@@ -245,6 +251,7 @@ module.exports = class CandidateService extends cds.ApplicationService {
             };
 
         } catch (error) {
+            await tx.rollback();
             return { success: false, mergedId: null, message: error.message };
         }
     }

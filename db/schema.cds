@@ -115,9 +115,7 @@ entity CVDocuments : cuid, managed {
     // Extracted Data
     // Note: extractedText is reused by OCR processing workflow
     // Initial CV extraction populates this field, OCR may enhance it
-    @Core.MediaType: 'text/plain'
     extractedText         : LargeString;
-    @Core.MediaType: 'application/json'
     extractedData         : LargeString;
 
     // AI Processing Metrics
@@ -423,13 +421,9 @@ entity JobPostings : cuid, managed, AuditTrail, Taggable {
     employmentType        : EmploymentType default 'full-time';
 
     // Description
-    @Core.MediaType: 'text/html'
     description           : LargeString;
-    @Core.MediaType: 'text/html'
     responsibilities      : LargeString;
-    @Core.MediaType: 'text/html'
     qualifications        : LargeString;
-    @Core.MediaType: 'text/html'
     benefits              : LargeString;
 
     // Requirements
@@ -536,6 +530,33 @@ entity MatchResults : cuid, managed {
     rulesApplied          : LargeString;              // JSON array of applied rules with before/after scores
     preFilterPassed       : Boolean default true;
     disqualifiedBy        : String(200);              // Rule name if disqualified
+
+    // Feedback-based Learning
+    feedbackMultiplier    : Decimal(5,2) default 1.0; // Adjusted based on recruiter feedback (0.5-1.5)
+}
+
+/**
+ * Match Feedback - Recruiter feedback on job-candidate matches
+ * Used to improve matching quality over time
+ */
+entity MatchFeedback : cuid, managed {
+    matchResult           : Association to MatchResults not null;
+    feedbackType          : String(20) not null;      // 'positive' or 'negative'
+    feedbackBy            : String(100);              // User ID who gave feedback
+    feedbackAt            : Timestamp;
+    notes                 : String(500);              // Optional context for feedback
+}
+
+/**
+ * Job Embeddings - Vector embeddings for job postings
+ * Used for semantic similarity matching with candidates
+ */
+entity JobEmbeddings : cuid, managed {
+    jobPosting            : Association to JobPostings not null;
+    embeddingModel        : String(100) default 'intfloat/multilingual-e5-small';
+    embeddingDimension    : Integer default 384;
+    generatedAt           : Timestamp;
+    textContent           : LargeString;              // Source text used for embedding
 }
 
 // ============================================

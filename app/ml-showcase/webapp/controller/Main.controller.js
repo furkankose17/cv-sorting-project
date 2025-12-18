@@ -264,13 +264,13 @@ sap.ui.define([
             if (oResult.success) {
                 const oEngineInfo = oResult.data.engine_info || {};
                 this._updateEndpointStatus("ocr", "success", {
-                    engine: oEngineInfo.engine || "paddleocr",
-                    backend: oEngineInfo.backend || "PaddlePaddle",
+                    engine: oEngineInfo.engine || "rapidocr",
+                    backend: oEngineInfo.backend || "ONNX Runtime",
                     supported_languages: oEngineInfo.supported_languages?.length || 0,
-                    status: "OCR service is operational with PaddleOCR",
+                    status: "OCR service is operational with RapidOCR",
                     note: "File upload feature available via /api/ocr/process endpoint"
                 });
-                MessageToast.show("OCR service is ready (PaddleOCR)");
+                MessageToast.show("OCR service is ready (RapidOCR)");
             } else {
                 this._updateEndpointStatus("ocr", "error", {
                     error: oResult.error,

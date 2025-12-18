@@ -244,3 +244,225 @@ input:focus {
         min-height: 400px;
     }
 }
+
+/* ==================== AI Search Assistant ==================== */
+
+/* FAB Button */
+.aiAssistantFAB {
+    position: fixed !important;
+    bottom: 24px;
+    right: 24px;
+    z-index: 1000;
+    width: 56px !important;
+    height: 56px !important;
+    border-radius: 50% !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.aiAssistantFAB:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3) !important;
+}
+
+.aiAssistantFAB .sapMBtnIcon {
+    font-size: 1.5rem !important;
+}
+
+.aiAssistantFABPositioned {
+    /* Class added after positioning */
+}
+
+/* Chat Dialog */
+.aiAssistantContent {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #f7f7f7;
+}
+
+.aiChatScroll {
+    flex: 1;
+    background: #f7f7f7;
+}
+
+.aiMessageList {
+    padding: 1rem;
+}
+
+/* Messages - common styles */
+.aiMessageUser,
+.aiMessageAssistant {
+    margin-bottom: 1rem;
+    animation: cv-fade-in 0.3s ease-in-out;
+}
+
+.aiMessageUser {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.aiMessageUser .aiMessageContent {
+    background: #0a6ed1;
+    color: white;
+    border-radius: 18px 18px 4px 18px;
+    padding: 0.75rem 1rem;
+    max-width: 85%;
+}
+
+.aiMessageAssistant .aiMessageContent {
+    background: white;
+    border-radius: 18px 18px 18px 4px;
+    padding: 0.75rem 1rem;
+    max-width: 85%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.aiMessageIcon {
+    font-size: 1.25rem;
+    margin: 0 0.5rem;
+    color: #0a6ed1;
+}
+
+.aiMessageUser .aiMessageIcon {
+    color: #666;
+}
+
+.aiMessageText {
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.aiMessageHint {
+    font-size: 0.75rem;
+    color: #666;
+    margin-top: 0.5rem;
+}
+
+.aiThinking {
+    font-style: italic;
+    color: #666;
+}
+
+/* Result Cards */
+.aiResultCards {
+    margin-top: 0.75rem;
+}
+
+.aiResultCard {
+    background: #f0f5ff;
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    border-left: 3px solid #0a6ed1;
+}
+
+.aiResultCardContent {
+    flex: 1;
+}
+
+.aiResultIcon {
+    font-size: 1rem;
+    color: #0a6ed1;
+    margin-right: 0.5rem;
+}
+
+.aiResultTitle {
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.aiResultSubtitle {
+    font-size: 0.75rem;
+    color: #666;
+    margin-top: 0.25rem;
+}
+
+.aiResultAction {
+    margin-left: auto;
+}
+
+.aiSeeAllLink {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+}
+
+/* Quick Actions */
+.aiQuickActions {
+    padding: 0.75rem 1rem;
+    background: white;
+    border-top: 1px solid #e5e5e5;
+    gap: 0.5rem;
+}
+
+.aiQuickActionsContainer {
+    gap: 0.5rem;
+}
+
+.aiQuickActionChip {
+    border-radius: 16px !important;
+    font-size: 0.75rem !important;
+}
+
+/* Chat Input */
+.aiChatInput {
+    flex: 1;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .aiAssistantFAB {
+        bottom: 16px;
+        right: 16px;
+        width: 48px !important;
+        height: 48px !important;
+    }
+
+    .aiMessageContent {
+        max-width: 90%;
+    }
+}
+
+/* ==================== CV Review Page Layout ==================== */
+
+/* Ensure the CV Review page fills available height */
+#cvReviewPage {
+    height: 100%;
+}
+
+#cvReviewPage > .sapMPageEnableScrolling {
+    height: 100%;
+}
+
+#cvReviewPage .sapMPageBgStandard {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Make the splitter fill remaining space */
+#reviewSplitter {
+    flex: 1;
+    min-height: 0;
+}
+
+/* Ensure splitter content areas fill their space */
+#reviewSplitter > .sapUiLoSplitterContent {
+    height: 100%;
+}
+
+/* Work History and Education cards styling */
+.workHistoryCard,
+.educationCard {
+    background: #f7f7f7;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    border: 1px solid #e5e5e5;
+}
+
+.workHistoryCard:hover,
+.educationCard:hover {
+    background: #f0f0f0;
+    border-color: #d0d0d0;
+}

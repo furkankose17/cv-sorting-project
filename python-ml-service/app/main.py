@@ -106,14 +106,16 @@ async def lifespan(app: FastAPI):
             tesseract_cmd=settings.tesseract_cmd if settings.tesseract_cmd else None,
             poppler_path=settings.poppler_path if settings.poppler_path else None,
             default_language=settings.ocr_default_language,
-            use_angle_cls=settings.ocr_use_angle_cls,
             table_detection=settings.ocr_table_detection,
-            layout_analysis=settings.ocr_layout_analysis
+            det_db_thresh=settings.ocr_det_db_thresh,
+            det_db_box_thresh=settings.ocr_det_db_box_thresh,
+            contrast_factor=settings.ocr_contrast_factor,
+            sharpness_factor=settings.ocr_sharpness_factor,
         )
         logger.info(f"OCR processor initialized: {ocr_processor.get_engine_info()}")
     except Exception as e:
         logger.warning(f"OCR processor initialization issue: {e}")
-        ocr_processor = OCRProcessor(engine="tesseract")
+        ocr_processor = OCRProcessor(engine="rapidocr")
 
     # Initialize database pool
     logger.info("Connecting to PostgreSQL...")

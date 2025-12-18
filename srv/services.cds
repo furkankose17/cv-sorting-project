@@ -314,6 +314,10 @@ service CVSortingService {
     entity SortingConfigurations as projection on db.SortingConfigurations;
     entity SavedFilters as projection on db.SavedFilters;
 
+    // Semantic Matching with Feedback Loop
+    entity MatchFeedback as projection on db.MatchFeedback;
+    entity JobEmbeddings as projection on db.JobEmbeddings;
+
     @readonly entity AuditLogs as projection on db.AuditLogs;
     @readonly entity WorkflowInstances as projection on db.WorkflowInstances;
 
@@ -361,6 +365,24 @@ service CVSortingService {
         avgScore: Decimal(5,2);
         processingTime: Integer;
         mlUsed: Boolean;  // Whether ML service was used
+    };
+
+    // Match a single candidate against all published jobs
+    action matchCandidateWithAllJobs(
+        candidateId: UUID not null,
+        minScore: Decimal(5,2),
+        useSemanticMatching: Boolean
+    ) returns {
+        totalJobsProcessed: Integer;
+        matchesCreated: Integer;
+        matchesUpdated: Integer;
+        topMatches: array of {
+            jobPostingId: UUID;
+            jobTitle: String;
+            overallScore: Decimal(5,2);
+            rank: Integer;
+        };
+        processingTime: Integer;
     };
 
     action rankCandidates(
@@ -623,6 +645,25 @@ service CVSortingService {
         sortOrder: Integer;
     };
 
+    // AI Search Assistant Action
+    action aiSearch(
+        query: String not null,
+        contextJobId: UUID,
+        contextCandidateId: UUID
+    ) returns {
+        intent: String;
+        message: String;
+        results: array of {
+            type: String;           // 'candidate' | 'job'
+            id: UUID;
+            title: String;          // name or job title
+            subtitle: String;       // skills or department
+            score: Decimal;
+            metadata: LargeString;  // JSON string for extra data
+        };
+        totalCount: Integer;
+    };
+
     // Joule AI Actions
     action chat(
         sessionId: String,
@@ -788,6 +829,31 @@ service CVSortingService {
         embeddingDimension: Integer;
         stored: Boolean;
         contentHash: String;
+    };
+
+    // Semantic Matching Feedback Actions
+    action submitMatchFeedback(
+        matchResultId: UUID not null,
+        feedbackType: String not null,  // 'positive' or 'negative'
+        notes: String
+    ) returns {
+        success: Boolean;
+        feedbackId: UUID;
+        newMultiplier: Decimal;
+    };
+
+    action removeMatchFeedback(
+        feedbackId: UUID not null
+    ) returns {
+        success: Boolean;
+        newMultiplier: Decimal;
+    };
+
+    action refreshMatchScores(
+        jobPostingId: UUID not null
+    ) returns {
+        matchesUpdated: Integer;
+        avgScoreChange: Decimal;
     };
 
     action bulkGenerateEmbeddings(

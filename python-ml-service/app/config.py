@@ -68,15 +68,18 @@ class Settings(BaseSettings):
     cap_token_url: Optional[str] = None
 
     # OCR Configuration
-    # PaddleOCR is primary (faster, better table handling), Tesseract is fallback
-    ocr_engine: str = "paddleocr"  # "paddleocr" or "tesseract"
+    # RapidOCR is primary (3-5x faster, lighter weight), Tesseract is fallback
+    ocr_engine: str = "rapidocr"  # "rapidocr" or "tesseract"
     tesseract_cmd: str = "tesseract"
     poppler_path: Optional[str] = None
-    ocr_default_language: str = "en"  # PaddleOCR uses 'en', 'german', 'turkish', etc.
+    ocr_default_language: str = "en"
     ocr_supported_languages: List[str] = ["en", "german", "turkish", "french", "spanish"]
     ocr_table_detection: bool = True
-    ocr_layout_analysis: bool = True
-    ocr_use_angle_cls: bool = True  # Detect rotated text
+    # RapidOCR optimization settings
+    ocr_det_db_thresh: float = 0.3  # Detection threshold (0.1-0.9, lower=more sensitive)
+    ocr_det_db_box_thresh: float = 0.5  # Box threshold
+    ocr_contrast_factor: float = 1.3  # Contrast enhancement for preprocessing
+    ocr_sharpness_factor: float = 1.2  # Sharpness enhancement for preprocessing
 
     # Matching Configuration
     semantic_weight: float = 0.4

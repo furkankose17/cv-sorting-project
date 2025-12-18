@@ -499,7 +499,9 @@ module.exports = class CVSortingService extends cds.ApplicationService {
 
             if (conditions.length > 0) cqnQuery = cqnQuery.where(conditions);
 
-            const orderBy = sortBy || 'createdAt';
+            // Whitelist allowed sort fields to prevent SQL injection
+            const ALLOWED_SORT_FIELDS = ['createdAt', 'firstName', 'lastName', 'email', 'totalExperienceYears', 'status_code', 'city', 'modifiedAt'];
+            const orderBy = ALLOWED_SORT_FIELDS.includes(sortBy) ? sortBy : 'createdAt';
             const order = sortOrder === 'asc' ? 'asc' : 'desc';
             cqnQuery = cqnQuery.orderBy(`${orderBy} ${order}`).limit(limit || 50, offset || 0);
 
@@ -857,7 +859,7 @@ module.exports = class CVSortingService extends cds.ApplicationService {
 
     _registerJobHandlers(entities) {
         const { JobPostings, JobRequiredSkills, MatchResults, Candidates, CandidateSkills,
-                Skills, Interviews, AuditLogs, CVDocuments } = entities;
+                Skills, Interviews, AuditLogs, CVDocuments, MatchFeedback, JobEmbeddings } = entities;
 
         // ----- Bound Actions on JobPostings -----
 
@@ -1144,6 +1146,333 @@ module.exports = class CVSortingService extends cds.ApplicationService {
                 mlUsed
             };
         });
+
+        // Match a single candidate against all published jobs
+        this.on('matchCandidateWithAllJobs', async (req) => {
+            const { candidateId, minScore, useSemanticMatching } = req.data;
+            const startTime = Date.now();
+
+            // Verify candidate exists
+            const candidate = await SELECT.one.from(Candidates).where({ ID: candidateId });
+            if (!candidate) {
+                req.error(404, `Candidate ${candidateId} not found`);
+                return;
+            }
+
+            // Get all published jobs
+            const publishedJobs = await SELECT.from(JobPostings).where({ status: 'published' });
+            if (publishedJobs.length === 0) {
+                return {
+                    totalJobsProcessed: 0,
+                    matchesCreated: 0,
+                    matchesUpdated: 0,
+                    topMatches: [],
+                    processingTime: Date.now() - startTime
+                };
+            }
+
+            // Get candidate skills once
+            const candidateSkills = await SELECT.from(CandidateSkills).where({ candidate_ID: candidateId });
+
+            let matchesCreated = 0;
+            let matchesUpdated = 0;
+            const allMatches = [];
+
+            // Process each job
+            for (const jobPosting of publishedJobs) {
+                const requiredSkills = await SELECT.from(JobRequiredSkills).where({ jobPosting_ID: jobPosting.ID });
+
+                // Calculate rule-based match score
+                const ruleBasedResult = this._calculateMatchScore(candidate, jobPosting, candidateSkills, requiredSkills);
+
+                let finalScore = ruleBasedResult.overallScore;
+                let semanticScore = null;
+
+                // Try ML semantic matching if enabled
+                if (useSemanticMatching !== false && this.mlClient) {
+                    try {
+                        const mlResult = await this.mlClient.findSemanticMatches({
+                            jobPostingId: jobPosting.ID,
+                            candidateIds: [candidateId],
+                            minScore: 0,
+                            limit: 1
+                        });
+
+                        if (mlResult?.matches?.length > 0) {
+                            semanticScore = mlResult.matches[0].combined_score || 0;
+                            const mlWeight = jobPosting.mlWeight || 0.6;
+                            finalScore = (ruleBasedResult.overallScore * (1 - mlWeight)) + (semanticScore * mlWeight);
+                        }
+                    } catch (mlError) {
+                        LOG.debug('ML matching skipped for job', { jobId: jobPosting.ID, error: mlError.message });
+                    }
+                }
+
+                if (finalScore >= (minScore || 0)) {
+                    const existingMatch = await SELECT.one.from(MatchResults)
+                        .where({ candidate_ID: candidateId, jobPosting_ID: jobPosting.ID });
+
+                    const matchData = {
+                        overallScore: Math.round(finalScore * 100) / 100,
+                        skillScore: ruleBasedResult.skillScore,
+                        experienceScore: ruleBasedResult.experienceScore,
+                        educationScore: ruleBasedResult.educationScore,
+                        locationScore: ruleBasedResult.locationScore,
+                        semanticScore: semanticScore,
+                        matchedAt: new Date().toISOString()
+                    };
+
+                    if (existingMatch) {
+                        await UPDATE(MatchResults).where({ ID: existingMatch.ID }).set(matchData);
+                        matchesUpdated++;
+                        allMatches.push({ ...matchData, jobPosting_ID: jobPosting.ID, jobTitle: jobPosting.title, ID: existingMatch.ID });
+                    } else {
+                        const newId = uuidv4();
+                        await INSERT.into(MatchResults).entries({
+                            ID: newId,
+                            candidate_ID: candidateId,
+                            jobPosting_ID: jobPosting.ID,
+                            ...matchData,
+                            reviewStatus: 'pending'
+                        });
+                        matchesCreated++;
+                        allMatches.push({ ...matchData, jobPosting_ID: jobPosting.ID, jobTitle: jobPosting.title, ID: newId });
+                    }
+                }
+            }
+
+            // Sort by score and assign ranks
+            allMatches.sort((a, b) => b.overallScore - a.overallScore);
+
+            // Update ranks in database
+            for (let i = 0; i < allMatches.length; i++) {
+                await UPDATE(MatchResults).where({ ID: allMatches[i].ID }).set({ rank: i + 1 });
+                allMatches[i].rank = i + 1;
+            }
+
+            // Return top 5 matches
+            const topMatches = allMatches.slice(0, 5).map(m => ({
+                jobPostingId: m.jobPosting_ID,
+                jobTitle: m.jobTitle,
+                overallScore: m.overallScore,
+                rank: m.rank
+            }));
+
+            return {
+                totalJobsProcessed: publishedJobs.length,
+                matchesCreated,
+                matchesUpdated,
+                topMatches,
+                processingTime: Date.now() - startTime
+            };
+        });
+
+        // ----- Semantic Matching Feedback Handlers -----
+
+        /**
+         * Submit feedback (thumbs up/down) for a match result
+         * Adjusts feedbackMultiplier for future scoring
+         */
+        this.on('submitMatchFeedback', async (req) => {
+            const { matchResultId, feedbackType, notes } = req.data;
+
+            // Validate feedback type
+            if (!['positive', 'negative'].includes(feedbackType)) {
+                req.error(400, 'feedbackType must be "positive" or "negative"');
+                return;
+            }
+
+            // Get match result
+            const matchResult = await SELECT.one.from(MatchResults).where({ ID: matchResultId });
+            if (!matchResult) {
+                req.error(404, `Match result ${matchResultId} not found`);
+                return;
+            }
+
+            // Check for existing feedback from this user for this match
+            const userId = req.user?.id || 'anonymous';
+            const existingFeedback = await SELECT.one.from(MatchFeedback)
+                .where({ matchResult_ID: matchResultId, feedbackBy: userId });
+
+            let feedbackId;
+            if (existingFeedback) {
+                // Update existing feedback (toggle behavior)
+                if (existingFeedback.feedbackType === feedbackType) {
+                    // Same feedback - remove it (toggle off)
+                    await DELETE.from(MatchFeedback).where({ ID: existingFeedback.ID });
+                    feedbackId = null;
+                } else {
+                    // Different feedback - update it (switch)
+                    await UPDATE(MatchFeedback).where({ ID: existingFeedback.ID }).set({
+                        feedbackType,
+                        feedbackAt: new Date().toISOString(),
+                        notes: notes || null
+                    });
+                    feedbackId = existingFeedback.ID;
+                }
+            } else {
+                // Create new feedback
+                feedbackId = uuidv4();
+                await INSERT.into(MatchFeedback).entries({
+                    ID: feedbackId,
+                    matchResult_ID: matchResultId,
+                    feedbackType,
+                    feedbackBy: userId,
+                    feedbackAt: new Date().toISOString(),
+                    notes: notes || null
+                });
+            }
+
+            // Recalculate feedbackMultiplier based on all feedback for this candidate
+            const candidateId = matchResult.candidate_ID;
+            const allFeedback = await SELECT.from(MatchFeedback)
+                .where({ 'matchResult.candidate_ID': candidateId });
+
+            // Calculate multiplier: +0.05 per positive (max 1.5), -0.1 per negative (min 0.5)
+            let multiplier = 1.0;
+            for (const fb of allFeedback) {
+                if (fb.feedbackType === 'positive') {
+                    multiplier = Math.min(1.5, multiplier + 0.05);
+                } else if (fb.feedbackType === 'negative') {
+                    multiplier = Math.max(0.5, multiplier - 0.1);
+                }
+            }
+            multiplier = Math.round(multiplier * 100) / 100;
+
+            // Update the match result's feedbackMultiplier
+            await UPDATE(MatchResults).where({ ID: matchResultId }).set({
+                feedbackMultiplier: multiplier
+            });
+
+            LOG.info('Match feedback submitted', {
+                matchResultId,
+                feedbackType,
+                newMultiplier: multiplier,
+                userId
+            });
+
+            return {
+                success: true,
+                feedbackId,
+                newMultiplier: multiplier
+            };
+        });
+
+        /**
+         * Remove feedback for a match result
+         */
+        this.on('removeMatchFeedback', async (req) => {
+            const { feedbackId } = req.data;
+
+            const feedback = await SELECT.one.from(MatchFeedback).where({ ID: feedbackId });
+            if (!feedback) {
+                req.error(404, `Feedback ${feedbackId} not found`);
+                return;
+            }
+
+            const matchResult = await SELECT.one.from(MatchResults).where({ ID: feedback.matchResult_ID });
+            if (!matchResult) {
+                req.error(404, 'Associated match result not found');
+                return;
+            }
+
+            // Delete the feedback
+            await DELETE.from(MatchFeedback).where({ ID: feedbackId });
+
+            // Recalculate multiplier
+            const candidateId = matchResult.candidate_ID;
+            const remainingFeedback = await SELECT.from(MatchFeedback)
+                .where({ 'matchResult.candidate_ID': candidateId });
+
+            let multiplier = 1.0;
+            for (const fb of remainingFeedback) {
+                if (fb.feedbackType === 'positive') {
+                    multiplier = Math.min(1.5, multiplier + 0.05);
+                } else if (fb.feedbackType === 'negative') {
+                    multiplier = Math.max(0.5, multiplier - 0.1);
+                }
+            }
+            multiplier = Math.round(multiplier * 100) / 100;
+
+            // Update the match result
+            await UPDATE(MatchResults).where({ ID: matchResult.ID }).set({
+                feedbackMultiplier: multiplier
+            });
+
+            LOG.info('Match feedback removed', { feedbackId, newMultiplier: multiplier });
+
+            return {
+                success: true,
+                newMultiplier: multiplier
+            };
+        });
+
+        /**
+         * Refresh all match scores for a job to incorporate feedback
+         */
+        this.on('refreshMatchScores', async (req) => {
+            const { jobPostingId } = req.data;
+
+            const jobPosting = await SELECT.one.from(JobPostings).where({ ID: jobPostingId });
+            if (!jobPosting) {
+                req.error(404, `Job posting ${jobPostingId} not found`);
+                return;
+            }
+
+            // Get all matches for this job
+            const matches = await SELECT.from(MatchResults).where({ jobPosting_ID: jobPostingId });
+            if (matches.length === 0) {
+                return { matchesUpdated: 0, avgScoreChange: 0 };
+            }
+
+            let totalScoreChange = 0;
+            let matchesUpdated = 0;
+
+            for (const match of matches) {
+                // Get all feedback for this candidate across all jobs
+                const allFeedback = await SELECT.from(MatchFeedback)
+                    .where({ 'matchResult.candidate_ID': match.candidate_ID });
+
+                // Calculate new multiplier
+                let multiplier = 1.0;
+                for (const fb of allFeedback) {
+                    if (fb.feedbackType === 'positive') {
+                        multiplier = Math.min(1.5, multiplier + 0.05);
+                    } else if (fb.feedbackType === 'negative') {
+                        multiplier = Math.max(0.5, multiplier - 0.1);
+                    }
+                }
+                multiplier = Math.round(multiplier * 100) / 100;
+
+                // Only update if multiplier changed
+                const oldMultiplier = match.feedbackMultiplier || 1.0;
+                if (multiplier !== oldMultiplier) {
+                    await UPDATE(MatchResults).where({ ID: match.ID }).set({
+                        feedbackMultiplier: multiplier
+                    });
+
+                    // Track score change (multiplier delta * base score approximation)
+                    const scoreImpact = (multiplier - oldMultiplier) * (match.overallScore || 0);
+                    totalScoreChange += scoreImpact;
+                    matchesUpdated++;
+                }
+            }
+
+            const avgScoreChange = matchesUpdated > 0 ?
+                Math.round((totalScoreChange / matchesUpdated) * 100) / 100 : 0;
+
+            LOG.info('Match scores refreshed', {
+                jobPostingId,
+                matchesUpdated,
+                avgScoreChange
+            });
+
+            return {
+                matchesUpdated,
+                avgScoreChange
+            };
+        });
+
         this.on('rankCandidates', (req) => this._delegateToJobModule(req, 'rankCandidates'));
         this.on('sortCandidates', (req) => this._delegateToJobModule(req, 'sortCandidates'));
         this.on('filterCandidates', (req) => this._delegateToJobModule(req, 'filterCandidates'));
@@ -1595,6 +1924,9 @@ module.exports = class CVSortingService extends cds.ApplicationService {
         this.on('findSemanticMatches', (req) => this._delegateToAIModule(req, 'handleFindSemanticMatches'));
         this.on('calculateSingleMatch', (req) => this._delegateToAIModule(req, 'handleCalculateSingleMatch'));
         this.on('semanticSearch', (req) => this._delegateToAIModule(req, 'handleSemanticSearch'));
+
+        // AI Search Assistant
+        this.on('aiSearch', async (req) => this._handleAISearch(req));
 
         // ML OCR
         this.on('processDocumentOCR', (req) => this._delegateToAIModule(req, 'handleProcessDocumentOCR'));
@@ -2418,5 +2750,900 @@ module.exports = class CVSortingService extends cds.ApplicationService {
 
         // Generate embedding for candidate
         await this._generateCandidateEmbeddingAsync(candidateId, entities);
+    }
+
+    // ================================================================
+    // AI SEARCH ASSISTANT HANDLER
+    // ================================================================
+
+    /**
+     * Handle AI Search Assistant queries
+     * Parses natural language queries and returns relevant candidates/jobs
+     */
+    async _handleAISearch(req) {
+        const { query, contextJobId, contextCandidateId } = req.data;
+        const db = cds.db;
+        const { Candidates, JobPostings, MatchResults, CandidateSkills, Skills } = db.entities('cv.sorting');
+
+        LOG.info('AI Search query received', { query, contextJobId, contextCandidateId });
+
+        try {
+            // Detect intent from query
+            const intent = this._detectSearchIntent(query, contextJobId, contextCandidateId);
+            LOG.info('Detected intent', { intent });
+
+            let results = [];
+            let message = '';
+            let totalCount = 0;
+
+            switch (intent.type) {
+                case 'greeting':
+                    message = "Hi! I'm your AI recruitment assistant. I can help you:\n" +
+                        "• Find candidates by skill (e.g., 'Find React developers')\n" +
+                        "• List all candidates ('Show all candidates')\n" +
+                        "• Search by name ('Find John Smith')\n" +
+                        "• Find top matches for jobs ('Top candidates for Senior Developer')\n" +
+                        "• Compare candidates ('Compare John vs Sarah')\n\n" +
+                        "What would you like to do?";
+                    break;
+
+                case 'list_all_candidates':
+                    const listResult = await this._listAllCandidates(db);
+                    results = listResult.results;
+                    totalCount = listResult.totalCount;
+                    message = totalCount > 0
+                        ? `Here are ${totalCount} candidates in the system:`
+                        : `No candidates found in the system.`;
+                    break;
+
+                case 'skill_search':
+                    const skillResult = await this._searchBySkill(intent.skillName, db);
+                    results = skillResult.results;
+                    totalCount = skillResult.totalCount;
+                    message = totalCount > 0
+                        ? `Found ${totalCount} candidates with ${intent.skillName} skills:`
+                        : `No candidates found with ${intent.skillName} skills. Try a different skill name.`;
+                    break;
+
+                case 'best_candidates':
+                    const bestResult = await this._getBestCandidates(db);
+                    results = bestResult.results;
+                    totalCount = bestResult.totalCount;
+                    message = totalCount > 0
+                        ? `Here are the top ${totalCount} candidates based on match scores:`
+                        : `No candidates with match scores found. Try running matching first.`;
+                    break;
+
+                case 'job_matches':
+                    const jobMatchResult = await this._searchJobMatches(intent, db);
+                    results = jobMatchResult.results;
+                    totalCount = jobMatchResult.totalCount;
+                    message = totalCount > 0
+                        ? `Found ${totalCount} candidates for "${intent.jobTitle || 'this job'}". Here are the top matches:`
+                        : `No matching candidates found for "${intent.jobTitle || 'this job'}". Make sure to run matching first.`;
+                    break;
+
+                case 'candidate_search':
+                    const searchResult = await this._searchCandidates(intent, db);
+                    results = searchResult.results;
+                    totalCount = searchResult.totalCount;
+                    message = totalCount > 0
+                        ? `Found ${totalCount} candidates matching "${intent.searchQuery}":`
+                        : `No candidates found matching "${intent.searchQuery}". Try a different search term.`;
+                    break;
+
+                case 'similar_candidates':
+                    const similarResult = await this._searchSimilarCandidates(intent, db);
+                    results = similarResult.results;
+                    totalCount = similarResult.totalCount;
+                    message = totalCount > 0
+                        ? `Found ${totalCount} candidates similar to ${intent.candidateName}:`
+                        : `No similar candidates found for ${intent.candidateName}.`;
+                    break;
+
+                case 'compare':
+                    const compareResult = await this._compareCandidates(intent, db);
+                    results = compareResult.results;
+                    totalCount = compareResult.totalCount;
+                    message = compareResult.message;
+                    break;
+
+                case 'job_fit':
+                    const jobFitResult = await this._searchJobFit(intent, db);
+                    results = jobFitResult.results;
+                    totalCount = jobFitResult.totalCount;
+                    message = totalCount > 0
+                        ? `Found ${totalCount} jobs that might fit ${intent.candidateName}:`
+                        : `No matching jobs found for ${intent.candidateName}.`;
+                    break;
+
+                default:
+                    // Default: try to extract keywords and search
+                    const keywords = this._extractKeywords(query);
+                    if (keywords.length > 0) {
+                        const keywordResult = await this._searchByKeywords(keywords, db);
+                        results = keywordResult.results;
+                        totalCount = keywordResult.totalCount;
+                        message = totalCount > 0
+                            ? `Found ${totalCount} candidates matching your search:`
+                            : `No candidates found. Try 'Show all candidates' or search by skill like 'Find Python developers'.`;
+                    } else {
+                        message = `I'm not sure what you're looking for. Try:\n` +
+                            `• 'Show all candidates'\n` +
+                            `• 'Find React developers'\n` +
+                            `• 'Find John Smith'\n` +
+                            `• 'Top candidates for Senior Developer'`;
+                    }
+            }
+
+            return {
+                intent: intent.type,
+                message,
+                results: results.slice(0, 3), // Top 3 for display
+                totalCount
+            };
+
+        } catch (error) {
+            LOG.error('AI Search error', error);
+            return {
+                intent: 'error',
+                message: `Sorry, I couldn't process that query. Please try rephrasing. Error: ${error.message}`,
+                results: [],
+                totalCount: 0
+            };
+        }
+    }
+
+    /**
+     * Detect search intent from natural language query
+     */
+    _detectSearchIntent(query, contextJobId, contextCandidateId) {
+        const lowerQuery = query.toLowerCase().trim();
+
+        // Greeting/help patterns
+        const greetingPatterns = [
+            /^(?:hi|hello|hey|greetings|howdy)[\s!.,?]*$/i,
+            /^(?:help|what can you do|how do i use|how does this work)[\s?]*$/i
+        ];
+
+        for (const pattern of greetingPatterns) {
+            if (pattern.test(query)) {
+                return { type: 'greeting' };
+            }
+        }
+
+        // List all/show all candidates
+        const listAllPatterns = [
+            /^(?:show|list|display|get)\s+(?:all\s+)?(?:candidates?|people|everyone)/i,
+            /^(?:all\s+)?candidates?$/i,
+            /^(?:show|list)\s+(?:me\s+)?(?:the\s+)?candidates?/i,
+            /^who\s+(?:do\s+we\s+have|is\s+available)/i
+        ];
+
+        for (const pattern of listAllPatterns) {
+            if (pattern.test(query)) {
+                return { type: 'list_all_candidates' };
+            }
+        }
+
+        // Best matches / top candidates (without specific job) - CHECK BEFORE skill search
+        const bestMatchPatterns = [
+            /^(?:show|get|find)?\s*(?:best|top)\s+(?:candidates?|matches?|people)\s*$/i,
+            /^(?:show|get|find)?\s*(?:best|top)\s+\d*\s*(?:candidates?|matches?|people)?\s*$/i,
+            /^show\s+best\s+candidate\s+matches\s*$/i
+        ];
+
+        for (const pattern of bestMatchPatterns) {
+            if (pattern.test(query)) {
+                return { type: 'best_candidates' };
+            }
+        }
+
+        // Job matches: "top candidates for X", "who fits X job", "best matches for X"
+        // CHECK BEFORE skill search to handle "Top candidates for Senior Developer"
+        const jobMatchPatterns = [
+            /(?:top|best|find)\s+candidates?\s+for\s+(.+)/i,
+            /who\s+(?:fits?|matches?|suits?)\s+(?:the\s+)?(.+?)\s*(?:job|role|position)?$/i,
+            /(?:candidates?|matches?)\s+for\s+(.+)/i,
+            /(.+?)\s+(?:job|role|position)\s+candidates?/i
+        ];
+
+        for (const pattern of jobMatchPatterns) {
+            const match = query.match(pattern);
+            if (match) {
+                const jobTitle = match[1]?.trim();
+                // Make sure we got a meaningful job title (not just empty or single char)
+                if (jobTitle && jobTitle.length >= 2) {
+                    return {
+                        type: 'job_matches',
+                        jobTitle: jobTitle,
+                        jobId: contextJobId
+                    };
+                }
+            }
+        }
+
+        // Skill-based search: "Find React developers", "Python engineers", "JavaScript devs"
+        // Non-skill words to filter out
+        const nonSkillWords = ['top', 'best', 'all', 'the', 'some', 'any', 'good', 'great', 'candidates', 'for'];
+        const skillSearchPatterns = [
+            /(?:find|show|get|list)\s+(.+?)\s+(?:developers?|engineers?|devs?|programmers?|specialists?|experts?)/i,
+            /^(.+?)\s+(?:developers?|engineers?|devs?|programmers?|specialists?|experts?)$/i,
+            /(?:who\s+knows?|people\s+with|candidates?\s+with)\s+(.+)/i
+        ];
+
+        for (const pattern of skillSearchPatterns) {
+            const match = query.match(pattern);
+            if (match) {
+                let skillName = match[1]?.trim();
+                // Filter out non-skill words and validate
+                if (skillName && skillName.length < 50 && skillName.length >= 2) {
+                    // Skip if extracted skill looks like non-skill words
+                    const skillLower = skillName.toLowerCase();
+                    const isNonSkill = nonSkillWords.some(w => skillLower === w || skillLower.startsWith(w + ' '));
+                    if (!isNonSkill) {
+                        return {
+                            type: 'skill_search',
+                            skillName: skillName
+                        };
+                    }
+                }
+            }
+        }
+
+        // Check for "this job" reference
+        if ((lowerQuery.includes('this job') || lowerQuery.includes('this role')) && contextJobId) {
+            return {
+                type: 'job_matches',
+                jobId: contextJobId,
+                jobTitle: null
+            };
+        }
+
+        // Similar candidates: "similar to X", "candidates like X"
+        const similarPatterns = [
+            /similar\s+to\s+(.+)/i,
+            /candidates?\s+like\s+(.+)/i,
+            /find\s+(?:someone|people)\s+like\s+(.+)/i
+        ];
+
+        for (const pattern of similarPatterns) {
+            const match = query.match(pattern);
+            if (match) {
+                return {
+                    type: 'similar_candidates',
+                    candidateName: match[1]?.trim(),
+                    candidateId: contextCandidateId
+                };
+            }
+        }
+
+        // Compare: "compare X vs Y", "compare X and Y"
+        const comparePatterns = [
+            /compare\s+(.+?)\s+(?:vs\.?|versus|and|with)\s+(.+)/i
+        ];
+
+        for (const pattern of comparePatterns) {
+            const match = query.match(pattern);
+            if (match) {
+                return {
+                    type: 'compare',
+                    candidate1: match[1]?.trim(),
+                    candidate2: match[2]?.trim(),
+                    jobId: contextJobId
+                };
+            }
+        }
+
+        // Job fit: "jobs for X", "what jobs fit X"
+        const jobFitPatterns = [
+            /(?:what\s+)?jobs?\s+(?:for|fit|match|suit)\s+(.+)/i,
+            /(?:roles?|positions?)\s+for\s+(.+)/i
+        ];
+
+        for (const pattern of jobFitPatterns) {
+            const match = query.match(pattern);
+            if (match) {
+                return {
+                    type: 'job_fit',
+                    candidateName: match[1]?.trim(),
+                    candidateId: contextCandidateId
+                };
+            }
+        }
+
+        // Name search: "Find John Smith", "Search for Sarah", "Look up Michael"
+        const nameSearchPatterns = [
+            /^(?:find|search\s+for|look\s*up|show\s+me|get)\s+(.+)/i,
+            /^(?:who\s+is|info\s+(?:on|about))\s+(.+)/i
+        ];
+
+        for (const pattern of nameSearchPatterns) {
+            const match = query.match(pattern);
+            if (match) {
+                const name = match[1]?.trim();
+                // Make sure it looks like a name (not a skill or command)
+                if (name && name.length >= 2 && name.length < 50) {
+                    return {
+                        type: 'candidate_search',
+                        searchQuery: name // Just the name, not the whole query
+                    };
+                }
+            }
+        }
+
+        // Default: candidate search (use query directly for simple cases)
+        // Check if it looks like a name (proper noun pattern: capitalized words)
+        const looksLikeName = /^[A-Z][a-z]+(\s+[A-Z][a-z]+)*$/.test(query.trim());
+        return {
+            type: 'candidate_search',
+            searchQuery: looksLikeName ? query : query // Use query as-is
+        };
+    }
+
+    /**
+     * Search for job matches
+     */
+    async _searchJobMatches(intent, db) {
+        const { JobPostings, Candidates, MatchResults } = db.entities('cv.sorting');
+
+        let jobId = intent.jobId;
+        let jobTitle = intent.jobTitle;
+
+        // If we have a title but no ID, find the job
+        if (!jobId && jobTitle) {
+            const jobs = await SELECT.from(JobPostings)
+                .where`LOWER(title) LIKE ${'%' + jobTitle.toLowerCase() + '%'}`
+                .limit(1);
+            if (jobs.length > 0) {
+                jobId = jobs[0].ID;
+                jobTitle = jobs[0].title;
+            }
+        } else if (jobId && !jobTitle) {
+            const job = await SELECT.one.from(JobPostings).where({ ID: jobId });
+            if (job) jobTitle = job.title;
+        }
+
+        if (!jobId) {
+            return { results: [], totalCount: 0 };
+        }
+
+        // Get match results for this job
+        const matches = await SELECT.from(MatchResults)
+            .where({ jobPosting_ID: jobId })
+            .orderBy('overallScore desc')
+            .limit(20);
+
+        const results = [];
+        for (const match of matches) {
+            const candidate = await SELECT.one.from(Candidates).where({ ID: match.candidate_ID });
+            if (candidate) {
+                results.push({
+                    type: 'candidate',
+                    id: candidate.ID,
+                    title: `${candidate.firstName} ${candidate.lastName}`,
+                    subtitle: candidate.headline || candidate.currentTitle || 'Candidate',
+                    score: match.overallScore,
+                    metadata: JSON.stringify({
+                        email: candidate.email,
+                        location: candidate.city,
+                        experience: candidate.totalExperienceYears
+                    })
+                });
+            }
+        }
+
+        return { results, totalCount: results.length };
+    }
+
+    /**
+     * Search candidates by text query
+     */
+    async _searchCandidates(intent, db) {
+        const { Candidates, CandidateSkills, Skills } = db.entities('cv.sorting');
+        const searchQuery = intent.searchQuery.toLowerCase().trim();
+
+        // Split into words for name matching
+        const words = searchQuery.split(/\s+/).filter(w => w.length >= 2);
+        let candidates = [];
+
+        // Try matching by name parts (first and last name)
+        if (words.length >= 2) {
+            // Try first word as firstName and last word as lastName
+            const firstName = words[0];
+            const lastName = words[words.length - 1];
+            candidates = await SELECT.from(Candidates)
+                .where`
+                    (LOWER(firstName) LIKE ${'%' + firstName + '%'} AND LOWER(lastName) LIKE ${'%' + lastName + '%'})
+                    OR LOWER(firstName) LIKE ${'%' + searchQuery + '%'}
+                    OR LOWER(lastName) LIKE ${'%' + searchQuery + '%'}
+                    OR LOWER(headline) LIKE ${'%' + searchQuery + '%'}
+                    OR LOWER(summary) LIKE ${'%' + searchQuery + '%'}
+                    OR LOWER(email) LIKE ${'%' + searchQuery + '%'}
+                `
+                .limit(20);
+        } else {
+            // Single word search - check all fields
+            candidates = await SELECT.from(Candidates)
+                .where`
+                    LOWER(firstName) LIKE ${'%' + searchQuery + '%'}
+                    OR LOWER(lastName) LIKE ${'%' + searchQuery + '%'}
+                    OR LOWER(headline) LIKE ${'%' + searchQuery + '%'}
+                    OR LOWER(summary) LIKE ${'%' + searchQuery + '%'}
+                    OR LOWER(email) LIKE ${'%' + searchQuery + '%'}
+                `
+                .limit(20);
+        }
+
+        // Also search by skills
+        const skillMatches = await SELECT.from(Skills)
+            .where`LOWER(name) LIKE ${'%' + searchQuery + '%'}`;
+
+        const skillIds = skillMatches.map(s => s.ID);
+        let skillCandidates = [];
+        if (skillIds.length > 0) {
+            const candidateSkills = await SELECT.from(CandidateSkills)
+                .where({ skill_ID: { in: skillIds } });
+            const candidateIds = [...new Set(candidateSkills.map(cs => cs.candidate_ID))];
+            if (candidateIds.length > 0) {
+                skillCandidates = await SELECT.from(Candidates)
+                    .where({ ID: { in: candidateIds } });
+            }
+        }
+
+        // Merge and dedupe
+        const allCandidates = [...candidates];
+        const existingIds = new Set(candidates.map(c => c.ID));
+        for (const c of skillCandidates) {
+            if (!existingIds.has(c.ID)) {
+                allCandidates.push(c);
+            }
+        }
+
+        const results = allCandidates.slice(0, 20).map(candidate => ({
+            type: 'candidate',
+            id: candidate.ID,
+            title: `${candidate.firstName} ${candidate.lastName}`,
+            subtitle: candidate.headline || candidate.email || 'Candidate',
+            score: candidate.overallScore || 0,
+            metadata: JSON.stringify({
+                email: candidate.email,
+                location: candidate.city,
+                experience: candidate.totalExperienceYears
+            })
+        }));
+
+        return { results, totalCount: allCandidates.length };
+    }
+
+    /**
+     * Search for similar candidates
+     */
+    async _searchSimilarCandidates(intent, db) {
+        const { Candidates } = db.entities('cv.sorting');
+
+        let candidateId = intent.candidateId;
+        const candidateName = intent.candidateName;
+
+        // Find candidate by name if no ID
+        if (!candidateId && candidateName) {
+            const nameParts = candidateName.split(' ');
+            let candidates;
+            if (nameParts.length >= 2) {
+                candidates = await SELECT.from(Candidates)
+                    .where`LOWER(firstName) LIKE ${'%' + nameParts[0].toLowerCase() + '%'}
+                           AND LOWER(lastName) LIKE ${'%' + nameParts[nameParts.length - 1].toLowerCase() + '%'}`
+                    .limit(1);
+            } else {
+                candidates = await SELECT.from(Candidates)
+                    .where`LOWER(firstName) LIKE ${'%' + candidateName.toLowerCase() + '%'}
+                           OR LOWER(lastName) LIKE ${'%' + candidateName.toLowerCase() + '%'}`
+                    .limit(1);
+            }
+            if (candidates.length > 0) {
+                candidateId = candidates[0].ID;
+            }
+        }
+
+        if (!candidateId) {
+            return { results: [], totalCount: 0, candidateName: candidateName || 'Unknown' };
+        }
+
+        // Get base candidate
+        const baseCandidate = await SELECT.one.from(Candidates).where({ ID: candidateId });
+        if (!baseCandidate) {
+            return { results: [], totalCount: 0, candidateName: candidateName || 'Unknown' };
+        }
+
+        // Find similar by headline (simple approach without ML)
+        // Extract first meaningful word from headline for similarity search
+        const headlineWords = (baseCandidate.headline || '').toLowerCase().split(/\s+/).filter(w => w.length > 2);
+        const searchTerm = headlineWords[0] || '';
+
+        let similar = [];
+        if (searchTerm) {
+            similar = await SELECT.from(Candidates)
+                .where`ID != ${candidateId} AND LOWER(headline) LIKE ${'%' + searchTerm + '%'}`
+                .limit(10);
+        }
+
+        const results = similar.map(candidate => ({
+            type: 'candidate',
+            id: candidate.ID,
+            title: `${candidate.firstName} ${candidate.lastName}`,
+            subtitle: candidate.headline || 'Candidate',
+            score: null,
+            metadata: JSON.stringify({
+                email: candidate.email,
+                location: candidate.city,
+                experience: candidate.totalExperienceYears
+            })
+        }));
+
+        return {
+            results,
+            totalCount: results.length,
+            candidateName: `${baseCandidate.firstName} ${baseCandidate.lastName}`
+        };
+    }
+
+    /**
+     * Compare two candidates
+     */
+    async _compareCandidates(intent, db) {
+        const { Candidates, MatchResults } = db.entities('cv.sorting');
+
+        // Find both candidates
+        const findCandidate = async (name) => {
+            const nameParts = name.split(' ');
+            let candidates;
+            if (nameParts.length >= 2) {
+                candidates = await SELECT.from(Candidates)
+                    .where`LOWER(firstName) LIKE ${'%' + nameParts[0].toLowerCase() + '%'}
+                           AND LOWER(lastName) LIKE ${'%' + nameParts[nameParts.length - 1].toLowerCase() + '%'}`
+                    .limit(1);
+            } else {
+                candidates = await SELECT.from(Candidates)
+                    .where`LOWER(firstName) LIKE ${'%' + name.toLowerCase() + '%'}
+                           OR LOWER(lastName) LIKE ${'%' + name.toLowerCase() + '%'}`
+                    .limit(1);
+            }
+            return candidates.length > 0 ? candidates[0] : null;
+        };
+
+        const candidate1 = await findCandidate(intent.candidate1);
+        const candidate2 = await findCandidate(intent.candidate2);
+
+        if (!candidate1 || !candidate2) {
+            const missing = !candidate1 ? intent.candidate1 : intent.candidate2;
+            return {
+                results: [],
+                totalCount: 0,
+                message: `Could not find candidate "${missing}". Please check the name.`
+            };
+        }
+
+        // Get match scores if job context exists
+        let score1 = candidate1.overallScore || 0;
+        let score2 = candidate2.overallScore || 0;
+
+        if (intent.jobId) {
+            const match1 = await SELECT.one.from(MatchResults)
+                .where({ candidate_ID: candidate1.ID, jobPosting_ID: intent.jobId });
+            const match2 = await SELECT.one.from(MatchResults)
+                .where({ candidate_ID: candidate2.ID, jobPosting_ID: intent.jobId });
+            if (match1) score1 = match1.overallScore;
+            if (match2) score2 = match2.overallScore;
+        }
+
+        const results = [
+            {
+                type: 'candidate',
+                id: candidate1.ID,
+                title: `${candidate1.firstName} ${candidate1.lastName}`,
+                subtitle: candidate1.headline || candidate1.currentTitle || 'Candidate',
+                score: score1,
+                metadata: JSON.stringify({ experience: candidate1.totalExperienceYears })
+            },
+            {
+                type: 'candidate',
+                id: candidate2.ID,
+                title: `${candidate2.firstName} ${candidate2.lastName}`,
+                subtitle: candidate2.headline || candidate2.currentTitle || 'Candidate',
+                score: score2,
+                metadata: JSON.stringify({ experience: candidate2.totalExperienceYears })
+            }
+        ];
+
+        const winner = score1 > score2 ? candidate1 : candidate2;
+        const message = score1 === score2
+            ? `Both candidates have similar scores (${score1}%).`
+            : `${winner.firstName} ${winner.lastName} has a higher score (${Math.max(score1, score2)}% vs ${Math.min(score1, score2)}%).`;
+
+        return { results, totalCount: 2, message: `Comparing candidates:\n${message}` };
+    }
+
+    /**
+     * Find jobs that fit a candidate
+     */
+    async _searchJobFit(intent, db) {
+        const { Candidates, JobPostings, MatchResults } = db.entities('cv.sorting');
+
+        let candidateId = intent.candidateId;
+        const candidateName = intent.candidateName;
+
+        // Find candidate by name
+        if (!candidateId && candidateName) {
+            const nameParts = candidateName.split(' ');
+            let candidates;
+            if (nameParts.length >= 2) {
+                candidates = await SELECT.from(Candidates)
+                    .where`LOWER(firstName) LIKE ${'%' + nameParts[0].toLowerCase() + '%'}
+                           AND LOWER(lastName) LIKE ${'%' + nameParts[nameParts.length - 1].toLowerCase() + '%'}`
+                    .limit(1);
+            } else {
+                candidates = await SELECT.from(Candidates)
+                    .where`LOWER(firstName) LIKE ${'%' + candidateName.toLowerCase() + '%'}
+                           OR LOWER(lastName) LIKE ${'%' + candidateName.toLowerCase() + '%'}`
+                    .limit(1);
+            }
+            if (candidates.length > 0) {
+                candidateId = candidates[0].ID;
+            }
+        }
+
+        if (!candidateId) {
+            return { results: [], totalCount: 0, candidateName: candidateName || 'Unknown' };
+        }
+
+        // Get match results for this candidate
+        const matches = await SELECT.from(MatchResults)
+            .where({ candidate_ID: candidateId })
+            .orderBy('overallScore desc')
+            .limit(10);
+
+        const results = [];
+        for (const match of matches) {
+            const job = await SELECT.one.from(JobPostings).where({ ID: match.jobPosting_ID });
+            if (job) {
+                results.push({
+                    type: 'job',
+                    id: job.ID,
+                    title: job.title,
+                    subtitle: `${job.department || ''} ${job.location ? '• ' + job.location : ''}`.trim(),
+                    score: match.overallScore,
+                    metadata: JSON.stringify({
+                        status: job.status,
+                        employmentType: job.employmentType
+                    })
+                });
+            }
+        }
+
+        const candidate = await SELECT.one.from(Candidates).where({ ID: candidateId });
+        const fullName = candidate ? `${candidate.firstName} ${candidate.lastName}` : candidateName;
+
+        return { results, totalCount: results.length, candidateName: fullName };
+    }
+
+    /**
+     * List all candidates
+     */
+    async _listAllCandidates(db) {
+        const { Candidates } = db.entities('cv.sorting');
+
+        const candidates = await SELECT.from(Candidates)
+            .orderBy('createdAt desc')
+            .limit(20);
+
+        const results = candidates.map(candidate => ({
+            type: 'candidate',
+            id: candidate.ID,
+            title: `${candidate.firstName} ${candidate.lastName}`,
+            subtitle: candidate.headline || candidate.email || 'Candidate',
+            score: candidate.overallScore || 0,
+            metadata: JSON.stringify({
+                email: candidate.email,
+                location: candidate.city,
+                experience: candidate.totalExperienceYears
+            })
+        }));
+
+        return { results, totalCount: candidates.length };
+    }
+
+    /**
+     * Search candidates by skill name
+     */
+    async _searchBySkill(skillName, db) {
+        const { Candidates, CandidateSkills, Skills } = db.entities('cv.sorting');
+
+        // Find skills matching the search term
+        const skills = await SELECT.from(Skills)
+            .where`LOWER(name) LIKE ${'%' + skillName.toLowerCase() + '%'}`;
+
+        if (skills.length === 0) {
+            return { results: [], totalCount: 0 };
+        }
+
+        const skillIds = skills.map(s => s.ID);
+
+        // Find candidates with these skills
+        const candidateSkillLinks = await SELECT.from(CandidateSkills)
+            .where({ skill_ID: { in: skillIds } });
+
+        const candidateIds = [...new Set(candidateSkillLinks.map(cs => cs.candidate_ID))];
+
+        if (candidateIds.length === 0) {
+            return { results: [], totalCount: 0 };
+        }
+
+        const candidates = await SELECT.from(Candidates)
+            .where({ ID: { in: candidateIds } })
+            .limit(20);
+
+        const results = candidates.map(candidate => ({
+            type: 'candidate',
+            id: candidate.ID,
+            title: `${candidate.firstName} ${candidate.lastName}`,
+            subtitle: candidate.headline || candidate.email || 'Candidate',
+            score: candidate.overallScore || 0,
+            metadata: JSON.stringify({
+                email: candidate.email,
+                location: candidate.city,
+                experience: candidate.totalExperienceYears,
+                matchedSkill: skills.find(s => candidateSkillLinks.some(
+                    cs => cs.candidate_ID === candidate.ID && cs.skill_ID === s.ID
+                ))?.name
+            })
+        }));
+
+        return { results, totalCount: candidates.length };
+    }
+
+    /**
+     * Get best candidates based on overall scores
+     */
+    async _getBestCandidates(db) {
+        const { Candidates, MatchResults } = db.entities('cv.sorting');
+
+        // Get candidates with highest match scores
+        const topMatches = await SELECT.from(MatchResults)
+            .columns('candidate_ID', 'MAX(overallScore) as maxScore')
+            .groupBy('candidate_ID')
+            .orderBy('maxScore desc')
+            .limit(20);
+
+        if (topMatches.length === 0) {
+            // Fallback: return all candidates ordered by overall score
+            const candidates = await SELECT.from(Candidates)
+                .orderBy('overallScore desc')
+                .limit(20);
+
+            const results = candidates.map(candidate => ({
+                type: 'candidate',
+                id: candidate.ID,
+                title: `${candidate.firstName} ${candidate.lastName}`,
+                subtitle: candidate.headline || candidate.email || 'Candidate',
+                score: candidate.overallScore || 0,
+                metadata: JSON.stringify({
+                    email: candidate.email,
+                    location: candidate.city
+                })
+            }));
+
+            return { results, totalCount: candidates.length };
+        }
+
+        const candidateIds = topMatches.map(m => m.candidate_ID);
+        const candidates = await SELECT.from(Candidates)
+            .where({ ID: { in: candidateIds } });
+
+        const candidateMap = new Map(candidates.map(c => [c.ID, c]));
+
+        const results = topMatches
+            .filter(m => candidateMap.has(m.candidate_ID))
+            .map(match => {
+                const candidate = candidateMap.get(match.candidate_ID);
+                return {
+                    type: 'candidate',
+                    id: candidate.ID,
+                    title: `${candidate.firstName} ${candidate.lastName}`,
+                    subtitle: candidate.headline || candidate.email || 'Candidate',
+                    score: match.maxScore || 0,
+                    metadata: JSON.stringify({
+                        email: candidate.email,
+                        location: candidate.city
+                    })
+                };
+            });
+
+        return { results, totalCount: results.length };
+    }
+
+    /**
+     * Extract keywords from a query
+     */
+    _extractKeywords(query) {
+        const stopWords = new Set([
+            'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+            'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been',
+            'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+            'should', 'may', 'might', 'must', 'can', 'find', 'show', 'get', 'list',
+            'search', 'look', 'looking', 'need', 'want', 'please', 'me', 'i', 'we',
+            'you', 'they', 'who', 'what', 'where', 'when', 'how', 'which', 'all'
+        ]);
+
+        return query
+            .toLowerCase()
+            .replace(/[^\w\s]/g, '')
+            .split(/\s+/)
+            .filter(word => word.length > 2 && !stopWords.has(word));
+    }
+
+    /**
+     * Search by extracted keywords
+     */
+    async _searchByKeywords(keywords, db) {
+        const { Candidates, CandidateSkills, Skills } = db.entities('cv.sorting');
+
+        let allCandidates = [];
+        const existingIds = new Set();
+
+        for (const keyword of keywords) {
+            // Search by name/headline
+            const nameMatches = await SELECT.from(Candidates)
+                .where`
+                    LOWER(firstName) LIKE ${'%' + keyword + '%'}
+                    OR LOWER(lastName) LIKE ${'%' + keyword + '%'}
+                    OR LOWER(headline) LIKE ${'%' + keyword + '%'}
+                `
+                .limit(10);
+
+            for (const c of nameMatches) {
+                if (!existingIds.has(c.ID)) {
+                    existingIds.add(c.ID);
+                    allCandidates.push(c);
+                }
+            }
+
+            // Search by skill
+            const skillMatches = await SELECT.from(Skills)
+                .where`LOWER(name) LIKE ${'%' + keyword + '%'}`;
+
+            if (skillMatches.length > 0) {
+                const skillIds = skillMatches.map(s => s.ID);
+                const candidateSkills = await SELECT.from(CandidateSkills)
+                    .where({ skill_ID: { in: skillIds } });
+                const candidateIds = candidateSkills
+                    .map(cs => cs.candidate_ID)
+                    .filter(id => !existingIds.has(id));
+
+                if (candidateIds.length > 0) {
+                    const skillCandidates = await SELECT.from(Candidates)
+                        .where({ ID: { in: candidateIds } });
+                    for (const c of skillCandidates) {
+                        if (!existingIds.has(c.ID)) {
+                            existingIds.add(c.ID);
+                            allCandidates.push(c);
+                        }
+                    }
+                }
+            }
+        }
+
+        const results = allCandidates.slice(0, 20).map(candidate => ({
+            type: 'candidate',
+            id: candidate.ID,
+            title: `${candidate.firstName} ${candidate.lastName}`,
+            subtitle: candidate.headline || candidate.email || 'Candidate',
+            score: candidate.overallScore || 0,
+            metadata: JSON.stringify({
+                email: candidate.email,
+                location: candidate.city
+            })
+        }));
+
+        return { results, totalCount: allCandidates.length };
     }
 };

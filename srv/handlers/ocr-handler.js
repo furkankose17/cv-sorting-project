@@ -57,10 +57,21 @@ async function uploadAndProcessCV(req) {
 
         LOG.info(`OCR completed with confidence: ${ocrResult.confidence}%`);
 
+        // Prepare extracted data with structured info and lines for PDF highlighting
+        const extractedDataObj = {
+            ...(ocrResult.structured_data || {}),
+            lines: ocrResult.lines || [],  // Lines with bounding boxes for highlighting
+            preview_image: ocrResult.preview_image || null,  // Base64 first page for overlay
+            preview_dimensions: ocrResult.preview_dimensions || null,  // Image dimensions
+            pages: ocrResult.pages,
+            method: ocrResult.method
+        };
+
         // Update document with OCR results
         await UPDATE(CVDocuments)
             .set({
                 extractedText: ocrResult.text,
+                extractedData: JSON.stringify(extractedDataObj),  // Store in extractedData for CVReview
                 structuredData: JSON.stringify(ocrResult.structured_data),
                 ocrConfidence: ocrResult.confidence,
                 ocrMethod: ocrResult.method,
@@ -299,7 +310,7 @@ async function reviewAndCreateCandidate(req) {
     const LOG = cds.log('ocr-handler');
 
     const db = await cds.connect.to('db');
-    const { CVDocuments, Candidates, CandidateSkills } = db.entities('cv.sorting');
+    const { CVDocuments, Candidates, CandidateSkills, Skills, WorkExperiences, Educations } = db.entities('cv.sorting');
 
     try {
         // Get document
@@ -313,17 +324,27 @@ async function reviewAndCreateCandidate(req) {
         // Parse edited data
         const extractedData = JSON.parse(editedData);
         const tier1 = extractedData.tier1 || {};
+        const tier2 = extractedData.tier2 || {};
 
         // Create candidate
         const candidateId = cds.utils.uuid();
+
+        // Parse location: "San Francisco, CA, USA" -> city="San Francisco", country_code="US"
+        const locationParts = (tier1.location?.value || '').split(',').map(p => p.trim());
+        const city = locationParts[0] || null;
+        // Map common country names to ISO codes
+        const countryMapping = { 'USA': 'US', 'United States': 'US', 'UK': 'GB', 'United Kingdom': 'GB' };
+        const rawCountry = locationParts[locationParts.length - 1] || null;
+        const country_code = countryMapping[rawCountry] || (rawCountry?.length === 2 ? rawCountry : null);
+
         await INSERT.into(Candidates).entries({
             ID: candidateId,
             firstName: tier1.firstName?.value,
             lastName: tier1.lastName?.value,
             email: tier1.email?.value,
             phone: tier1.phone?.value,
-            city: tier1.location?.value?.split(',')[0]?.trim(),
-            country: tier1.location?.value?.split(',')[1]?.trim(),
+            city: city,
+            country_code: country_code,
             status_code: 'new'
         });
 
@@ -334,45 +355,125 @@ async function reviewAndCreateCandidate(req) {
             .set({
                 candidate_ID: candidateId,
                 ocrStatus: 'completed',
-                reviewedBy: req.user.id,
+                reviewedBy: req.user?.id || 'system',
                 reviewedAt: new Date()
             })
             .where({ ID: documentId });
+
+        // Save work experiences
+        const workHistory = tier2.workHistory || [];
+        for (const job of workHistory) {
+            const startYear = job.startDate?.value;
+            const endYear = job.endDate?.value;
+            const isCurrent = endYear?.toLowerCase() === 'present' || !endYear;
+
+            await INSERT.into(WorkExperiences).entries({
+                ID: cds.utils.uuid(),
+                candidate_ID: candidateId,
+                companyName: job.company?.value || 'Unknown',
+                jobTitle: job.jobTitle?.value || 'Unknown',
+                startDate: startYear ? `${startYear}-01-01` : null,
+                endDate: isCurrent ? null : (endYear ? `${endYear}-12-31` : null),
+                isCurrent: isCurrent,
+                description: job.responsibilities?.value || ''
+            });
+        }
+        LOG.info(`Saved ${workHistory.length} work experiences for candidate ${candidateId}`);
+
+        // Save education
+        const education = tier2.education || [];
+        for (const edu of education) {
+            const gradYear = edu.graduationYear?.value;
+
+            await INSERT.into(Educations).entries({
+                ID: cds.utils.uuid(),
+                candidate_ID: candidateId,
+                institution: edu.institution?.value || 'Unknown',
+                degree: edu.degree?.value || '',
+                fieldOfStudy: edu.fieldOfStudy?.value || '',
+                endDate: gradYear ? `${gradYear}-06-30` : null
+            });
+        }
+        LOG.info(`Saved ${education.length} education entries for candidate ${candidateId}`);
+
+        // Save skills - find or create skill, then link to candidate
+        let linkedSkillsCount = 0;
+        const skills = tier2.skills || [];
+        for (const skillData of skills) {
+            const skillName = skillData.name?.value;
+            if (!skillName) continue;
+
+            const normalizedName = skillName.toLowerCase().trim();
+
+            // Find existing skill or create new one
+            let skill = await SELECT.one.from(Skills)
+                .where({ normalizedName: normalizedName });
+
+            if (!skill) {
+                const skillId = cds.utils.uuid();
+                await INSERT.into(Skills).entries({
+                    ID: skillId,
+                    name: skillName,
+                    normalizedName: normalizedName,
+                    isActive: true,
+                    usageCount: 1
+                });
+                skill = { ID: skillId };
+                LOG.info(`Created new skill: ${skillName}`);
+            } else {
+                // Increment usage count
+                await UPDATE(Skills)
+                    .set({ usageCount: (skill.usageCount || 0) + 1 })
+                    .where({ ID: skill.ID });
+            }
+
+            // Link skill to candidate
+            await INSERT.into(CandidateSkills).entries({
+                ID: cds.utils.uuid(),
+                candidate_ID: candidateId,
+                skill_ID: skill.ID,
+                proficiencyLevel: 'intermediate',
+                source: 'extracted',
+                confidenceScore: skillData.name?.confidence || 90
+            });
+            linkedSkillsCount++;
+        }
+        LOG.info(`Linked ${linkedSkillsCount} skills to candidate ${candidateId}`);
 
         // Generate embedding for semantic search
         let embeddingGenerated = false;
         try {
             const mlClient = createMLClient();
 
-            // Prepare candidate profile for embedding
-            const candidateProfile = {
-                name: `${tier1.firstName?.value || ''} ${tier1.lastName?.value || ''}`.trim(),
-                email: tier1.email?.value || '',
-                skills: [],
-                experience: extractedData.tier2?.workHistory || []
-            };
+            // Build text content for embedding
+            const skillsText = skills.map(s => s.name?.value).filter(Boolean).join(', ');
+            const experienceText = workHistory.map(job =>
+                `${job.jobTitle?.value || ''} at ${job.company?.value || ''}: ${job.responsibilities?.value || ''}`
+            ).join('\n');
 
-            // Generate embedding
-            const embeddingResult = await mlClient.generateEmbedding({
-                text: JSON.stringify(candidateProfile),
-                type: 'candidate'
-            });
+            // Use CV extracted text as main content
+            const textContent = document.extractedText || `${tier1.firstName?.value || ''} ${tier1.lastName?.value || ''} - ${skillsText}`;
 
-            if (embeddingResult && embeddingResult.embedding) {
-                await UPDATE(Candidates)
-                    .set({ embedding: JSON.stringify(embeddingResult.embedding) })
-                    .where({ ID: candidateId });
+            if (textContent && textContent.length >= 10) {
+                const embeddingResult = await mlClient.generateEmbedding({
+                    entityType: 'candidate',
+                    entityId: candidateId,
+                    textContent: textContent,
+                    skillsText: skillsText,
+                    experienceText: experienceText
+                });
 
-                embeddingGenerated = true;
-                LOG.info(`Generated embedding for candidate ${candidateId}`);
+                if (embeddingResult && embeddingResult.stored) {
+                    embeddingGenerated = true;
+                    LOG.info(`Generated embedding for candidate ${candidateId}`);
+                }
+            } else {
+                LOG.warn(`Insufficient text content for embedding generation (length: ${textContent?.length || 0})`);
             }
         } catch (embeddingError) {
             LOG.warn(`Failed to generate embedding for candidate ${candidateId}: ${embeddingError.message}`);
             // Don't fail the whole operation if embedding generation fails
         }
-
-        // Count linked skills (placeholder - actual skill linking would be done separately)
-        const linkedSkillsCount = 0;
 
         return {
             candidateId,

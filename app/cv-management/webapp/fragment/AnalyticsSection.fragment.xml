@@ -129,6 +129,93 @@
             </f:Card>
         </layout:HorizontalLayout>
 
+        <!-- Priority Candidates Panel - Smart Screening Assistant -->
+        <Panel
+            headerText="{i18n>priorityCandidates}"
+            expandable="true"
+            expanded="true"
+            class="sapUiMediumMarginBottom">
+            <headerToolbar>
+                <Toolbar>
+                    <Title text="{i18n>hotCandidatesToReview}" />
+                    <ToolbarSpacer />
+                    <Button
+                        icon="sap-icon://refresh"
+                        tooltip="{i18n>refresh}"
+                        press=".onRefreshPriorityCandidates" />
+                </Toolbar>
+            </headerToolbar>
+            <content>
+                <VBox class="sapUiSmallMargin">
+                    <!-- Loading Indicator -->
+                    <BusyIndicator
+                        visible="{dashboard>/priorityData/isLoading}" />
+
+                    <!-- Priority Candidates by Job -->
+                    <Table
+                        id="priorityCandidatesTable"
+                        items="{dashboard>/priorityData/jobsWithHotCandidates}"
+                        noDataText="{i18n>noCandidatesPendingReview}"
+                        visible="{= !${dashboard>/priorityData/isLoading} }">
+                        <columns>
+                            <Column>
+                                <Text text="{i18n>jobTitle}" />
+                            </Column>
+                            <Column width="6em" hAlign="Center">
+                                <Text text="{i18n>hotLabel}" />
+                            </Column>
+                            <Column width="6em" hAlign="Center">
+                                <Text text="{i18n>warmLabel}" />
+                            </Column>
+                            <Column width="6em" hAlign="Center">
+                                <Text text="{i18n>totalLabel}" />
+                            </Column>
+                            <Column width="8em">
+                                <Text text="{i18n>actions}" />
+                            </Column>
+                        </columns>
+                        <items>
+                            <ColumnListItem type="Navigation" press=".onPriorityJobPress">
+                                <cells>
+                                    <VBox>
+                                        <Text text="{dashboard>jobTitle}" class="sapMText" />
+                                        <Text text="{dashboard>department}" class="sapUiTinyText" />
+                                    </VBox>
+                                    <ObjectStatus
+                                        text="{dashboard>hotCount}"
+                                        state="Success"
+                                        icon="sap-icon://status-positive" />
+                                    <ObjectStatus
+                                        text="{dashboard>warmCount}"
+                                        state="Warning"
+                                        icon="sap-icon://status-critical" />
+                                    <ObjectNumber number="{dashboard>totalMatches}" />
+                                    <Button
+                                        text="{i18n>reviewCandidates}"
+                                        type="Emphasized"
+                                        press=".onReviewPriorityCandidates" />
+                                </cells>
+                            </ColumnListItem>
+                        </items>
+                    </Table>
+
+                    <!-- Empty State -->
+                    <IllustratedMessage
+                        illustrationType="sapIllus-NoData"
+                        title="{i18n>noCandidatesPendingReview}"
+                        description="{i18n>runMatchingToSeeResults}"
+                        visible="{= !${dashboard>/priorityData/isLoading} &amp;&amp; ${dashboard>/priorityData/jobsWithHotCandidates}.length === 0 }">
+                        <additionalContent>
+                            <Button
+                                text="{i18n>viewAllJobs}"
+                                type="Emphasized"
+                                press=".onViewAllJobs" />
+                        </additionalContent>
+                    </IllustratedMessage>
+                </VBox>
+            </content>
+        </Panel>
+
         <!-- Pipeline Status Panel -->
         <Panel
             headerText="{i18n>candidatePipeline}"

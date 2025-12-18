@@ -65,6 +65,12 @@
                     <Title text="Candidate List" level="H3" />
                     <ToolbarSpacer />
                     <Button
+                        text="Match Selected"
+                        icon="sap-icon://match"
+                        type="Emphasized"
+                        press=".onBulkMatchCandidates"
+                        enabled="{= ${view>/selectedCandidatesCount} > 0 }" />
+                    <Button
                         text="Bulk Update Status"
                         icon="sap-icon://multi-select"
                         press=".onBulkUpdateStatus"
@@ -171,6 +177,11 @@
 
                         <!-- Actions -->
                         <HBox justifyContent="End">
+                            <Button
+                                icon="sap-icon://match"
+                                type="Transparent"
+                                press=".onMatchCandidateFromList"
+                                tooltip="Match with Jobs" />
                             <Button
                                 icon="sap-icon://edit"
                                 type="Transparent"

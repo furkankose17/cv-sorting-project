@@ -7,7 +7,7 @@ for repeated texts. Uses MD5 hash for cache keys.
 
 import hashlib
 import logging
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 from collections import OrderedDict
 import numpy as np
 
@@ -159,7 +159,7 @@ class EmbeddingCache:
         total = self.hits + self.misses
         return self.hits / total if total > 0 else 0.0
 
-    def stats(self) -> Dict[str, any]:
+    def stats(self) -> Dict[str, Any]:
         """
         Get cache statistics.
 

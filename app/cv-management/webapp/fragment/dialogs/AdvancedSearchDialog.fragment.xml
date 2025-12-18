@@ -105,7 +105,7 @@
 
                                 <Label text="Status" />
                                 <MultiComboBox
-                                    id="statusFilter"
+                                    id="advancedSearchStatusFilter"
                                     selectedKeys="{dialogModel>/statuses}">
                                     <items>
                                         <core:Item key="new" text="New" />
@@ -118,7 +118,7 @@
 
                                 <Label text="Skills" />
                                 <MultiComboBox
-                                    id="skillsFilter"
+                                    id="advancedSearchSkillsFilter"
                                     selectedKeys="{dialogModel>/skills}"
                                     items="{/Skills}">
                                     <core:Item key="{ID}" text="{name}" />

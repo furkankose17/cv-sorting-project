@@ -154,19 +154,18 @@
           "name": "JobDetail"
         },
         "jobScoring": {
-          "id": "JobScoring",
-          "name": "JobScoring"
+          "id": "JobDetail",
+          "name": "JobDetail",
+          "viewLevel": 2
         },
         "Upload": {
-          "viewType": "XML",
-          "viewName": "Upload",
-          "viewId": "upload",
+          "id": "Upload",
+          "name": "Upload",
           "viewLevel": 1
         },
         "cvReview": {
           "id": "CVReview",
           "name": "CVReview",
-          "viewType": "XML",
           "viewLevel": 1
         }
       }

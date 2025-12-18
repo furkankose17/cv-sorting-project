@@ -78,7 +78,7 @@
                         placeholder="List key requirements, qualifications, and skills..." />
 
                     <!-- Experience & Salary -->
-                    <core:Title text="Experience & Compensation" class="sapUiTinyMarginTop" />
+                    <core:Title text="Experience &amp; Compensation" class="sapUiTinyMarginTop" />
 
                     <Label text="Minimum Experience (years)" />
                     <StepInput

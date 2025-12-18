@@ -41,8 +41,12 @@
 
                 <uxap:actions>
                     <Button
-                        text="Update Status"
+                        text="Match with Jobs"
+                        icon="sap-icon://match"
                         type="Emphasized"
+                        press=".onMatchWithJobs" />
+                    <Button
+                        text="Update Status"
                         press=".onUpdateStatus" />
                     <Button
                         text="Add Skill"
@@ -304,10 +308,12 @@
                                 id="interviewsTable"
                                 items="{
                                     path: 'interviews',
+                                    templateShareable: false,
                                     parameters: {
-                                        $expand: 'interviewType,status'
+                                        $$ownRequest: true
                                     }
-                                }">
+                                }"
+                                noDataText="No interviews scheduled">
                                 <headerToolbar>
                                     <OverflowToolbar>
                                         <Title text="Interview History" level="H4" />
@@ -341,8 +347,7 @@
                                             <Text text="{interviewType}" />
                                             <Text text="{
                                                 path: 'scheduledDate',
-                                                type: 'sap.ui.model.type.DateTime',
-                                                formatOptions: {pattern: 'MMM dd, yyyy HH:mm'}
+                                                formatter: '.DisplayFormatter.formatDateTime'
                                             }" />
                                             <ObjectStatus
                                                 text="{status}"
@@ -417,12 +422,15 @@
                                             <ObjectNumber
                                                 number="{
                                                     path: 'semanticScore',
-                                                    formatter: '.DataFormatter.formatScore'
+                                                    formatter: '.StatusFormatter.formatSemanticScoreValue'
                                                 }"
-                                                unit="%"
+                                                unit="{
+                                                    path: 'semanticScore',
+                                                    formatter: '.StatusFormatter.formatSemanticScoreUnit'
+                                                }"
                                                 state="{
                                                     path: 'semanticScore',
-                                                    formatter: '.StatusFormatter.formatScoreState'
+                                                    formatter: '.StatusFormatter.formatSemanticScoreState'
                                                 }" />
                                             <Text text="{
                                                 path: 'createdAt',

@@ -28,6 +28,11 @@ module.exports = class JobService extends cds.ApplicationService {
         this.thresholds = new Map();
         this.notificationHistory = [];
 
+        // Memory cleanup: periodically prune old notifications (every hour)
+        this._cleanupInterval = setInterval(() => {
+            this._cleanupOldNotifications();
+        }, 60 * 60 * 1000); // 1 hour
+
         // Get entity references
         const { JobPostings, JobRequiredSkills, MatchResults, Candidates, CandidateSkills,
                 Skills, SkillCategories, CVDocuments, AuditLogs, Interviews,
@@ -1466,6 +1471,44 @@ module.exports = class JobService extends cds.ApplicationService {
         }
 
         return filtered;
+    }
+
+    /**
+     * Cleanup old notifications to prevent memory leak
+     * Keeps only last 30 days of notification history
+     * @private
+     */
+    _cleanupOldNotifications() {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const thirtyDaysAgoISO = thirtyDaysAgo.toISOString();
+
+        const originalLength = this.notificationHistory.length;
+        this.notificationHistory = this.notificationHistory.filter(
+            n => n.sentAt > thirtyDaysAgoISO
+        );
+
+        const removed = originalLength - this.notificationHistory.length;
+        if (removed > 0) {
+            LOG.info(`Memory cleanup: removed ${removed} old notifications`);
+        }
+
+        // Also clean up stale thresholds (not updated in 90 days)
+        const ninetyDaysAgo = new Date();
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+        const ninetyDaysAgoISO = ninetyDaysAgo.toISOString();
+
+        let removedThresholds = 0;
+        for (const [jobId, threshold] of this.thresholds.entries()) {
+            if (threshold.updatedAt && threshold.updatedAt < ninetyDaysAgoISO) {
+                this.thresholds.delete(jobId);
+                removedThresholds++;
+            }
+        }
+
+        if (removedThresholds > 0) {
+            LOG.info(`Memory cleanup: removed ${removedThresholds} stale thresholds`);
+        }
     }
 
     async _triggerN8nWebhook(payload) {

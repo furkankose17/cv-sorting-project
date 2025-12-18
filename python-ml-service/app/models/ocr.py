@@ -1,23 +1,24 @@
 """
 OCR Processor for CV Sorting ML Service.
 Uses RapidOCR as primary engine with Tesseract as fallback.
-Supports multilingual OCR (EN, DE, TR, FR, ES) with table detection.
+Optimized for CV/resume document processing with high accuracy.
 """
 
 import io
 import logging
 import os
-import tempfile
+import hashlib
+import time
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
-import hashlib
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
 
 class OCRProcessor:
     """
-    OCR processor using RapidOCR (primary) or Tesseract (fallback).
+    Optimized OCR processor using RapidOCR (primary) or Tesseract (fallback).
     Supports PDF, PNG, JPG, TIFF, and other image formats.
 
     RapidOCR advantages:
@@ -25,6 +26,7 @@ class OCRProcessor:
     - Excellent handling of both clean and scanned documents
     - Built-in multilingual support (EN, DE, TR, FR, ES, etc.)
     - Lower memory footprint (~500MB vs 2GB+)
+    - No GPU required for good performance
     """
 
     SUPPORTED_FORMATS = {
@@ -39,26 +41,8 @@ class OCRProcessor:
         'webp': 'image/webp'
     }
 
-    # Language mapping: PaddleOCR uses different codes
-    PADDLE_LANG_MAP = {
-        'en': 'en',
-        'eng': 'en',
-        'german': 'german',
-        'deu': 'german',
-        'de': 'german',
-        'turkish': 'tr',  # PaddleOCR uses 'tr' for Turkish
-        'tur': 'tr',
-        'tr': 'tr',
-        'french': 'fr',
-        'fra': 'fr',
-        'fr': 'fr',
-        'spanish': 'es',
-        'spa': 'es',
-        'es': 'es',
-    }
-
-    # Tesseract language codes (for fallback)
-    TESSERACT_LANG_MAP = {
+    # Language mapping for RapidOCR (auto-detects, but useful for Tesseract fallback)
+    LANGUAGE_MAP = {
         'en': 'eng',
         'eng': 'eng',
         'german': 'deu',
@@ -81,58 +65,99 @@ class OCRProcessor:
         tesseract_cmd: Optional[str] = None,
         poppler_path: Optional[str] = None,
         default_language: str = "en",
-        use_angle_cls: bool = True,
+        # RapidOCR optimization settings
+        det_db_thresh: float = 0.3,  # Detection threshold (lower = more sensitive)
+        det_db_box_thresh: float = 0.5,  # Box threshold
+        det_db_unclip_ratio: float = 1.6,  # Unclip ratio for text regions
+        rec_batch_num: int = 6,  # Recognition batch size
+        use_det: bool = True,
+        use_cls: bool = True,
+        use_rec: bool = True,
+        # Image preprocessing
+        apply_preprocessing: bool = True,
+        contrast_factor: float = 1.3,
+        sharpness_factor: float = 1.2,
+        # Table detection
         table_detection: bool = True,
-        layout_analysis: bool = True
     ):
         """
-        Initialize OCR processor.
+        Initialize OCR processor with optimized settings for CV processing.
 
         Args:
-            engine: OCR engine to use ('rapidocr', 'paddleocr', or 'tesseract')
-            tesseract_cmd: Path to tesseract executable
+            engine: OCR engine to use ('rapidocr' or 'tesseract')
+            tesseract_cmd: Path to tesseract executable (for fallback)
             poppler_path: Path to poppler binaries (for PDF conversion)
             default_language: Default OCR language
-            use_angle_cls: Whether to use angle classification
-            table_detection: Whether to enable table detection
-            layout_analysis: Whether to enable layout analysis
+            det_db_thresh: Text detection threshold (0.1-0.9, lower=more sensitive)
+            det_db_box_thresh: Box detection threshold
+            det_db_unclip_ratio: Expansion ratio for detected text regions
+            rec_batch_num: Batch size for recognition (higher=faster but more memory)
+            use_det: Enable text detection
+            use_cls: Enable text direction classification
+            use_rec: Enable text recognition
+            apply_preprocessing: Apply image preprocessing for better accuracy
+            contrast_factor: Contrast enhancement factor
+            sharpness_factor: Sharpness enhancement factor
+            table_detection: Enable table structure detection
         """
         self.engine = engine or os.getenv("OCR_ENGINE", "rapidocr")
         self.default_language = default_language
         self.poppler_path = poppler_path
-        self.use_angle_cls = use_angle_cls
         self.table_detection = table_detection
-        self.layout_analysis = layout_analysis
 
-        self._paddle_ocr = None
+        # RapidOCR optimization parameters
+        self.det_db_thresh = det_db_thresh
+        self.det_db_box_thresh = det_db_box_thresh
+        self.det_db_unclip_ratio = det_db_unclip_ratio
+        self.rec_batch_num = rec_batch_num
+        self.use_det = use_det
+        self.use_cls = use_cls
+        self.use_rec = use_rec
+
+        # Preprocessing settings
+        self.apply_preprocessing = apply_preprocessing
+        self.contrast_factor = contrast_factor
+        self.sharpness_factor = sharpness_factor
+
+        # Engine instances
         self._rapid_ocr = None
         self._tesseract_available = False
 
-        # Initialize based on engine selection
+        # Initialize the selected engine
         if self.engine == "rapidocr":
             self._init_rapidocr()
-        elif self.engine == "paddleocr":
-            self._init_paddleocr()
         else:
             self._init_tesseract(tesseract_cmd)
 
-    def _init_paddleocr(self):
-        """Initialize PaddleOCR engine (v3.x compatible)."""
+    def _init_rapidocr(self):
+        """Initialize RapidOCR engine with optimized settings."""
         try:
-            from paddleocr import PaddleOCR
+            from rapidocr_onnxruntime import RapidOCR
 
-            paddle_lang = self.PADDLE_LANG_MAP.get(self.default_language, 'en')
-            logger.info(f"Initializing PaddleOCR 3.x with language: {paddle_lang}")
+            logger.info("Initializing RapidOCR with optimized settings...")
 
-            # PaddleOCR 3.x simplified initialization
-            self._paddle_ocr = PaddleOCR(lang=paddle_lang)
-            logger.info("PaddleOCR 3.x initialized successfully")
+            # Initialize with optimized parameters for CV processing
+            self._rapid_ocr = RapidOCR(
+                det_db_thresh=self.det_db_thresh,
+                det_db_box_thresh=self.det_db_box_thresh,
+                det_db_unclip_ratio=self.det_db_unclip_ratio,
+                rec_batch_num=self.rec_batch_num,
+                use_det=self.use_det,
+                use_cls=self.use_cls,
+                use_rec=self.use_rec,
+            )
+
+            logger.info("RapidOCR initialized successfully with optimized settings")
+            logger.info(f"  - Detection threshold: {self.det_db_thresh}")
+            logger.info(f"  - Box threshold: {self.det_db_box_thresh}")
+            logger.info(f"  - Recognition batch size: {self.rec_batch_num}")
+
         except ImportError:
-            logger.warning("PaddleOCR not available, falling back to Tesseract")
+            logger.warning("RapidOCR not available, falling back to Tesseract")
             self.engine = "tesseract"
             self._init_tesseract(None)
         except Exception as e:
-            logger.warning(f"PaddleOCR initialization failed: {e}, falling back to Tesseract")
+            logger.warning(f"RapidOCR initialization failed: {e}, falling back to Tesseract")
             self.engine = "tesseract"
             self._init_tesseract(None)
 
@@ -152,69 +177,47 @@ class OCRProcessor:
             logger.warning(f"Could not verify Tesseract installation: {e}")
             self._tesseract_available = False
 
-    def _init_rapidocr(self):
-        """Initialize RapidOCR engine."""
-        try:
-            from rapidocr_onnxruntime import RapidOCR
-
-            logger.info("Initializing RapidOCR...")
-            self._rapid_ocr = RapidOCR()
-            logger.info("RapidOCR initialized successfully")
-        except ImportError:
-            logger.warning("RapidOCR not available, falling back to Tesseract")
-            self.engine = "tesseract"
-            self._init_tesseract(None)
-        except Exception as e:
-            logger.warning(f"RapidOCR initialization failed: {e}, falling back to Tesseract")
-            self.engine = "tesseract"
-            self._init_tesseract(None)
-
     def extract_text(
         self,
         file_content: bytes,
         file_type: str,
         language: Optional[str] = None,
-        engine: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Extract text from a document.
+        Extract text from a document with optimized processing.
 
         Args:
             file_content: Binary file content
             file_type: File type (pdf, png, jpg, etc.)
             language: OCR language code (en, german, turkish, etc.)
-            engine: Override OCR engine ('rapidocr', 'paddleocr', or 'tesseract')
 
         Returns:
             Dict with extracted text, confidence, and metadata
         """
         file_type = file_type.lower().replace('.', '')
         language = language or self.default_language
-        use_engine = engine or self.engine
 
         if file_type not in self.SUPPORTED_FORMATS:
             raise ValueError(f"Unsupported file type: {file_type}. Supported: {list(self.SUPPORTED_FORMATS.keys())}")
 
-        logger.info(f"Processing {file_type} file with language: {language}, engine: {use_engine}")
+        logger.info(f"Processing {file_type} file with engine: {self.engine}")
 
         if file_type == 'pdf':
-            return self._process_pdf(file_content, language, use_engine)
+            return self._process_pdf(file_content, language)
         else:
-            return self._process_image(file_content, language, use_engine)
+            return self._process_image(file_content, language)
 
     def _process_pdf(
         self,
         content: bytes,
         language: str,
-        use_engine: str
     ) -> Dict[str, Any]:
         """
-        Process PDF document.
+        Process PDF document with optimized settings.
 
         Args:
             content: PDF file content
             language: OCR language
-            use_engine: OCR engine to use
 
         Returns:
             Extraction result
@@ -224,37 +227,49 @@ class OCRProcessor:
         logger.info("Converting PDF to images...")
 
         try:
-            # Convert PDF to images
+            # Use higher DPI for better accuracy on CVs
             images = convert_from_bytes(
                 content,
                 poppler_path=self.poppler_path,
-                dpi=150,  # Balanced DPI for speed and quality
-                fmt='png'
+                dpi=200,  # Higher DPI for better text quality
+                fmt='png',
+                grayscale=False,  # Keep color for better detection
             )
         except Exception as e:
-            logger.error(f"PDF conversion failed: {e}")
-            # Try even lower DPI
+            logger.warning(f"PDF conversion with DPI 200 failed: {e}, trying lower DPI")
             images = convert_from_bytes(
                 content,
                 poppler_path=self.poppler_path,
-                dpi=100,
-                fmt='png'
+                dpi=150,
+                fmt='png',
             )
 
         logger.info(f"PDF has {len(images)} pages")
 
+        # Capture first page as preview image for frontend highlighting
+        preview_image = None
+        preview_dimensions = None
+        if images:
+            first_page = images[0]
+            preview_dimensions = {"width": first_page.width, "height": first_page.height}
+            # Convert to base64 PNG for frontend display
+            preview_buffer = io.BytesIO()
+            first_page.save(preview_buffer, format='PNG', optimize=True)
+            preview_buffer.seek(0)
+            import base64
+            preview_image = base64.b64encode(preview_buffer.getvalue()).decode('utf-8')
+            logger.info(f"Generated preview image: {first_page.width}x{first_page.height}")
+
         texts = []
         confidences = []
         page_results = []
-        tables = []
+        all_lines = []
 
         for i, image in enumerate(images):
             logger.debug(f"Processing page {i + 1}/{len(images)}")
 
-            if use_engine == "rapidocr" and self._rapid_ocr:
+            if self._rapid_ocr:
                 page_result = self._ocr_with_rapid(image, language)
-            elif use_engine == "paddleocr" and self._paddle_ocr:
-                page_result = self._ocr_with_paddle(image, language)
             else:
                 page_result = self._ocr_with_tesseract(image, language)
 
@@ -264,14 +279,15 @@ class OCRProcessor:
             page_results.append({
                 'page': i + 1,
                 'text_length': len(page_result['text']),
-                'confidence': round(page_result['confidence'], 2)
+                'confidence': round(page_result['confidence'], 2),
+                'lines_count': page_result.get('lines_count', 0)
             })
 
-            # Collect tables if detected
-            if 'tables' in page_result and page_result['tables']:
-                for table in page_result['tables']:
-                    table['page'] = i + 1
-                    tables.append(table)
+            # Collect line data for table detection
+            if 'lines' in page_result and isinstance(page_result['lines'], list):
+                for line in page_result['lines']:
+                    line['page'] = i + 1
+                    all_lines.append(line)
 
         # Combine all pages
         full_text = '\n\n'.join(texts)
@@ -281,15 +297,21 @@ class OCRProcessor:
             'text': full_text,
             'pages': len(images),
             'confidence': round(avg_confidence, 2),
-            'method': f'{use_engine}_pdf',
+            'method': f'{self.engine}_pdf',
             'language': language,
             'page_details': page_results,
             'text_length': len(full_text),
-            'content_hash': self._compute_hash(content)
+            'content_hash': self._compute_hash(content),
+            'lines': all_lines,  # Include all lines with bounding boxes
+            'preview_image': preview_image,  # Base64-encoded first page for highlighting overlay
+            'preview_dimensions': preview_dimensions,  # Width/height for coordinate mapping
         }
 
-        if tables:
-            result['tables'] = tables
+        # Detect tables from line positions
+        if self.table_detection and all_lines:
+            tables = self._detect_tables_from_lines(all_lines)
+            if tables:
+                result['tables'] = tables
 
         return result
 
@@ -297,15 +319,13 @@ class OCRProcessor:
         self,
         content: bytes,
         language: str,
-        use_engine: str
     ) -> Dict[str, Any]:
         """
-        Process image file.
+        Process image file with preprocessing for better accuracy.
 
         Args:
             content: Image file content
             language: OCR language
-            use_engine: OCR engine to use
 
         Returns:
             Extraction result
@@ -321,123 +341,152 @@ class OCRProcessor:
 
         logger.info(f"Processing image: {image.size}, mode: {image.mode}")
 
-        # Perform OCR based on engine
-        if use_engine == "rapidocr" and self._rapid_ocr:
+        # Apply preprocessing for better OCR accuracy
+        if self.apply_preprocessing:
+            image = self._preprocess_image_for_ocr(image)
+
+        # Perform OCR
+        if self._rapid_ocr:
             ocr_result = self._ocr_with_rapid(image, language)
-        elif use_engine == "paddleocr" and self._paddle_ocr:
-            ocr_result = self._ocr_with_paddle(image, language)
         else:
-            # Preprocess image for Tesseract
-            image = self._preprocess_image(image)
             ocr_result = self._ocr_with_tesseract(image, language)
 
         result = {
             'text': ocr_result['text'],
             'pages': 1,
             'confidence': round(ocr_result['confidence'], 2),
-            'method': f'{use_engine}_image',
+            'method': f'{self.engine}_image',
             'language': language,
             'image_size': list(image.size),
             'text_length': len(ocr_result['text']),
-            'content_hash': self._compute_hash(content)
+            'content_hash': self._compute_hash(content),
+            'lines': ocr_result.get('lines', []),  # Include lines with bounding boxes
         }
 
-        if 'tables' in ocr_result and ocr_result['tables']:
-            result['tables'] = ocr_result['tables']
+        # Include line count
+        if 'lines' in ocr_result and isinstance(ocr_result['lines'], list):
+            result['lines_count'] = len(ocr_result['lines'])
+
+            # Detect tables
+            if self.table_detection:
+                tables = self._detect_tables_from_lines(ocr_result['lines'])
+                if tables:
+                    result['tables'] = tables
 
         return result
 
-    def _ocr_with_paddle(self, image, language: str) -> Dict[str, Any]:
+    def _preprocess_image_for_ocr(self, image) -> 'Image':
         """
-        Perform OCR using PaddleOCR 3.x.
+        Preprocess image for better OCR accuracy.
+        Optimized for CV/resume documents.
+
+        Args:
+            image: PIL Image
+
+        Returns:
+            Preprocessed image
+        """
+        from PIL import Image, ImageEnhance, ImageFilter, ImageOps
+
+        # Auto-orient based on EXIF data
+        try:
+            image = ImageOps.exif_transpose(image)
+        except Exception:
+            pass
+
+        # Convert to RGB for consistent processing
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+
+        # Resize if image is too small (upscale for better OCR)
+        min_dimension = 1000
+        if min(image.size) < min_dimension:
+            scale_factor = min_dimension / min(image.size)
+            new_size = (int(image.size[0] * scale_factor), int(image.size[1] * scale_factor))
+            image = image.resize(new_size, Image.Resampling.LANCZOS)
+            logger.debug(f"Upscaled image to {new_size}")
+
+        # Enhance contrast for better text visibility
+        if self.contrast_factor != 1.0:
+            enhancer = ImageEnhance.Contrast(image)
+            image = enhancer.enhance(self.contrast_factor)
+
+        # Enhance sharpness for clearer text edges
+        if self.sharpness_factor != 1.0:
+            enhancer = ImageEnhance.Sharpness(image)
+            image = enhancer.enhance(self.sharpness_factor)
+
+        # Apply slight unsharp mask for text enhancement
+        image = image.filter(ImageFilter.UnsharpMask(radius=1, percent=50, threshold=3))
+
+        return image
+
+    def _ocr_with_rapid(self, image, language: str) -> Dict[str, Any]:
+        """
+        Perform OCR using RapidOCR with optimized settings.
 
         Args:
             image: PIL Image object
-            language: Language code
+            language: Language code (RapidOCR auto-detects)
 
         Returns:
-            Dict with text, confidence, and optional tables
+            Dict with text, confidence, lines, and metadata
         """
-        import numpy as np
-        from PIL import Image
-        import tempfile
-        import os
+        start_time = time.time()
 
-        # Convert PIL Image to numpy array or save to temp file
-        # PaddleOCR 3.x requires file path or numpy array
-        if isinstance(image, Image.Image):
-            # Save to temp file for PaddleOCR 3.x
-            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
-                image.save(tmp.name)
-                temp_path = tmp.name
+        # Convert PIL Image to numpy array for RapidOCR
+        img_array = np.array(image)
 
-            try:
-                # Run PaddleOCR 3.x with .predict()
-                result = self._paddle_ocr.predict(temp_path)
-            finally:
-                # Clean up temp file
-                if os.path.exists(temp_path):
-                    os.unlink(temp_path)
-        else:
-            # If already numpy array, save to temp file
-            img = Image.fromarray(image) if isinstance(image, np.ndarray) else image
-            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
-                img.save(tmp.name)
-                temp_path = tmp.name
+        # Run RapidOCR
+        result, elapse = self._rapid_ocr(img_array)
+        elapsed_seconds = time.time() - start_time
 
-            try:
-                result = self._paddle_ocr.predict(temp_path)
-            finally:
-                if os.path.exists(temp_path):
-                    os.unlink(temp_path)
+        logger.info(f"RapidOCR processing took {elapsed_seconds:.2f}s")
 
+        # Handle empty result
         if not result or len(result) == 0:
-            return {'text': '', 'confidence': 0.0, 'lines': [], 'tables': []}
+            return {
+                'text': '',
+                'confidence': 0.0,
+                'lines': [],
+                'lines_count': 0,
+            }
 
-        # Extract from PaddleOCR 3.x result format
-        page_result = result[0]
-        rec_texts = page_result.get('rec_texts', [])
-        rec_scores = page_result.get('rec_scores', [])
-        rec_polys = page_result.get('rec_polys', [])
-
-        # Extract text and confidence
+        # Extract text, confidence, and bounding boxes
+        # RapidOCR returns: [[bbox, text, confidence], ...]
+        lines = []
         texts = []
         confidences = []
-        line_data = []
 
-        for i, text in enumerate(rec_texts):
-            conf = rec_scores[i] if i < len(rec_scores) else 0.9
-            bbox = rec_polys[i] if i < len(rec_polys) else []
+        for item in result:
+            bbox, text, conf = item[0], item[1], item[2]
 
             texts.append(text)
             confidences.append(float(conf))
-            line_data.append({
+
+            # Store line data with bounding box
+            lines.append({
                 'text': text,
-                'confidence': float(conf),
-                'bbox': bbox.tolist() if hasattr(bbox, 'tolist') else bbox
+                'confidence': float(conf) * 100,
+                'bbox': bbox if isinstance(bbox, list) else bbox.tolist() if hasattr(bbox, 'tolist') else list(bbox),
             })
 
-        full_text = ' '.join(texts)
-        avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+        # Join text with newlines (preserves document structure better)
+        full_text = '\n'.join(texts)
 
-        result_dict = {
+        # Calculate average confidence (convert to percentage)
+        avg_confidence = (sum(confidences) / len(confidences) * 100) if confidences else 0.0
+
+        return {
             'text': full_text,
-            'confidence': avg_confidence * 100,  # Convert to percentage
-            'lines': line_data,
-            'tables': []
+            'confidence': avg_confidence,
+            'lines': lines,
+            'lines_count': len(lines),
         }
-
-        # Attempt table detection if enabled
-        if self.table_detection:
-            tables = self._detect_tables_from_lines(line_data)
-            if tables:
-                result_dict['tables'] = tables
-
-        return result_dict
 
     def _ocr_with_tesseract(self, image, language: str) -> Dict[str, Any]:
         """
-        Perform OCR using Tesseract.
+        Perform OCR using Tesseract (fallback engine).
 
         Args:
             image: PIL Image object
@@ -449,71 +498,80 @@ class OCRProcessor:
         import pytesseract
 
         # Map language to Tesseract code
-        tess_lang = self.TESSERACT_LANG_MAP.get(language, 'eng')
+        tess_lang = self.LANGUAGE_MAP.get(language, 'eng')
+
+        # Apply additional preprocessing for Tesseract
+        processed = self._preprocess_for_tesseract(image)
 
         # Get OCR data with confidence scores
         data = pytesseract.image_to_data(
-            image,
+            processed,
             lang=tess_lang,
-            output_type=pytesseract.Output.DICT
+            output_type=pytesseract.Output.DICT,
+            config='--oem 3 --psm 3'  # Use LSTM engine with auto page segmentation
         )
 
-        # Extract text
-        text = ' '.join([
-            word for word in data['text']
-            if word.strip()
-        ])
+        # Build text with structure preservation
+        lines = []
+        current_line = []
+        current_line_num = -1
+
+        for i, word in enumerate(data['text']):
+            if not word.strip():
+                continue
+
+            line_num = data['line_num'][i]
+            conf = data['conf'][i]
+
+            if line_num != current_line_num and current_line:
+                lines.append(' '.join(current_line))
+                current_line = []
+
+            current_line.append(word)
+            current_line_num = line_num
+
+        if current_line:
+            lines.append(' '.join(current_line))
+
+        full_text = '\n'.join(lines)
 
         # Calculate confidence
-        conf_values = [
-            int(c) for c in data['conf']
-            if str(c) != '-1' and c != ''
-        ]
+        conf_values = [int(c) for c in data['conf'] if str(c) != '-1' and c != '']
         confidence = sum(conf_values) / len(conf_values) if conf_values else 0.0
 
         return {
-            'text': text,
+            'text': full_text,
             'confidence': confidence,
-            'tables': []
+            'lines': [],
+            'lines_count': len(lines),
         }
 
-    def _ocr_with_rapid(self, image, language: str) -> Dict[str, Any]:
+    def _preprocess_for_tesseract(self, image) -> 'Image':
         """
-        Perform OCR using RapidOCR.
+        Additional preprocessing specifically for Tesseract.
 
         Args:
-            image: PIL Image object
-            language: Language code (not used by RapidOCR - auto-detects)
+            image: PIL Image
 
         Returns:
-            Dict with text, confidence, and optional tables
+            Preprocessed grayscale image
         """
-        import time
+        from PIL import Image, ImageEnhance, ImageFilter
 
-        # RapidOCR accepts PIL Image directly
-        start_time = time.time()
-        result, elapse = self._rapid_ocr(image)
-        elapsed_seconds = time.time() - start_time
+        # Convert to grayscale
+        if image.mode == 'RGB':
+            gray = image.convert('L')
+        else:
+            gray = image
 
-        logger.info(f"RapidOCR processing took {elapsed_seconds:.2f}s (lib reported: {elapse}ms)")
+        # Strong contrast enhancement
+        enhancer = ImageEnhance.Contrast(gray)
+        enhanced = enhancer.enhance(2.0)
 
-        # result format: [[bbox, text, confidence], ...] or None
-        if not result or len(result) == 0:
-            return {'text': '', 'confidence': 0.0, 'lines': [], 'tables': []}
+        # Sharpen
+        sharpened = enhanced.filter(ImageFilter.SHARPEN)
 
-        # Extract text and confidence
-        texts = [item[1] for item in result]
-        confidences = [item[2] for item in result]
-
-        full_text = '\n'.join(texts)
-        avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
-
-        return {
-            'text': full_text,
-            'confidence': avg_confidence * 100,  # Convert to percentage
-            'lines': len(texts),
-            'tables': []
-        }
+        return sharpened
 
     def _detect_tables_from_lines(self, lines: List[Dict]) -> List[Dict]:
         """
@@ -528,33 +586,47 @@ class OCRProcessor:
         if not lines or len(lines) < 3:
             return []
 
-        # Simple heuristic: detect aligned text blocks
-        # This is a basic implementation - can be enhanced
         tables = []
 
         # Group lines by vertical position (y-coordinate)
         y_groups = {}
         for line in lines:
-            if 'bbox' in line and len(line['bbox']) >= 4:
-                y_center = (line['bbox'][0][1] + line['bbox'][2][1]) / 2
-                y_bucket = round(y_center / 20) * 20  # Group by ~20px bands
-                if y_bucket not in y_groups:
-                    y_groups[y_bucket] = []
-                y_groups[y_bucket].append(line)
+            if 'bbox' not in line or not line['bbox']:
+                continue
+
+            bbox = line['bbox']
+            # Handle different bbox formats
+            if isinstance(bbox[0], (list, tuple)):
+                # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]] format
+                y_center = (bbox[0][1] + bbox[2][1]) / 2
+                x_start = bbox[0][0]
+            else:
+                # [x1, y1, x2, y2] format
+                y_center = (bbox[1] + bbox[3]) / 2
+                x_start = bbox[0]
+
+            y_bucket = round(y_center / 25) * 25  # Group by ~25px bands
+            if y_bucket not in y_groups:
+                y_groups[y_bucket] = []
+            y_groups[y_bucket].append({
+                'text': line['text'],
+                'x': x_start,
+                'confidence': line.get('confidence', 0)
+            })
 
         # Find rows with multiple columns (potential table rows)
         table_rows = []
         for y_pos in sorted(y_groups.keys()):
-            if len(y_groups[y_pos]) >= 2:  # At least 2 columns
+            row_items = y_groups[y_pos]
+            if len(row_items) >= 2:  # At least 2 columns
+                # Sort by x position
+                sorted_items = sorted(row_items, key=lambda x: x['x'])
                 table_rows.append({
                     'y': y_pos,
-                    'cells': [l['text'] for l in sorted(
-                        y_groups[y_pos],
-                        key=lambda x: x['bbox'][0][0] if 'bbox' in x else 0
-                    )]
+                    'cells': [item['text'] for item in sorted_items]
                 })
 
-        # If we have consecutive table-like rows, mark as a table
+        # Look for consecutive table-like rows
         if len(table_rows) >= 2:
             tables.append({
                 'rows': [row['cells'] for row in table_rows],
@@ -564,118 +636,14 @@ class OCRProcessor:
 
         return tables
 
-    def _preprocess_image(self, image) -> 'Image':
-        """
-        Preprocess image for better OCR results.
-
-        Args:
-            image: PIL Image
-
-        Returns:
-            Preprocessed image
-        """
-        from PIL import Image, ImageEnhance, ImageFilter
-
-        # Convert to grayscale for text
-        if image.mode == 'RGB':
-            gray = image.convert('L')
-        else:
-            gray = image
-
-        # Enhance contrast
-        enhancer = ImageEnhance.Contrast(gray)
-        enhanced = enhancer.enhance(1.5)
-
-        # Optional: sharpen
-        sharpened = enhanced.filter(ImageFilter.SHARPEN)
-
-        return sharpened
-
-    def extract_structured_data(
-        self,
-        text: str
-    ) -> Dict[str, Any]:
-        """
-        Extract structured data from CV text.
-        Identifies sections like experience, education, skills, etc.
-
-        Args:
-            text: Extracted text from CV
-
-        Returns:
-            Structured data dict
-        """
-        import re
-
-        result = {
-            'personal_info': {},
-            'skills': [],
-            'experience': [],
-            'education': [],
-            'languages': [],
-            'certifications': [],
-            'summary': None,
-            'raw_text': text
-        }
-
-        # Extract email
-        email_pattern = r'[\w\.-]+@[\w\.-]+\.\w+'
-        emails = re.findall(email_pattern, text)
-        if emails:
-            result['personal_info']['email'] = emails[0]
-
-        # Extract phone
-        phone_patterns = [
-            r'\+?\d{1,4}[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,9}',
-            r'\(\d{3}\)\s*\d{3}[-.\s]?\d{4}',
-        ]
-        for pattern in phone_patterns:
-            phones = re.findall(pattern, text)
-            if phones:
-                result['personal_info']['phone'] = phones[0]
-                break
-
-        # Extract LinkedIn
-        linkedin_pattern = r'linkedin\.com/in/[\w-]+'
-        linkedin = re.findall(linkedin_pattern, text, re.IGNORECASE)
-        if linkedin:
-            result['personal_info']['linkedin'] = f"https://{linkedin[0]}"
-
-        # Extract skills using common patterns
-        skill_patterns = [
-            r'python', r'javascript', r'typescript', r'java', r'c\+\+', r'c#',
-            r'react', r'angular', r'vue', r'node\.?js', r'express',
-            r'sql', r'mysql', r'postgresql', r'mongodb', r'redis',
-            r'aws', r'azure', r'gcp', r'docker', r'kubernetes',
-            r'sap', r'abap', r'fiori', r'ui5', r'hana', r'btp', r'cap',
-            r'git', r'jenkins', r'ci/cd', r'agile', r'scrum',
-            r'machine learning', r'deep learning', r'nlp', r'tensorflow', r'pytorch'
-        ]
-
-        text_lower = text.lower()
-        for pattern in skill_patterns:
-            if re.search(pattern, text_lower):
-                # Capitalize properly
-                skill = pattern.replace(r'\.?', '.').replace(r'\+\+', '++')
-                result['skills'].append(skill)
-
-        # Extract languages
-        language_patterns = [
-            (r'english', 'English'),
-            (r'german|deutsch', 'German'),
-            (r'turkish|türkçe', 'Turkish'),
-            (r'french|français', 'French'),
-            (r'spanish|español', 'Spanish'),
-        ]
-        for pattern, lang in language_patterns:
-            if re.search(pattern, text_lower):
-                result['languages'].append(lang)
-
-        return result
-
     def _compute_hash(self, content: bytes) -> str:
         """Compute SHA-256 hash of content."""
         return hashlib.sha256(content).hexdigest()
+
+    @property
+    def _ocr_available(self) -> bool:
+        """Check if any OCR engine is available for processing."""
+        return self._rapid_ocr is not None or self._tesseract_available
 
     def get_supported_formats(self) -> List[str]:
         """Get list of supported file formats."""
@@ -692,48 +660,31 @@ class OCRProcessor:
         Returns:
             Dict with engine information
         """
-        info = {
+        return {
             "engine": self.engine,
             "default_language": self.default_language,
-            "supported_languages": list(self.PADDLE_LANG_MAP.keys()) if self.engine in ["paddleocr", "rapidocr"] else list(self.TESSERACT_LANG_MAP.keys()),
+            "supported_languages": list(self.LANGUAGE_MAP.keys()),
             "table_detection": self.table_detection,
-            "layout_analysis": self.layout_analysis,
-            "angle_classification": self.use_angle_cls,
+            "preprocessing_enabled": self.apply_preprocessing,
             "rapid_available": self._rapid_ocr is not None,
-            "paddle_available": self._paddle_ocr is not None,
             "tesseract_available": self._tesseract_available,
-            "supported_formats": self.get_supported_formats()
+            "ocr_available": self._ocr_available,
+            "supported_formats": self.get_supported_formats(),
+            "optimization_settings": {
+                "det_db_thresh": self.det_db_thresh,
+                "det_db_box_thresh": self.det_db_box_thresh,
+                "det_db_unclip_ratio": self.det_db_unclip_ratio,
+                "rec_batch_num": self.rec_batch_num,
+                "contrast_factor": self.contrast_factor,
+                "sharpness_factor": self.sharpness_factor,
+            }
         }
-        return info
 
     def get_available_languages(self) -> List[str]:
         """
-        Get list of available languages for the current engine.
+        Get list of available languages.
 
         Returns:
             List of language codes
         """
-        if self.engine in ["paddleocr", "rapidocr"]:
-            return ["en", "german", "turkish", "french", "spanish", "chinese", "japanese", "korean"]
-        else:
-            return ["eng", "deu", "tur", "fra", "spa"]
-
-    def switch_engine(self, engine: str):
-        """
-        Switch OCR engine at runtime.
-
-        Args:
-            engine: New engine ('rapidocr', 'paddleocr', or 'tesseract')
-        """
-        if engine not in ["rapidocr", "paddleocr", "tesseract"]:
-            raise ValueError(f"Invalid engine: {engine}. Must be 'rapidocr', 'paddleocr', or 'tesseract'")
-
-        if engine == "rapidocr" and self._rapid_ocr is None:
-            self._init_rapidocr()
-        elif engine == "paddleocr" and self._paddle_ocr is None:
-            self._init_paddleocr()
-        elif engine == "tesseract" and not self._tesseract_available:
-            self._init_tesseract(None)
-
-        self.engine = engine
-        logger.info(f"OCR engine switched to: {engine}")
+        return ["en", "german", "turkish", "french", "spanish", "chinese", "japanese", "korean"]

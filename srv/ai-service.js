@@ -1535,13 +1535,23 @@ Always provide structured insights when analyzing candidates or jobs.`
             extractStructured: true
         });
 
-        // Update document with extracted text
+        // Prepare extracted data with structured info and lines for PDF highlighting
+        const extractedDataObj = {
+            ...(result.structured_data || {}),
+            lines: result.lines || [],  // Lines with bounding boxes for highlighting
+            pages: result.pages,
+            method: result.method
+        };
+
+        // Update document with extracted text and structured data
         await UPDATE(CVDocuments)
             .where({ ID: documentId })
             .with({
                 extractedText: result.text,
+                extractedData: JSON.stringify(extractedDataObj),
                 ocrConfidence: result.confidence,
-                status: 'Processed',
+                ocrStatus: 'completed',
+                extractionMethod: result.method,
                 processedAt: new Date()
             });
 
@@ -1550,7 +1560,8 @@ Always provide structured insights when analyzing candidates or jobs.`
             text: result.text,
             confidence: result.confidence,
             pages: result.pages,
-            structuredData: JSON.stringify(result.structured_data || {})
+            structuredData: JSON.stringify(result.structured_data || {}),
+            linesCount: (result.lines || []).length
         };
     }
 

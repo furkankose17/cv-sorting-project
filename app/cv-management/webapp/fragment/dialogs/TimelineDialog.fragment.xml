@@ -62,18 +62,12 @@
                         }"
                         filterValue="{dialogModel>eventType}">
 
-                        <suite:customAction>
-                            <Button
-                                icon="sap-icon://detail-view"
-                                type="Transparent"
-                                tooltip="View Details"
+                        <suite:embeddedControl>
+                            <Link
+                                text="View Details"
                                 press=".onTimelineEventDetails"
                                 visible="{= ${dialogModel>hasDetails} === true }" />
-                        </suite:customAction>
-
-                        <suite:suggestionItems>
-                            <core:Item text="{dialogModel>details}" />
-                        </suite:suggestionItems>
+                        </suite:embeddedControl>
                     </suite:TimelineItem>
                 </suite:Timeline>
 
