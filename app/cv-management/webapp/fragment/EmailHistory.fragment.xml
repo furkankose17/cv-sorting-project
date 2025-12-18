@@ -1,0 +1,134 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.f"
+    xmlns:layout="sap.ui.layout">
+
+    <VBox class="sapUiSmallMargin">
+        <!-- Filter Bar -->
+        <Toolbar>
+            <DateRangeSelection
+                id="emailHistoryDateRange"
+                placeholder="{i18n>filterByDate}"
+                change=".onEmailHistoryFilterChange" />
+            <MultiComboBox
+                id="emailHistoryTypeFilter"
+                placeholder="{i18n>filterByType}"
+                selectionChange=".onEmailHistoryFilterChange"
+                width="200px">
+                <core:Item key="cv_received" text="{i18n>cv_received}" />
+                <core:Item key="status_changed" text="{i18n>status_changed}" />
+                <core:Item key="interview_invitation" text="{i18n>interview_invitation}" />
+                <core:Item key="interview_reminder" text="{i18n>interview_reminder}" />
+                <core:Item key="offer_extended" text="{i18n>offer_extended}" />
+                <core:Item key="application_rejected" text="{i18n>application_rejected}" />
+            </MultiComboBox>
+            <MultiComboBox
+                id="emailHistoryStatusFilter"
+                placeholder="{i18n>filterByStatus}"
+                selectionChange=".onEmailHistoryFilterChange"
+                width="150px">
+                <core:Item key="queued" text="{i18n>queued}" />
+                <core:Item key="sent" text="{i18n>sent}" />
+                <core:Item key="failed" text="{i18n>failed}" />
+                <core:Item key="bounced" text="{i18n>bounced}" />
+            </MultiComboBox>
+            <SearchField
+                id="emailHistorySearch"
+                placeholder="{i18n>searchRecipient}"
+                width="250px"
+                search=".onEmailHistorySearch" />
+            <ToolbarSpacer />
+            <Button
+                text="{i18n>clearFilters}"
+                press=".onClearEmailHistoryFilters" />
+        </Toolbar>
+
+        <!-- Notifications Table -->
+        <Table
+            id="emailHistoryTable"
+            items="{
+                path: '/EmailNotifications',
+                parameters: {
+                    $expand: 'candidate,jobPosting',
+                    $orderby: 'createdAt desc'
+                }
+            }"
+            growing="true"
+            growingThreshold="25"
+            mode="SingleSelectMaster"
+            itemPress=".onEmailHistoryItemPress">
+
+            <headerToolbar>
+                <Toolbar>
+                    <Title text="{i18n>history}" />
+                    <ToolbarSpacer />
+                    <Text text="{= ${email>/history/totalCount} + ' notifications'}" />
+                </Toolbar>
+            </headerToolbar>
+
+            <columns>
+                <Column width="150px">
+                    <Text text="{i18n>sentAt}" />
+                </Column>
+                <Column width="150px">
+                    <Text text="{i18n>notificationType}" />
+                </Column>
+                <Column>
+                    <Text text="{i18n>recipient}" />
+                </Column>
+                <Column>
+                    <Text text="{i18n>candidate}" />
+                </Column>
+                <Column>
+                    <Text text="{i18n>job}" />
+                </Column>
+                <Column width="100px">
+                    <Text text="{i18n>status}" />
+                </Column>
+                <Column width="100px" hAlign="Center">
+                    <Text text="{i18n>actions}" />
+                </Column>
+            </columns>
+
+            <items>
+                <ColumnListItem type="Active">
+                    <cells>
+                        <Text text="{
+                            path: 'sentAt',
+                            type: 'sap.ui.model.type.DateTime',
+                            formatOptions: { style: 'medium' }
+                        }" />
+                        <ObjectStatus
+                            text="{notificationType}"
+                            icon="{= ${notificationType} === 'cv_received' ? 'sap-icon://document' :
+                                    ${notificationType} === 'interview_invitation' ? 'sap-icon://appointment' :
+                                    ${notificationType} === 'interview_reminder' ? 'sap-icon://bell' : 'sap-icon://email' }" />
+                        <Text text="{recipientEmail}" />
+                        <Text text="{candidate/firstName} {candidate/lastName}" />
+                        <Text text="{jobPosting/title}" />
+                        <ObjectStatus
+                            text="{deliveryStatus}"
+                            state="{= ${deliveryStatus} === 'sent' ? 'Success' :
+                                    ${deliveryStatus} === 'failed' ? 'Error' :
+                                    ${deliveryStatus} === 'bounced' ? 'Error' : 'Warning' }" />
+                        <HBox>
+                            <Button
+                                icon="sap-icon://detail-view"
+                                tooltip="{i18n>viewDetails}"
+                                press=".onViewEmailDetails"
+                                type="Transparent" />
+                            <Button
+                                icon="sap-icon://refresh"
+                                tooltip="{i18n>retry}"
+                                press=".onRetryEmail"
+                                type="Transparent"
+                                visible="{= ${deliveryStatus} === 'failed' || ${deliveryStatus} === 'bounced' }" />
+                        </HBox>
+                    </cells>
+                </ColumnListItem>
+            </items>
+        </Table>
+    </VBox>
+
+</core:FragmentDefinition>
