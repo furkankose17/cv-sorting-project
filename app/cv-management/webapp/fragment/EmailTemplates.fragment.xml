@@ -1,0 +1,188 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.f"
+    xmlns:card="sap.f.cards"
+    xmlns:layout="sap.ui.layout">
+
+    <VBox class="sapUiSmallMargin">
+        <!-- Info Banner -->
+        <MessageStrip
+            text="{i18n>templatesInfo}"
+            type="Information"
+            showIcon="true"
+            class="sapUiMediumMarginBottom" />
+
+        <!-- Templates Grid -->
+        <layout:Grid defaultSpan="L4 M6 S12" class="sapUiSmallMargin">
+            <!-- CV Received Template -->
+            <f:Card class="sapUiSmallMarginBottom">
+                <f:header>
+                    <card:Header
+                        title="{i18n>cv_received}"
+                        subtitle="Subject: Your CV has been received"
+                        icon="sap-icon://document" />
+                </f:header>
+                <f:content>
+                    <VBox class="sapUiSmallMargin">
+                        <Text text="Last edited: Dec 15, 2024" class="sapUiTinyMarginBottom" />
+                        <HBox>
+                            <Button
+                                text="{i18n>preview}"
+                                icon="sap-icon://show"
+                                press=".onPreviewTemplate"
+                                class="sapUiTinyMarginEnd"
+                                customData:templateKey="cv_received" />
+                            <Button
+                                text="{i18n>editInN8n}"
+                                icon="sap-icon://action-settings"
+                                press=".onEditTemplateInN8n"
+                                customData:templateKey="cv_received" />
+                        </HBox>
+                    </VBox>
+                </f:content>
+            </f:Card>
+
+            <!-- Status Changed Template -->
+            <f:Card class="sapUiSmallMarginBottom">
+                <f:header>
+                    <card:Header
+                        title="{i18n>status_changed}"
+                        subtitle="Subject: Application Update"
+                        icon="sap-icon://status-positive" />
+                </f:header>
+                <f:content>
+                    <VBox class="sapUiSmallMargin">
+                        <Text text="Last edited: Dec 10, 2024" class="sapUiTinyMarginBottom" />
+                        <HBox>
+                            <Button
+                                text="{i18n>preview}"
+                                icon="sap-icon://show"
+                                press=".onPreviewTemplate"
+                                class="sapUiTinyMarginEnd"
+                                customData:templateKey="status_changed" />
+                            <Button
+                                text="{i18n>editInN8n}"
+                                icon="sap-icon://action-settings"
+                                press=".onEditTemplateInN8n"
+                                customData:templateKey="status_changed" />
+                        </HBox>
+                    </VBox>
+                </f:content>
+            </f:Card>
+
+            <!-- Interview Invitation Template -->
+            <f:Card class="sapUiSmallMarginBottom">
+                <f:header>
+                    <card:Header
+                        title="{i18n>interview_invitation}"
+                        subtitle="Subject: Interview Invitation"
+                        icon="sap-icon://appointment" />
+                </f:header>
+                <f:content>
+                    <VBox class="sapUiSmallMargin">
+                        <Text text="Last edited: Dec 8, 2024" class="sapUiTinyMarginBottom" />
+                        <HBox>
+                            <Button
+                                text="{i18n>preview}"
+                                icon="sap-icon://show"
+                                press=".onPreviewTemplate"
+                                class="sapUiTinyMarginEnd"
+                                customData:templateKey="interview_invitation" />
+                            <Button
+                                text="{i18n>editInN8n}"
+                                icon="sap-icon://action-settings"
+                                press=".onEditTemplateInN8n"
+                                customData:templateKey="interview_invitation" />
+                        </HBox>
+                    </VBox>
+                </f:content>
+            </f:Card>
+
+            <!-- Interview Reminder Template -->
+            <f:Card class="sapUiSmallMarginBottom">
+                <f:header>
+                    <card:Header
+                        title="{i18n>interview_reminder}"
+                        subtitle="Subject: Interview Reminder"
+                        icon="sap-icon://bell" />
+                </f:header>
+                <f:content>
+                    <VBox class="sapUiSmallMargin">
+                        <Text text="Last edited: Dec 5, 2024" class="sapUiTinyMarginBottom" />
+                        <HBox>
+                            <Button
+                                text="{i18n>preview}"
+                                icon="sap-icon://show"
+                                press=".onPreviewTemplate"
+                                class="sapUiTinyMarginEnd"
+                                customData:templateKey="interview_reminder" />
+                            <Button
+                                text="{i18n>editInN8n}"
+                                icon="sap-icon://action-settings"
+                                press=".onEditTemplateInN8n"
+                                customData:templateKey="interview_reminder" />
+                        </HBox>
+                    </VBox>
+                </f:content>
+            </f:Card>
+
+            <!-- Offer Extended Template -->
+            <f:Card class="sapUiSmallMarginBottom">
+                <f:header>
+                    <card:Header
+                        title="{i18n>offer_extended}"
+                        subtitle="Subject: Job Offer"
+                        icon="sap-icon://competitor" />
+                </f:header>
+                <f:content>
+                    <VBox class="sapUiSmallMargin">
+                        <Text text="Last edited: Nov 28, 2024" class="sapUiTinyMarginBottom" />
+                        <HBox>
+                            <Button
+                                text="{i18n>preview}"
+                                icon="sap-icon://show"
+                                press=".onPreviewTemplate"
+                                class="sapUiTinyMarginEnd"
+                                customData:templateKey="offer_extended" />
+                            <Button
+                                text="{i18n>editInN8n}"
+                                icon="sap-icon://action-settings"
+                                press=".onEditTemplateInN8n"
+                                customData:templateKey="offer_extended" />
+                        </HBox>
+                    </VBox>
+                </f:content>
+            </f:Card>
+
+            <!-- Application Rejected Template -->
+            <f:Card class="sapUiSmallMarginBottom">
+                <f:header>
+                    <card:Header
+                        title="{i18n>application_rejected}"
+                        subtitle="Subject: Application Update"
+                        icon="sap-icon://decline" />
+                </f:header>
+                <f:content>
+                    <VBox class="sapUiSmallMargin">
+                        <Text text="Last edited: Nov 25, 2024" class="sapUiTinyMarginBottom" />
+                        <HBox>
+                            <Button
+                                text="{i18n>preview}"
+                                icon="sap-icon://show"
+                                press=".onPreviewTemplate"
+                                class="sapUiTinyMarginEnd"
+                                customData:templateKey="application_rejected" />
+                            <Button
+                                text="{i18n>editInN8n}"
+                                icon="sap-icon://action-settings"
+                                press=".onEditTemplateInN8n"
+                                customData:templateKey="application_rejected" />
+                        </HBox>
+                    </VBox>
+                </f:content>
+            </f:Card>
+        </layout:Grid>
+    </VBox>
+
+</core:FragmentDefinition>
