@@ -1953,6 +1953,46 @@ module.exports = class CVSortingService extends cds.ApplicationService {
             }
         });
 
+        // Handler for n8n callback - log email notification
+        this.on('logEmailNotification', async (req) => {
+            const { EmailNotifications } = this.entities;
+            const {
+                candidateId,
+                jobPostingId,
+                notificationType,
+                recipientEmail,
+                subject,
+                templateUsed,
+                deliveryStatus
+            } = req.data;
+
+            try {
+                const notification = {
+                    candidate_ID: candidateId,
+                    jobPosting_ID: jobPostingId || null,
+                    notificationType,
+                    recipientEmail,
+                    subject,
+                    templateUsed,
+                    sentAt: new Date().toISOString(),
+                    deliveryStatus: deliveryStatus || 'sent'
+                };
+
+                const result = await INSERT.into(EmailNotifications).entries(notification);
+
+                LOG.info('Email notification logged', {
+                    notificationType,
+                    recipientEmail,
+                    deliveryStatus
+                });
+
+                return result.req.data.ID || notification.ID;
+            } catch (error) {
+                LOG.error('Error logging email notification:', error);
+                throw error;
+            }
+        });
+
         LOG.info('Email notification handlers registered');
     }
 
