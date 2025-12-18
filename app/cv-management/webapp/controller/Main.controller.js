@@ -103,6 +103,50 @@ sap.ui.define([
             });
             this.setModel(oDashboardModel, "dashboard");
 
+            // Initialize email center model
+            const oEmailModel = new JSONModel({
+                isLoading: false,
+                stats: {
+                    sentToday: 0,
+                    sentYesterday: 0,
+                    deliveryRate: 100,
+                    failedCount: 0,
+                    pendingCount: 0,
+                    totalSent: 0,
+                    openRate: 0,
+                    clickRate: 0
+                },
+                health: {
+                    n8nConnected: false,
+                    smtpStatus: 'unknown',
+                    lastSuccessfulSend: null,
+                    webhooksEnabled: false
+                },
+                recentActivity: [],
+                settings: [],
+                templates: [
+                    { key: 'cv_received', name: 'CV Received', subject: 'Your CV has been received for {jobTitle}', lastEdited: '2024-12-15' },
+                    { key: 'status_changed', name: 'Status Changed', subject: 'Application Update for {jobTitle}', lastEdited: '2024-12-10' },
+                    { key: 'interview_invitation', name: 'Interview Invitation', subject: 'Interview Invitation for {jobTitle}', lastEdited: '2024-12-08' },
+                    { key: 'interview_reminder', name: 'Interview Reminder', subject: 'Reminder: Interview Tomorrow', lastEdited: '2024-12-05' },
+                    { key: 'interview_confirmed', name: 'Interview Confirmed', subject: 'Interview Confirmed for {jobTitle}', lastEdited: '2024-12-01' },
+                    { key: 'offer_extended', name: 'Offer Extended', subject: 'Job Offer for {jobTitle}', lastEdited: '2024-11-28' },
+                    { key: 'application_rejected', name: 'Application Rejected', subject: 'Application Update for {jobTitle}', lastEdited: '2024-11-25' }
+                ],
+                history: {
+                    filters: {
+                        dateFrom: null,
+                        dateTo: null,
+                        types: [],
+                        statuses: [],
+                        search: ''
+                    },
+                    items: [],
+                    totalCount: 0
+                }
+            });
+            this.setModel(oEmailModel, "email");
+
             // Attach to route matched
             const oRouter = this.getRouter();
             oRouter.getRoute("main").attachPatternMatched(this._onRouteMatched, this);
@@ -170,7 +214,8 @@ sap.ui.define([
                 { id: "candidatesTab", fragmentName: "cvmanagement.fragment.CandidatesSection" },
                 { id: "jobsTab", fragmentName: "cvmanagement.fragment.JobsSection" },
                 { id: "documentsTab", fragmentName: "cvmanagement.fragment.DocumentsSection" },
-                { id: "analyticsTab", fragmentName: "cvmanagement.fragment.AnalyticsSection" }
+                { id: "analyticsTab", fragmentName: "cvmanagement.fragment.AnalyticsSection" },
+                { id: "emailCenterTab", fragmentName: "cvmanagement.fragment.EmailCenterSection" }
             ];
 
             aFragments.forEach(oFragmentConfig => {
