@@ -128,6 +128,34 @@ module.exports = class CVSortingService extends cds.ApplicationService {
                 this._generateCandidateEmbeddingAsync(candidateId, entities).catch(err => {
                     LOG.warn('Failed to generate candidate embedding after CV upload', { candidateId, error: err.message });
                 });
+
+                // Send CV received webhook (if enabled)
+                if (process.env.ENABLE_WEBHOOKS === 'true') {
+                    try {
+                        const result = await webhookHelper.sendCVReceivedWebhook(
+                            data.ID,
+                            candidateId,
+                            data.fileName || 'unknown'
+                        );
+
+                        if (result.success) {
+                            LOG.info('CV received webhook sent successfully', {
+                                documentId: data.ID,
+                                webhookId: result.webhookId
+                            });
+                        } else {
+                            LOG.warn('CV received webhook failed (non-blocking)', {
+                                documentId: data.ID,
+                                error: result.error
+                            });
+                        }
+                    } catch (webhookError) {
+                        LOG.error('Unexpected CV received webhook error (non-blocking)', {
+                            documentId: data.ID,
+                            error: webhookError.message
+                        });
+                    }
+                }
             }
         });
 
