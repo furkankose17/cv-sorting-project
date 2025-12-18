@@ -179,6 +179,45 @@ cv-sorting-project/
 
 ---
 
+## Email Automation Setup
+
+The application supports automated email notifications via n8n workflow automation.
+
+### Quick Start
+
+```bash
+# Start n8n and Mailhog
+./scripts/setup-email-dev.sh
+
+# Enable webhooks in your .env
+ENABLE_WEBHOOKS=true
+```
+
+### Services
+
+| Service | URL | Purpose |
+|---------|-----|---------|
+| n8n | http://localhost:5678 | Workflow automation |
+| Mailhog | http://localhost:8025 | Email capture (dev) |
+
+### Workflows
+
+1. **Status Change Notification** - Emails candidates when their application status changes
+2. **CV Received Confirmation** - Confirms receipt of uploaded CVs
+3. **Interview Scheduling** - Sends interview invitations with calendar attachments
+4. **Interview Reminders** - Sends 24-hour reminders for upcoming interviews
+5. **Pending Notifications Poller** - Processes queued notifications
+
+### Configuration
+
+See `.env.example` for all email-related configuration options.
+
+### Testing Emails
+
+All emails in development are captured by Mailhog. Visit http://localhost:8025 to view sent emails.
+
+---
+
 ## Testing
 
 ```bash
