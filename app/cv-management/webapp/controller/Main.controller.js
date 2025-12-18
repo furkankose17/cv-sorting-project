@@ -3858,6 +3858,114 @@ sap.ui.define([
             });
         },
 
+        // ============================================
+        // EMAIL TEMPLATES HANDLERS
+        // ============================================
+
+        /**
+         * Preview email template with sample data
+         * @param {sap.ui.base.Event} oEvent Button press event
+         */
+        onPreviewTemplate: function (oEvent) {
+            const oButton = oEvent.getSource();
+            const sTemplateKey = oButton.data("templateKey") || oButton.getCustomData().find(d => d.getKey() === "templateKey")?.getValue();
+
+            const oEmailModel = this.getModel("email");
+            const aTemplates = oEmailModel.getProperty("/templates");
+            const oTemplate = aTemplates.find(t => t.key === sTemplateKey);
+
+            if (!oTemplate) {
+                sap.m.MessageBox.error("Template not found");
+                return;
+            }
+
+            const sampleData = {
+                candidateName: "John Smith",
+                jobTitle: "Senior Developer",
+                companyName: "TechCorp Inc.",
+                interviewDate: "December 25, 2024 at 10:00 AM",
+                interviewLocation: "Conference Room A",
+                recruiterName: "Jane Doe",
+                recruiterEmail: "jane.doe@techcorp.com"
+            };
+
+            const oDialog = new sap.m.Dialog({
+                title: "Template Preview: " + oTemplate.name,
+                contentWidth: "600px",
+                content: [
+                    new sap.m.VBox({
+                        class: "sapUiSmallMargin",
+                        items: [
+                            new sap.m.Label({ text: "Subject", design: "Bold" }),
+                            new sap.m.Text({ text: oTemplate.subject.replace(/{(\w+)}/g, (m, key) => sampleData[key] || m) }),
+                            new sap.m.Label({ text: "Preview (with sample data)", design: "Bold", class: "sapUiMediumMarginTop" }),
+                            new sap.m.FormattedText({
+                                htmlText: this._getTemplatePreviewHtml(sTemplateKey, sampleData)
+                            }),
+                            new sap.m.Label({ text: this.getResourceBundle().getText("availableVariables"), design: "Bold", class: "sapUiMediumMarginTop" }),
+                            new sap.m.Text({ text: "{candidateName}, {jobTitle}, {companyName}, {interviewDate}, {interviewLocation}, {recruiterName}, {recruiterEmail}" })
+                        ]
+                    })
+                ],
+                buttons: [
+                    new sap.m.Button({
+                        text: this.getResourceBundle().getText("sendTest"),
+                        icon: "sap-icon://email",
+                        press: function () {
+                            sap.m.MessageToast.show("Test email sent!");
+                        }
+                    }),
+                    new sap.m.Button({
+                        text: "Close",
+                        press: function () {
+                            oDialog.close();
+                        }
+                    })
+                ],
+                afterClose: function () {
+                    oDialog.destroy();
+                }
+            });
+
+            oDialog.open();
+        },
+
+        /**
+         * Get template preview HTML with sample data substituted
+         * @param {string} sKey Template key
+         * @param {object} oData Sample data for substitution
+         * @returns {string} HTML content for the template
+         * @private
+         */
+        _getTemplatePreviewHtml: function (sKey, oData) {
+            const templates = {
+                cv_received: `<p>Dear ${oData.candidateName},</p><p>Thank you for submitting your CV for the <strong>${oData.jobTitle}</strong> position at ${oData.companyName}.</p><p>We have received your application and will review it shortly.</p><p>Best regards,<br/>${oData.recruiterName}</p>`,
+                status_changed: `<p>Dear ${oData.candidateName},</p><p>We would like to update you on the status of your application for <strong>${oData.jobTitle}</strong>.</p><p>Your application has moved to the next stage in our recruitment process.</p><p>Best regards,<br/>${oData.recruiterName}</p>`,
+                interview_invitation: `<p>Dear ${oData.candidateName},</p><p>We are pleased to invite you for an interview for the <strong>${oData.jobTitle}</strong> position.</p><p><strong>Date:</strong> ${oData.interviewDate}<br/><strong>Location:</strong> ${oData.interviewLocation}</p><p>Please confirm your attendance.</p><p>Best regards,<br/>${oData.recruiterName}</p>`,
+                interview_reminder: `<p>Dear ${oData.candidateName},</p><p>This is a reminder about your upcoming interview for <strong>${oData.jobTitle}</strong>.</p><p><strong>Date:</strong> ${oData.interviewDate}<br/><strong>Location:</strong> ${oData.interviewLocation}</p><p>We look forward to meeting you!</p><p>Best regards,<br/>${oData.recruiterName}</p>`,
+                offer_extended: `<p>Dear ${oData.candidateName},</p><p>We are delighted to extend an offer for the <strong>${oData.jobTitle}</strong> position at ${oData.companyName}.</p><p>Please review the attached offer letter and let us know your decision.</p><p>Best regards,<br/>${oData.recruiterName}</p>`,
+                application_rejected: `<p>Dear ${oData.candidateName},</p><p>Thank you for your interest in the <strong>${oData.jobTitle}</strong> position at ${oData.companyName}.</p><p>After careful consideration, we have decided to move forward with other candidates.</p><p>We wish you success in your job search.</p><p>Best regards,<br/>${oData.recruiterName}</p>`
+            };
+            return templates[sKey] || "<p>Template preview not available</p>";
+        },
+
+        /**
+         * Edit template in n8n workflow editor
+         * @param {sap.ui.base.Event} oEvent Button press event
+         */
+        onEditTemplateInN8n: function (oEvent) {
+            const oButton = oEvent.getSource();
+            const sTemplateKey = oButton.data("templateKey") || oButton.getCustomData().find(d => d.getKey() === "templateKey")?.getValue();
+
+            // Open n8n with the workflow for this template type
+            const n8nUrl = "http://localhost:5678/workflow";
+            sap.m.URLHelper.redirect(n8nUrl, true);
+        },
+
+        // ============================================
+        // EMAIL SETTINGS HANDLERS
+        // ============================================
+
         /**
          * Load email settings from backend
          * @private
