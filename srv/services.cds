@@ -948,6 +948,21 @@ service CVSortingService {
         notificationId: UUID;
     };
 
+    // Email automation - pending interview reminders for n8n polling
+    function getPendingInterviewReminders() returns array of {
+        interviewId      : UUID;
+        candidateId      : UUID;
+        candidateEmail   : String;
+        candidateName    : String;
+        jobTitle         : String;
+        scheduledAt      : DateTime;
+        interviewTitle   : String;
+        location         : String;
+        meetingLink      : String;
+        interviewerName  : String;
+        interviewerEmail : String;
+    };
+
     function getScoringCriteria(
         jobPostingId: UUID
     ) returns array of ScoringCriteria;
