@@ -830,6 +830,21 @@ entity EmailNotifications : cuid, managed {
 }
 
 /**
+ * Notification Settings
+ * Stores configuration settings for email notifications (types, timing, rate limits)
+ */
+entity NotificationSettings : cuid, managed {
+    settingKey: String(100) not null;
+    settingValue: String(500);
+    settingType: String(20) enum {
+        boolean;
+        number;
+        string;
+    } default 'string';
+    description: String(255);
+}
+
+/**
  * Candidate Status History
  * Tracks all status changes for candidates with audit trail
  */

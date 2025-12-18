@@ -1,0 +1,12 @@
+ID,settingKey,settingValue,settingType,description
+11111111-1111-1111-1111-111111111101,webhooks_enabled,true,boolean,Enable webhook notifications
+11111111-1111-1111-1111-111111111102,webhook_url,http://localhost:5678/webhook,string,n8n webhook base URL
+11111111-1111-1111-1111-111111111103,notification_cooldown_hours,24,number,Hours between duplicate notifications
+11111111-1111-1111-1111-111111111104,reminder_window_hours,24,number,Hours before interview to send reminder
+11111111-1111-1111-1111-111111111105,rate_limit_per_minute,50,number,Max emails per minute
+11111111-1111-1111-1111-111111111106,type_cv_received,true,boolean,Enable CV received notifications
+11111111-1111-1111-1111-111111111107,type_status_changed,true,boolean,Enable status change notifications
+11111111-1111-1111-1111-111111111108,type_interview_invitation,true,boolean,Enable interview invitation notifications
+11111111-1111-1111-1111-111111111109,type_interview_reminder,true,boolean,Enable interview reminder notifications
+11111111-1111-1111-1111-111111111110,type_offer_extended,false,boolean,Enable offer extended notifications
+11111111-1111-1111-1111-111111111111,type_application_rejected,false,boolean,Enable application rejected notifications

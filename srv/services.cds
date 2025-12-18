@@ -1043,6 +1043,21 @@ service CVSortingService {
         deliveryStatus   : String
     ) returns UUID;
 
+    // ============================================
+    // EMAIL NOTIFICATIONS DOMAIN
+    // ============================================
+
+    @readonly
+    entity EmailNotifications as projection on db.EmailNotifications {
+        *,
+        candidate.firstName as candidateFirstName,
+        candidate.lastName as candidateLastName,
+        candidate.email as candidateEmail,
+        jobPosting.title as jobTitle
+    };
+
+    entity NotificationSettings as projection on db.NotificationSettings;
+
     function getScoringCriteria(
         jobPostingId: UUID
     ) returns array of ScoringCriteria;
