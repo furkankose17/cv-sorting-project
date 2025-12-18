@@ -41,6 +41,7 @@
     "watch": "cds watch --profile development",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
+    "test:integration": "jest test/integration --no-coverage --testTimeout=30000",
     "build": "cds build --production",
     "build:cf": "mbt build",
     "deploy": "cf deploy mta_archives/*.mtar",
