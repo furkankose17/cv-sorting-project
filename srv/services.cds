@@ -963,6 +963,9 @@ service CVSortingService {
         interviewerEmail : String;
     };
 
+    // Email automation - mark reminder as sent (called by n8n after sending)
+    action markInterviewReminderSent(interviewId: UUID) returns Boolean;
+
     function getScoringCriteria(
         jobPostingId: UUID
     ) returns array of ScoringCriteria;
