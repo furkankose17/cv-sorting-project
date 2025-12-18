@@ -3656,6 +3656,208 @@ sap.ui.define([
             sap.m.URLHelper.redirect(n8nUrl, true);
         },
 
+        // ============================================
+        // EMAIL HISTORY HANDLERS
+        // ============================================
+
+        /**
+         * Handle email history filter change
+         */
+        onEmailHistoryFilterChange: function () {
+            this._applyEmailHistoryFilters();
+        },
+
+        /**
+         * Handle email history search
+         * @param {sap.ui.base.Event} oEvent Search event
+         */
+        onEmailHistorySearch: function (oEvent) {
+            const sQuery = oEvent.getParameter("query");
+            const oEmailModel = this.getModel("email");
+            oEmailModel.setProperty("/history/filters/search", sQuery);
+            this._applyEmailHistoryFilters();
+        },
+
+        /**
+         * Apply email history filters - builds and applies OData filters
+         * @private
+         */
+        _applyEmailHistoryFilters: function () {
+            const oTable = this.byId("emailHistoryTable");
+            if (!oTable) return;
+
+            const oBinding = oTable.getBinding("items");
+            if (!oBinding) return;
+
+            const aFilters = [];
+            const oEmailModel = this.getModel("email");
+            const oFilters = oEmailModel.getProperty("/history/filters");
+
+            // Date filter
+            const oDateRange = this.byId("emailHistoryDateRange");
+            if (oDateRange) {
+                const oFrom = oDateRange.getDateValue();
+                const oTo = oDateRange.getSecondDateValue();
+                if (oFrom) {
+                    aFilters.push(new Filter("createdAt", FilterOperator.GE, oFrom));
+                }
+                if (oTo) {
+                    aFilters.push(new Filter("createdAt", FilterOperator.LE, oTo));
+                }
+            }
+
+            // Type filter
+            const oTypeFilter = this.byId("emailHistoryTypeFilter");
+            if (oTypeFilter) {
+                const aTypes = oTypeFilter.getSelectedKeys();
+                if (aTypes.length > 0) {
+                    const aTypeFilters = aTypes.map(type => new Filter("notificationType", FilterOperator.EQ, type));
+                    aFilters.push(new Filter({ filters: aTypeFilters, and: false }));
+                }
+            }
+
+            // Status filter
+            const oStatusFilter = this.byId("emailHistoryStatusFilter");
+            if (oStatusFilter) {
+                const aStatuses = oStatusFilter.getSelectedKeys();
+                if (aStatuses.length > 0) {
+                    const aStatusFilters = aStatuses.map(status => new Filter("deliveryStatus", FilterOperator.EQ, status));
+                    aFilters.push(new Filter({ filters: aStatusFilters, and: false }));
+                }
+            }
+
+            // Search filter
+            if (oFilters.search) {
+                aFilters.push(new Filter({
+                    filters: [
+                        new Filter("recipientEmail", FilterOperator.Contains, oFilters.search),
+                        new Filter("candidate/firstName", FilterOperator.Contains, oFilters.search),
+                        new Filter("candidate/lastName", FilterOperator.Contains, oFilters.search)
+                    ],
+                    and: false
+                }));
+            }
+
+            oBinding.filter(aFilters.length > 0 ? new Filter({ filters: aFilters, and: true }) : []);
+        },
+
+        /**
+         * Clear all email history filters
+         */
+        onClearEmailHistoryFilters: function () {
+            const oDateRange = this.byId("emailHistoryDateRange");
+            const oTypeFilter = this.byId("emailHistoryTypeFilter");
+            const oStatusFilter = this.byId("emailHistoryStatusFilter");
+            const oSearch = this.byId("emailHistorySearch");
+
+            if (oDateRange) oDateRange.setValue("");
+            if (oTypeFilter) oTypeFilter.setSelectedKeys([]);
+            if (oStatusFilter) oStatusFilter.setSelectedKeys([]);
+            if (oSearch) oSearch.setValue("");
+
+            const oEmailModel = this.getModel("email");
+            oEmailModel.setProperty("/history/filters", {
+                dateFrom: null,
+                dateTo: null,
+                types: [],
+                statuses: [],
+                search: ''
+            });
+
+            this._applyEmailHistoryFilters();
+        },
+
+        /**
+         * Handle email history item press - show detail dialog
+         * @param {sap.ui.base.Event} oEvent List item press event
+         */
+        onEmailHistoryItemPress: function (oEvent) {
+            const oItem = oEvent.getParameter("listItem");
+            const oContext = oItem.getBindingContext();
+            this._showEmailDetailDialog(oContext);
+        },
+
+        /**
+         * View email notification details
+         * @param {sap.ui.base.Event} oEvent Button press event
+         */
+        onViewEmailDetails: function (oEvent) {
+            const oButton = oEvent.getSource();
+            const oContext = oButton.getBindingContext();
+            this._showEmailDetailDialog(oContext);
+        },
+
+        /**
+         * Show email notification detail dialog
+         * @param {sap.ui.model.Context} oContext Binding context
+         * @private
+         */
+        _showEmailDetailDialog: function (oContext) {
+            const oData = oContext.getObject();
+
+            const oDialog = new sap.m.Dialog({
+                title: this.getResourceBundle().getText("notificationDetails"),
+                contentWidth: "500px",
+                content: [
+                    new sap.m.VBox({
+                        class: "sapUiSmallMargin",
+                        items: [
+                            new sap.m.Label({ text: this.getResourceBundle().getText("notificationType"), design: "Bold" }),
+                            new sap.m.Text({ text: oData.notificationType }),
+                            new sap.m.Label({ text: this.getResourceBundle().getText("recipient"), design: "Bold", class: "sapUiSmallMarginTop" }),
+                            new sap.m.Text({ text: oData.recipientEmail }),
+                            new sap.m.Label({ text: this.getResourceBundle().getText("subject"), design: "Bold", class: "sapUiSmallMarginTop" }),
+                            new sap.m.Text({ text: oData.subject || "N/A" }),
+                            new sap.m.Label({ text: this.getResourceBundle().getText("status"), design: "Bold", class: "sapUiSmallMarginTop" }),
+                            new sap.m.ObjectStatus({
+                                text: oData.deliveryStatus,
+                                state: oData.deliveryStatus === 'sent' ? 'Success' : oData.deliveryStatus === 'failed' ? 'Error' : 'Warning'
+                            }),
+                            new sap.m.Label({ text: this.getResourceBundle().getText("timestamps"), design: "Bold", class: "sapUiSmallMarginTop" }),
+                            new sap.m.Text({ text: "Created: " + (oData.createdAt || "N/A") }),
+                            new sap.m.Text({ text: "Sent: " + (oData.sentAt || "N/A") }),
+                            new sap.m.Text({ text: "Opened: " + (oData.openedAt || "N/A") }),
+                            new sap.m.Text({ text: "Clicked: " + (oData.clickedAt || "N/A") })
+                        ]
+                    })
+                ],
+                beginButton: new sap.m.Button({
+                    text: "Close",
+                    press: function () {
+                        oDialog.close();
+                    }
+                }),
+                afterClose: function () {
+                    oDialog.destroy();
+                }
+            });
+
+            oDialog.open();
+        },
+
+        /**
+         * Retry failed email notification
+         * @param {sap.ui.base.Event} oEvent Button press event
+         */
+        onRetryEmail: function (oEvent) {
+            const oButton = oEvent.getSource();
+            const oContext = oButton.getBindingContext();
+            const sId = oContext.getProperty("ID");
+
+            const oModel = this.getModel();
+            oModel.callFunction("/retryFailedNotification", {
+                method: "POST",
+                urlParameters: { notificationId: sId },
+                success: () => {
+                    sap.m.MessageToast.show("Notification queued for retry");
+                    this.byId("emailHistoryTable").getBinding("items").refresh();
+                },
+                error: (oError) => {
+                    sap.m.MessageBox.error("Failed to retry notification: " + oError.message);
+                }
+            });
+        },
+
         /**
          * Load email settings from backend
          * @private
