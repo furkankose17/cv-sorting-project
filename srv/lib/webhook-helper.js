@@ -127,6 +127,27 @@ class WebhookHelper {
     }
 
     /**
+     * Send interview scheduled webhook with full details
+     * @param {string} interviewId - Interview ID
+     * @param {string} candidateId - Candidate ID
+     * @param {string} jobPostingId - Job Posting ID
+     * @param {string} scheduledAt - ISO datetime string
+     * @param {string} interviewerEmail - Interviewer email
+     * @returns {Promise<{success: boolean, webhookId: string|null, error: string|null}>}
+     */
+    async sendInterviewScheduledWebhook(interviewId, candidateId, jobPostingId, scheduledAt, interviewerEmail) {
+        const payload = {
+            interviewId,
+            candidateId,
+            jobPostingId,
+            scheduledAt,
+            interviewerEmail
+        };
+
+        return this.sendWebhook('interview-scheduled', payload);
+    }
+
+    /**
      * Sleep helper for retry backoff
      * @param {number} ms - Milliseconds to sleep
      * @returns {Promise<void>}

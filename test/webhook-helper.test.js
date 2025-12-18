@@ -243,6 +243,38 @@ describe('WebhookHelper', () => {
         });
     });
 
+    describe('sendInterviewScheduledWebhook', () => {
+        test('should send interview-scheduled webhook with full details', async () => {
+            const interviewId = 'interview-789';
+            const candidateId = 'candidate-456';
+            const jobPostingId = 'job-123';
+            const scheduledAt = '2025-12-20T10:00:00Z';
+            const interviewerEmail = 'interviewer@company.com';
+
+            const scope = nock(mockN8nUrl)
+                .post('/interview-scheduled', (body) => {
+                    expect(body.eventType).toBe('interview-scheduled');
+                    expect(body.payload).toMatchObject({
+                        interviewId,
+                        candidateId,
+                        jobPostingId,
+                        scheduledAt,
+                        interviewerEmail
+                    });
+                    return true;
+                })
+                .reply(200, { success: true, webhookId: 'interview-scheduled-123' });
+
+            const result = await webhookHelper.sendInterviewScheduledWebhook(
+                interviewId, candidateId, jobPostingId, scheduledAt, interviewerEmail
+            );
+
+            expect(result.success).toBe(true);
+            expect(result.webhookId).toBe('interview-scheduled-123');
+            expect(scope.isDone()).toBe(true);
+        });
+    });
+
     describe('Configuration', () => {
         test('should use default values when env vars not set', async () => {
             delete process.env.N8N_WEBHOOK_URL;
