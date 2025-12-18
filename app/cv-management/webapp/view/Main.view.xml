@@ -73,6 +73,14 @@
                         text="Analytics"
                         key="analytics">
                     </IconTabFilter>
+
+                    <!-- Email Center Tab -->
+                    <IconTabFilter
+                        id="emailCenterTab"
+                        icon="sap-icon://email"
+                        text="Email Center"
+                        key="emailCenter">
+                    </IconTabFilter>
                 </items>
             </IconTabBar>
         </content>
