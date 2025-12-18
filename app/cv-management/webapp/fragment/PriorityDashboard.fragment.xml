@@ -1,0 +1,96 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.f"
+    xmlns:card="sap.f.cards">
+
+    <Panel
+        headerText="{i18n>priorityDashboardTitle}"
+        class="sapUiMediumMarginBottom"
+        visible="{= ${dashboard>/priorityData/jobsWithHotCandidates}.length > 0 }">
+
+        <headerToolbar>
+            <OverflowToolbar>
+                <Title text="{i18n>priorityDashboardTitle}" />
+                <ToolbarSpacer />
+                <Button
+                    icon="sap-icon://refresh"
+                    tooltip="{i18n>refresh}"
+                    press=".onRefreshPriorityCandidates" />
+            </OverflowToolbar>
+        </headerToolbar>
+
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <!-- Summary Cards -->
+                <HBox class="sapUiSmallMarginBottom">
+                    <f:Card class="sapUiSmallMarginEnd" width="150px">
+                        <f:header>
+                            <card:Header
+                                title="{i18n>hotCandidatesTotal}"
+                                subtitle="{i18n>readyToReview}" />
+                        </f:header>
+                        <f:content>
+                            <NumericContent
+                                value="{dashboard>/priorityData/totalHotCandidates}"
+                                valueColor="Good"
+                                icon="sap-icon://status-positive" />
+                        </f:content>
+                    </f:Card>
+                    <f:Card width="150px">
+                        <f:header>
+                            <card:Header
+                                title="{i18n>warmCandidatesTotal}"
+                                subtitle="{i18n>worthConsidering}" />
+                        </f:header>
+                        <f:content>
+                            <NumericContent
+                                value="{dashboard>/priorityData/totalWarmCandidates}"
+                                valueColor="Critical"
+                                icon="sap-icon://status-critical" />
+                        </f:content>
+                    </f:Card>
+                </HBox>
+
+                <!-- Jobs with Hot Candidates List -->
+                <List
+                    items="{dashboard>/priorityData/jobsWithHotCandidates}"
+                    noDataText="{i18n>noHotCandidates}"
+                    mode="None">
+                    <CustomListItem type="Active" press=".onPriorityJobPress">
+                        <HBox
+                            alignItems="Center"
+                            justifyContent="SpaceBetween"
+                            class="sapUiSmallMargin">
+                            <VBox>
+                                <Text text="{dashboard>title}" class="sapUiTinyMarginBottom" />
+                                <Text text="{dashboard>department}" class="sapUiTinyText" />
+                            </VBox>
+                            <HBox alignItems="Center">
+                                <ObjectStatus
+                                    text="{dashboard>hotCount} Hot"
+                                    state="Success"
+                                    icon="sap-icon://status-positive"
+                                    class="sapUiTinyMarginEnd" />
+                                <ObjectStatus
+                                    text="{dashboard>warmCount} Warm"
+                                    state="Warning"
+                                    icon="sap-icon://status-critical"
+                                    visible="{= ${dashboard>warmCount} > 0 }" />
+                                <Button
+                                    text="{i18n>reviewNow}"
+                                    type="Emphasized"
+                                    press=".onReviewPriorityJob"
+                                    class="sapUiSmallMarginBegin" />
+                            </HBox>
+                        </HBox>
+                        <customData>
+                            <core:CustomData key="jobId" value="{dashboard>ID}" />
+                        </customData>
+                    </CustomListItem>
+                </List>
+            </VBox>
+        </content>
+    </Panel>
+
+</core:FragmentDefinition>

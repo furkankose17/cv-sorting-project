@@ -5,6 +5,11 @@
     xmlns:u="sap.ui.unified">
 
     <VBox class="sapUiSmallMargin">
+        <!-- Priority Dashboard - Shows jobs with hot candidates -->
+        <core:Fragment
+            fragmentName="cvmanagement.fragment.PriorityDashboard"
+            type="XML" />
+
         <!-- Upload Instructions -->
         <MessageStrip
             text="Upload CVs for automatic processing. Files will be processed with OCR and structured data extraction. Confidence ≥85% will auto-create candidates."
@@ -141,18 +146,15 @@
                             <ObjectIdentifier
                                 title="{fileName}"
                                 text="{mediaType}" />
-                            <Text text="{= %{createdAt} ? ${path: 'createdAt', type: 'sap.ui.model.type.DateTime', formatOptions: {pattern: 'dd MMM yyyy HH:mm'}} : '-' }" />
+                            <Text text="{= %{createdAt} ? %{createdAt} : '-'}" />
                             <ObjectStatus
                                 text="{ocrStatus}"
                                 state="{= ${ocrStatus} === 'completed' ? 'Success' : ${ocrStatus} === 'processing' ? 'Information' : ${ocrStatus} === 'failed' ? 'Error' : 'Warning' }" />
-                            <Text text="{
-                                path: 'ocrConfidence',
-                                type: 'sap.ui.model.type.Float',
-                                formatOptions: {
-                                    maxFractionDigits: 1
-                                }
-                            }%" />
-                            <Text text="{= ${candidate/firstName} ? ${candidate/firstName} + ' ' + ${candidate/lastName} : 'No candidate' }" />
+                            <ObjectNumber
+                                number="{ocrConfidence}"
+                                unit="%"
+                                state="{= ${ocrConfidence} >= 85 ? 'Success' : ${ocrConfidence} >= 70 ? 'Warning' : 'Error' }" />
+                            <Text text="{= %{candidate/firstName} ? %{candidate/firstName} + ' ' + %{candidate/lastName} : 'No candidate' }" />
                         </cells>
                         <customData>
                             <core:CustomData key="documentId" value="{ID}" />
