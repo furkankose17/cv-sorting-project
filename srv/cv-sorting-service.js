@@ -1927,6 +1927,32 @@ module.exports = class CVSortingService extends cds.ApplicationService {
             }
         });
 
+        // Handler for n8n callback - mark interview reminder as sent
+        this.on('markInterviewReminderSent', async (req) => {
+            const { interviewId } = req.data;
+            const { Interviews } = this.entities;
+
+            try {
+                const result = await UPDATE(Interviews)
+                    .where({ ID: interviewId })
+                    .set({
+                        reminderSent: true,
+                        reminderSentAt: new Date().toISOString()
+                    });
+
+                if (result === 1) {
+                    LOG.info('Interview reminder marked as sent', { interviewId });
+                    return true;
+                } else {
+                    LOG.warn('Interview not found for reminder update', { interviewId });
+                    return false;
+                }
+            } catch (error) {
+                LOG.error('Error marking reminder sent:', { interviewId, error: error.message });
+                throw error;
+            }
+        });
+
         LOG.info('Email notification handlers registered');
     }
 
