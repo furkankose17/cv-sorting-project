@@ -344,6 +344,7 @@ entity Interviews : cuid, managed, AuditTrail {
 
     // Reminders
     reminderSent          : Boolean default false;
+    reminderSentAt        : Timestamp;
     feedbackDueDate       : Date;
 
     // Completion
