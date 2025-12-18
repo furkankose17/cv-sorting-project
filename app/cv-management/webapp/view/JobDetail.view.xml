@@ -191,6 +191,25 @@
                             <Toolbar>
                                 <Title text="Matching Candidates" level="H3" />
                                 <ToolbarSpacer />
+                                <SegmentedButton
+                                    id="triageFilter"
+                                    selectionChange=".onTriageFilterChange"
+                                    selectedKey="all">
+                                    <items>
+                                        <SegmentedButtonItem key="all" text="All" />
+                                        <SegmentedButtonItem key="top10" text="Top 10" />
+                                        <SegmentedButtonItem key="hot" text="Hot" />
+                                        <SegmentedButtonItem key="warm" text="Warm" />
+                                    </items>
+                                </SegmentedButton>
+                                <Button
+                                    id="quickRankButton"
+                                    text="{i18n>quickRankTop10}"
+                                    icon="sap-icon://sorting-ranking"
+                                    type="Accept"
+                                    press=".onQuickRankTop10"
+                                    tooltip="{i18n>quickRankTooltip}" />
+                                <ToolbarSeparator />
                                 <Button
                                     text="Run Matching"
                                     icon="sap-icon://play"
@@ -228,11 +247,17 @@
                                     <Column width="8em" hAlign="Center">
                                         <Text text="Overall Score" />
                                     </Column>
+                                    <Column width="5em" hAlign="Center">
+                                        <Text text="Triage" />
+                                    </Column>
                                     <Column width="8em" hAlign="Center">
                                         <Text text="Skills Score" />
                                     </Column>
                                     <Column width="8em" hAlign="Center">
                                         <Text text="Semantic Score" />
+                                    </Column>
+                                    <Column width="7em" hAlign="Center">
+                                        <Text text="Feedback" />
                                     </Column>
                                     <Column width="10em">
                                         <Text text="Actions" />
@@ -241,7 +266,7 @@
                                 <items>
                                     <ColumnListItem type="Navigation" press=".onMatchPress">
                                         <cells>
-                                            <Text text="{= ${matchResults>}.indexOf(${matchResults>}) + 1 }" />
+                                            <ObjectNumber number="{rank}" emphasized="true" />
                                             <VBox>
                                                 <Text text="{candidate/firstName} {candidate/lastName}" />
                                                 <Text text="{candidate/email}" class="sapUiTinyText" />
@@ -259,6 +284,19 @@
                                                     path: 'overallScore',
                                                     formatter: '.StatusFormatter.formatScoreState'
                                                 }" />
+                                            <ObjectStatus
+                                                text="{
+                                                    path: 'overallScore',
+                                                    formatter: '.StatusFormatter.formatScoreBadge'
+                                                }"
+                                                icon="{
+                                                    path: 'overallScore',
+                                                    formatter: '.StatusFormatter.formatScoreBadgeIcon'
+                                                }"
+                                                state="{
+                                                    path: 'overallScore',
+                                                    formatter: '.StatusFormatter.formatScoreState'
+                                                }" />
                                             <ObjectNumber
                                                 number="{skillScore}"
                                                 unit="%"
@@ -267,12 +305,32 @@
                                                     formatter: '.StatusFormatter.formatScoreState'
                                                 }" />
                                             <ObjectNumber
-                                                number="{semanticScore}"
-                                                unit="%"
+                                                number="{
+                                                    path: 'semanticScore',
+                                                    formatter: '.StatusFormatter.formatSemanticScoreValue'
+                                                }"
+                                                unit="{
+                                                    path: 'semanticScore',
+                                                    formatter: '.StatusFormatter.formatSemanticScoreUnit'
+                                                }"
                                                 state="{
                                                     path: 'semanticScore',
-                                                    formatter: '.StatusFormatter.formatScoreState'
+                                                    formatter: '.StatusFormatter.formatSemanticScoreState'
                                                 }" />
+                                            <!-- Feedback Buttons -->
+                                            <HBox justifyContent="Center" alignItems="Center">
+                                                <Button
+                                                    icon="sap-icon://thumb-up"
+                                                    type="{= ${feedbackMultiplier} > 1 ? 'Accept' : 'Transparent' }"
+                                                    press=".onFeedbackPositive"
+                                                    tooltip="Good match - increases score for similar candidates" />
+                                                <Button
+                                                    icon="sap-icon://thumb-down"
+                                                    type="{= ${feedbackMultiplier} &lt; 1 ? 'Reject' : 'Transparent' }"
+                                                    press=".onFeedbackNegative"
+                                                    tooltip="Poor match - decreases score for similar candidates"
+                                                    class="sapUiTinyMarginBegin" />
+                                            </HBox>
                                             <HBox>
                                                 <Button
                                                     text="View"

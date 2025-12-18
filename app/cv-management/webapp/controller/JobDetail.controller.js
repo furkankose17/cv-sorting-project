@@ -1,11 +1,13 @@
 sap.ui.define([
     "./BaseController",
     "sap/ui/model/json/JSONModel",
+    "sap/ui/model/Filter",
+    "sap/ui/model/FilterOperator",
     "../utils/MLServiceClient",
     "../model/formatter/DataFormatter",
     "../model/formatter/StatusFormatter",
     "../model/formatter/DisplayFormatter"
-], function (BaseController, JSONModel, MLServiceClient,
+], function (BaseController, JSONModel, Filter, FilterOperator, MLServiceClient,
              DataFormatter, StatusFormatter, DisplayFormatter) {
     "use strict";
 
@@ -50,7 +52,7 @@ sap.ui.define([
 
             // Bind the view to the job posting (using draft entity syntax)
             this.getView().bindElement({
-                path: "/JobPostings(ID='" + sJobId + "',IsActiveEntity=true)",
+                path: "/JobPostings(ID=" + sJobId + ",IsActiveEntity=true)",
                 parameters: {
                     $expand: "requiredSkills($expand=skill),matchResults($expand=candidate($expand=status)),customRules"
                 }
@@ -70,7 +72,7 @@ sap.ui.define([
 
             // Bind the view (using draft entity syntax)
             this.getView().bindElement({
-                path: "/JobPostings(ID='" + sJobId + "',IsActiveEntity=true)",
+                path: "/JobPostings(ID=" + sJobId + ",IsActiveEntity=true)",
                 parameters: {
                     $expand: "requiredSkills($expand=skill),matchResults($expand=candidate),customRules"
                 }
@@ -128,7 +130,7 @@ sap.ui.define([
                 try {
                     // Call publish action (auto-generates embedding)
                     const oModel = this.getModel();
-                    const oActionContext = oModel.bindContext("/JobPostings(ID='" + sJobId + "',IsActiveEntity=true)/CVSortingService.publish");
+                    const oActionContext = oModel.bindContext("/JobPostings(ID=" + sJobId + ",IsActiveEntity=true)/CVSortingService.publish");
                     await oActionContext.execute();
 
                     this.showSuccess("Job published successfully and embedding generated");
@@ -269,6 +271,160 @@ sap.ui.define([
                 oTable.getBinding("items").refresh();
             }
             this.showSuccess("Matches refreshed");
+        },
+
+        /**
+         * Quick rank - instantly filter and show top 10 candidates by score
+         */
+        onQuickRankTop10: function () {
+            // Set filter to Top 10
+            const oSegmentedButton = this.byId("triageFilter");
+            if (oSegmentedButton) {
+                oSegmentedButton.setSelectedKey("top10");
+            }
+
+            // Trigger the filter change programmatically
+            this._applyTriageFilter("top10");
+
+            // Show message
+            sap.m.MessageToast.show(this.getResourceBundle().getText("quickRankRunning"));
+        },
+
+        /**
+         * Apply triage filter programmatically
+         * @param {string} sKey The filter key
+         * @private
+         */
+        _applyTriageFilter: function (sKey) {
+            const oTable = this.byId("matchResultsTable");
+            if (!oTable) return;
+
+            const oBinding = oTable.getBinding("items");
+            if (!oBinding) return;
+
+            const aFilters = [];
+
+            switch (sKey) {
+                case "top10":
+                    aFilters.push(new sap.ui.model.Filter("rank", sap.ui.model.FilterOperator.LE, 10));
+                    break;
+                case "hot":
+                    aFilters.push(new sap.ui.model.Filter("overallScore", sap.ui.model.FilterOperator.GE, 80));
+                    break;
+                case "warm":
+                    aFilters.push(new sap.ui.model.Filter([
+                        new sap.ui.model.Filter("overallScore", sap.ui.model.FilterOperator.GE, 60),
+                        new sap.ui.model.Filter("overallScore", sap.ui.model.FilterOperator.LT, 80)
+                    ], true));
+                    break;
+                default:
+                    // No filter for "all"
+                    break;
+            }
+
+            oBinding.filter(aFilters);
+        },
+
+        /**
+         * Handle triage filter change (All/Top 10/Hot/Warm)
+         * @param {sap.ui.base.Event} oEvent The selection change event
+         */
+        onTriageFilterChange: function (oEvent) {
+            const sKey = oEvent.getParameter("item").getKey();
+            const oTable = this.byId("matchResultsTable");
+            if (!oTable) return;
+
+            const oBinding = oTable.getBinding("items");
+            if (!oBinding) return;
+
+            // Build filters based on selection
+            const aFilters = [];
+
+            switch (sKey) {
+                case "top10":
+                    // Filter by rank <= 10
+                    aFilters.push(new Filter("rank", FilterOperator.LE, 10));
+                    break;
+                case "hot":
+                    // Filter by score >= 80
+                    aFilters.push(new Filter("overallScore", FilterOperator.GE, 80));
+                    break;
+                case "warm":
+                    // Filter by score >= 60 and < 80
+                    aFilters.push(new Filter({
+                        filters: [
+                            new Filter("overallScore", FilterOperator.GE, 60),
+                            new Filter("overallScore", FilterOperator.LT, 80)
+                        ],
+                        and: true
+                    }));
+                    break;
+                // "all" - no filters
+            }
+
+            oBinding.filter(aFilters);
+        },
+
+        // ==================== Feedback Actions ====================
+
+        /**
+         * Handle positive feedback (thumbs up) button press
+         * @param {sap.ui.base.Event} oEvent The press event
+         */
+        onFeedbackPositive: async function (oEvent) {
+            await this._submitFeedback(oEvent, "positive");
+        },
+
+        /**
+         * Handle negative feedback (thumbs down) button press
+         * @param {sap.ui.base.Event} oEvent The press event
+         */
+        onFeedbackNegative: async function (oEvent) {
+            await this._submitFeedback(oEvent, "negative");
+        },
+
+        /**
+         * Submit feedback for a match result
+         * @param {sap.ui.base.Event} oEvent The press event
+         * @param {string} sFeedbackType 'positive' or 'negative'
+         * @private
+         */
+        _submitFeedback: async function (oEvent, sFeedbackType) {
+            const oButton = oEvent.getSource();
+            const oContext = oButton.getBindingContext();
+            const sMatchResultId = oContext.getProperty("ID");
+
+            // Prevent event propagation to avoid navigation
+            oEvent.preventDefault && oEvent.preventDefault();
+
+            this.setBusy(true);
+            try {
+                const oModel = this.getModel();
+                const oActionContext = oModel.bindContext("/submitMatchFeedback(...)");
+                oActionContext.setParameter("matchResultId", sMatchResultId);
+                oActionContext.setParameter("feedbackType", sFeedbackType);
+                oActionContext.setParameter("notes", null);
+
+                await oActionContext.execute();
+                const oResult = oActionContext.getBoundContext().getObject();
+
+                if (oResult.success) {
+                    const sMessage = oResult.feedbackId ?
+                        `Feedback recorded (multiplier: ${oResult.newMultiplier}x)` :
+                        "Feedback removed";
+                    this.showSuccess(sMessage);
+
+                    // Refresh the view context to show updated state
+                    const oViewContext = this.getView().getBindingContext();
+                    if (oViewContext) {
+                        oViewContext.refresh();
+                    }
+                }
+            } catch (error) {
+                this.handleError(error);
+            } finally {
+                this.setBusy(false);
+            }
         },
 
         /**
