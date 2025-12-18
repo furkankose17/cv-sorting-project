@@ -87,6 +87,7 @@ sap.ui.define([
                     totalHotCandidates: 0,
                     totalWarmCandidates: 0
                 },
+                processingCount: 0,
                 jobsKPI: {
                     totalJobs: 0,
                     publishedJobs: 0,
@@ -118,15 +119,22 @@ sap.ui.define([
                 oModel.attachEventOnce("dataReceived", () => {
                     this._loadDashboardStats();
                     this._loadPriorityDashboard();
+                    this._loadProcessingCount();
                 });
                 // Also try immediately in case model is already loaded
                 setTimeout(() => {
                     if (oModel.getServiceUrl()) {
                         this._loadDashboardStats();
                         this._loadPriorityDashboard();
+                        this._loadProcessingCount();
                     }
                 }, 500);
             }
+
+            // Poll processing count every 30 seconds
+            this._processingCountInterval = setInterval(() => {
+                this._loadProcessingCount();
+            }, 30000);
 
             // Initialize AI Assistant model
             const oAIAssistantModel = new JSONModel({
@@ -246,6 +254,11 @@ sap.ui.define([
             if (this._keydownHandler) {
                 document.removeEventListener("keydown", this._keydownHandler);
                 this._keydownHandler = null;
+            }
+            // Clear processing count polling interval
+            if (this._processingCountInterval) {
+                clearInterval(this._processingCountInterval);
+                this._processingCountInterval = null;
             }
         },
 
@@ -1953,6 +1966,23 @@ sap.ui.define([
             }).catch(oError => {
                 console.error("Failed to load priority dashboard:", oError);
                 oDashboardModel.setProperty("/priorityData/isLoading", false);
+            });
+        },
+
+        /**
+         * Load count of CVs currently processing
+         * @private
+         */
+        _loadProcessingCount: function () {
+            const oModel = this.getModel();
+            const oDashboardModel = this.getModel("dashboard");
+
+            oModel.bindList("/CVDocuments", undefined, undefined,
+                new Filter("ocrStatus", FilterOperator.EQ, "processing")
+            ).requestContexts(0, 1000).then(aContexts => {
+                oDashboardModel.setProperty("/processingCount", aContexts.length);
+            }).catch(oError => {
+                console.error("Failed to load processing count:", oError);
             });
         },
 

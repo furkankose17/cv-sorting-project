@@ -10,6 +10,14 @@
             fragmentName="cvmanagement.fragment.PriorityDashboard"
             type="XML" />
 
+        <!-- Processing Status Indicator -->
+        <MessageStrip
+            text="{= ${dashboard>/processingCount} > 0 ? ${dashboard>/processingCount} + ' CVs currently processing' : 'All CVs processed' }"
+            type="{= ${dashboard>/processingCount} > 0 ? 'Warning' : 'Success' }"
+            showIcon="true"
+            visible="{= ${dashboard>/processingCount} !== undefined }"
+            class="sapUiSmallMarginBottom" />
+
         <!-- Upload Instructions -->
         <MessageStrip
             text="Upload CVs for automatic processing. Files will be processed with OCR and structured data extraction. Confidence ≥85% will auto-create candidates."
