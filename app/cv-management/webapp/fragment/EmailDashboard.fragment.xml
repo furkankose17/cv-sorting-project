@@ -1,0 +1,176 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.f"
+    xmlns:card="sap.f.cards"
+    xmlns:layout="sap.ui.layout">
+
+    <VBox class="sapUiSmallMargin">
+        <!-- KPI Stats Cards Row -->
+        <layout:HorizontalLayout allowWrapping="true" class="sapUiMediumMarginBottom">
+            <!-- Sent Today Card -->
+            <f:Card class="sapUiSmallMarginEnd" width="200px">
+                <f:header>
+                    <card:Header
+                        title="{i18n>sentToday}"
+                        subtitle="{= ${email>/stats/sentToday} > ${email>/stats/sentYesterday} ? '↑' : ${email>/stats/sentToday} < ${email>/stats/sentYesterday} ? '↓' : '→' } vs yesterday" />
+                </f:header>
+                <f:content>
+                    <NumericContent
+                        value="{email>/stats/sentToday}"
+                        scale=""
+                        valueColor="Good"
+                        icon="sap-icon://email"
+                        class="sapUiSmallMargin" />
+                </f:content>
+            </f:Card>
+
+            <!-- Delivery Rate Card -->
+            <f:Card class="sapUiSmallMarginEnd" width="200px">
+                <f:header>
+                    <card:Header
+                        title="{i18n>deliveryRate}"
+                        subtitle="{email>/stats/totalSent} total sent" />
+                </f:header>
+                <f:content>
+                    <NumericContent
+                        value="{email>/stats/deliveryRate}"
+                        scale="%"
+                        valueColor="{= ${email>/stats/deliveryRate} >= 95 ? 'Good' : ${email>/stats/deliveryRate} >= 80 ? 'Critical' : 'Error' }"
+                        icon="sap-icon://accept"
+                        class="sapUiSmallMargin" />
+                </f:content>
+            </f:Card>
+
+            <!-- Failed Card -->
+            <f:Card class="sapUiSmallMarginEnd" width="200px">
+                <f:header>
+                    <card:Header
+                        title="{i18n>failedNotifications}"
+                        subtitle="Click to view" />
+                </f:header>
+                <f:content>
+                    <NumericContent
+                        value="{email>/stats/failedCount}"
+                        scale=""
+                        valueColor="{= ${email>/stats/failedCount} > 0 ? 'Error' : 'Good' }"
+                        icon="sap-icon://error"
+                        class="sapUiSmallMargin"
+                        press=".onFailedCardPress" />
+                </f:content>
+            </f:Card>
+
+            <!-- Pending Queue Card -->
+            <f:Card class="sapUiSmallMarginEnd" width="200px">
+                <f:header>
+                    <card:Header
+                        title="{i18n>pendingQueue}"
+                        subtitle="Awaiting send" />
+                </f:header>
+                <f:content>
+                    <NumericContent
+                        value="{email>/stats/pendingCount}"
+                        scale=""
+                        valueColor="Neutral"
+                        icon="sap-icon://pending"
+                        class="sapUiSmallMargin" />
+                </f:content>
+            </f:Card>
+        </layout:HorizontalLayout>
+
+        <!-- System Health and Recent Activity Row -->
+        <layout:HorizontalLayout allowWrapping="true" class="sapUiMediumMarginBottom">
+            <!-- System Health Panel -->
+            <f:Card class="sapUiSmallMarginEnd" width="350px">
+                <f:header>
+                    <card:Header
+                        title="{i18n>systemHealth}"
+                        icon="sap-icon://monitor-payments" />
+                </f:header>
+                <f:content>
+                    <VBox class="sapUiSmallMargin">
+                        <HBox justifyContent="SpaceBetween" class="sapUiTinyMarginBottom">
+                            <Label text="{i18n>n8nConnection}" />
+                            <ObjectStatus
+                                text="{= ${email>/health/n8nConnected} ? ${i18n>connected} : ${i18n>disconnected} }"
+                                state="{= ${email>/health/n8nConnected} ? 'Success' : 'Error' }" />
+                        </HBox>
+                        <HBox justifyContent="SpaceBetween" class="sapUiTinyMarginBottom">
+                            <Label text="{i18n>smtpStatus}" />
+                            <ObjectStatus
+                                text="{email>/health/smtpStatus}"
+                                state="{= ${email>/health/smtpStatus} === 'ok' ? 'Success' : ${email>/health/smtpStatus} === 'degraded' ? 'Warning' : 'Error' }" />
+                        </HBox>
+                        <HBox justifyContent="SpaceBetween" class="sapUiTinyMarginBottom">
+                            <Label text="{i18n>webhooksEnabled}" />
+                            <ObjectStatus
+                                text="{= ${email>/health/webhooksEnabled} ? ${i18n>yes} : ${i18n>no} }"
+                                state="{= ${email>/health/webhooksEnabled} ? 'Success' : 'Warning' }" />
+                        </HBox>
+                        <HBox justifyContent="SpaceBetween">
+                            <Label text="{i18n>lastSuccessfulSend}" />
+                            <Text text="{email>/health/lastSuccessfulSend}" />
+                        </HBox>
+                    </VBox>
+                </f:content>
+            </f:Card>
+
+            <!-- Recent Activity Panel -->
+            <f:Card class="sapUiSmallMarginEnd" width="500px">
+                <f:header>
+                    <card:Header
+                        title="{i18n>recentActivity}"
+                        icon="sap-icon://activity-2" />
+                </f:header>
+                <f:content>
+                    <List
+                        items="{email>/recentActivity}"
+                        noDataText="No recent activity"
+                        growing="false">
+                        <StandardListItem
+                            title="{email>notificationType}"
+                            description="{email>recipientEmail}"
+                            info="{email>timeAgo}"
+                            infoState="{= ${email>deliveryStatus} === 'sent' ? 'Success' : ${email>deliveryStatus} === 'failed' ? 'Error' : 'Warning' }"
+                            icon="{= ${email>deliveryStatus} === 'sent' ? 'sap-icon://accept' : ${email>deliveryStatus} === 'failed' ? 'sap-icon://error' : 'sap-icon://pending' }" />
+                    </List>
+                </f:content>
+            </f:Card>
+        </layout:HorizontalLayout>
+
+        <!-- Quick Actions Panel -->
+        <f:Card width="100%">
+            <f:header>
+                <card:Header
+                    title="{i18n>quickActions}"
+                    icon="sap-icon://action" />
+            </f:header>
+            <f:content>
+                <HBox class="sapUiSmallMargin" justifyContent="Start">
+                    <Button
+                        text="{i18n>retryFailed}"
+                        icon="sap-icon://refresh"
+                        type="Emphasized"
+                        enabled="{= ${email>/stats/failedCount} > 0 }"
+                        press=".onRetryAllFailed"
+                        class="sapUiSmallMarginEnd" />
+                    <Button
+                        text="{i18n>sendTestEmail}"
+                        icon="sap-icon://email"
+                        press=".onSendTestEmail"
+                        class="sapUiSmallMarginEnd" />
+                    <Button
+                        text="{i18n>openN8nDashboard}"
+                        icon="sap-icon://action-settings"
+                        press=".onOpenN8nDashboard"
+                        class="sapUiSmallMarginEnd" />
+                    <Button
+                        text="{i18n>refreshStats}"
+                        icon="sap-icon://synchronize"
+                        press=".onRefreshEmailStats" />
+                </HBox>
+            </f:content>
+        </f:Card>
+    </VBox>
+
+</core:FragmentDefinition>
