@@ -1,0 +1,264 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.f"
+    xmlns:card="sap.f.cards"
+    xmlns:layout="sap.ui.layout">
+
+    <VBox class="sapUiSmallMargin">
+        <!-- Header Toolbar -->
+        <Toolbar>
+            <Title text="{i18n>analyticsTitle}" level="H2" />
+            <ToolbarSpacer />
+            <DateRangeSelection
+                id="analyticsDateRange"
+                change=".onAnalyticsDateRangeChange"
+                placeholder="{i18n>selectDateRange}" />
+            <Button
+                icon="sap-icon://refresh"
+                tooltip="{i18n>refresh}"
+                press=".onRefreshAnalytics" />
+            <Button
+                text="{i18n>exportReport}"
+                icon="sap-icon://excel-attachment"
+                press=".onExportAnalyticsReport" />
+        </Toolbar>
+
+        <!-- KPI Cards Row -->
+        <layout:HorizontalLayout allowWrapping="true" class="sapUiMediumMarginTop sapUiMediumMarginBottom">
+            <!-- Total Candidates Card -->
+            <f:Card class="sapUiSmallMarginEnd" width="260px">
+                <f:header>
+                    <card:Header
+                        title="{i18n>totalCandidates}"
+                        subtitle="{i18n>allTime}" />
+                </f:header>
+                <f:content>
+                    <NumericContent
+                        value="{dashboard>/pipelineData/totalCandidates}"
+                        scale=""
+                        valueColor="Good"
+                        icon="sap-icon://group"
+                        class="sapUiSmallMargin" />
+                </f:content>
+            </f:Card>
+
+            <!-- Active Jobs Card -->
+            <f:Card class="sapUiSmallMarginEnd" width="260px">
+                <f:header>
+                    <card:Header
+                        title="{i18n>activeJobs}"
+                        subtitle="{i18n>currentlyOpen}" />
+                </f:header>
+                <f:content>
+                    <NumericContent
+                        value="{dashboard>/jobsData/activeJobs}"
+                        scale=""
+                        valueColor="Neutral"
+                        icon="sap-icon://activity-items"
+                        class="sapUiSmallMargin" />
+                </f:content>
+            </f:Card>
+
+            <!-- Avg Match Score Card -->
+            <f:Card class="sapUiSmallMarginEnd" width="260px">
+                <f:header>
+                    <card:Header
+                        title="{i18n>avgMatchScore}"
+                        subtitle="{i18n>acrossAllMatches}" />
+                </f:header>
+                <f:content>
+                    <NumericContent
+                        value="{dashboard>/matchingData/avgScore}"
+                        scale="%"
+                        valueColor="Critical"
+                        icon="sap-icon://target-group"
+                        class="sapUiSmallMargin" />
+                </f:content>
+            </f:Card>
+
+            <!-- Time to Hire Card -->
+            <f:Card class="sapUiSmallMarginEnd" width="260px">
+                <f:header>
+                    <card:Header
+                        title="{i18n>avgTimeToHire}"
+                        subtitle="{i18n>inDays}" />
+                </f:header>
+                <f:content>
+                    <NumericContent
+                        value="{dashboard>/pipelineData/avgTimeToHire}"
+                        scale="{i18n>days}"
+                        valueColor="Neutral"
+                        icon="sap-icon://pending"
+                        class="sapUiSmallMargin" />
+                </f:content>
+            </f:Card>
+
+            <!-- Upcoming Interviews Card -->
+            <f:Card class="sapUiSmallMarginEnd" width="260px">
+                <f:header>
+                    <card:Header
+                        title="{i18n>upcomingInterviews}"
+                        subtitle="{i18n>thisWeek}" />
+                </f:header>
+                <f:content>
+                    <NumericContent
+                        value="{dashboard>/interviewData/upcomingCount}"
+                        scale=""
+                        valueColor="Critical"
+                        icon="sap-icon://appointment"
+                        class="sapUiSmallMargin" />
+                </f:content>
+            </f:Card>
+
+            <!-- Completion Rate Card -->
+            <f:Card width="260px">
+                <f:header>
+                    <card:Header
+                        title="{i18n>completionRate}"
+                        subtitle="{i18n>interviews}" />
+                </f:header>
+                <f:content>
+                    <NumericContent
+                        value="{dashboard>/interviewData/completionRate}"
+                        scale="%"
+                        valueColor="Good"
+                        icon="sap-icon://complete"
+                        class="sapUiSmallMargin" />
+                </f:content>
+            </f:Card>
+        </layout:HorizontalLayout>
+
+        <!-- Pipeline Status Panel -->
+        <Panel
+            headerText="{i18n>candidatePipeline}"
+            expandable="true"
+            expanded="true"
+            class="sapUiMediumMarginBottom">
+            <content>
+                <Table
+                    items="{dashboard>/pipelineData/byStatus}"
+                    growing="true"
+                    growingThreshold="10">
+                    <columns>
+                        <Column><Text text="{i18n>status}" /></Column>
+                        <Column hAlign="End"><Text text="{i18n>count}" /></Column>
+                        <Column hAlign="End" width="200px"><Text text="{i18n>percentage}" /></Column>
+                    </columns>
+                    <items>
+                        <ColumnListItem>
+                            <cells>
+                                <ObjectStatus text="{dashboard>status}" state="{dashboard>state}" />
+                                <ObjectNumber number="{dashboard>count}" />
+                                <ProgressIndicator
+                                    percentValue="{dashboard>percentage}"
+                                    displayValue="{dashboard>percentage}%"
+                                    state="{dashboard>state}" />
+                            </cells>
+                        </ColumnListItem>
+                    </items>
+                </Table>
+            </content>
+        </Panel>
+
+        <!-- Top Skills Panel -->
+        <Panel
+            headerText="{i18n>topSkills}"
+            expandable="true"
+            expanded="true"
+            class="sapUiMediumMarginBottom">
+            <content>
+                <Table
+                    items="{dashboard>/skillsData/topSkills}"
+                    growing="true"
+                    growingThreshold="10">
+                    <columns>
+                        <Column><Text text="{i18n>skillName}" /></Column>
+                        <Column hAlign="End"><Text text="{i18n>candidateCount}" /></Column>
+                        <Column hAlign="End"><Text text="{i18n>demandCount}" /></Column>
+                        <Column hAlign="End"><Text text="{i18n>supplyDemand}" /></Column>
+                    </columns>
+                    <items>
+                        <ColumnListItem>
+                            <cells>
+                                <Text text="{dashboard>skillName}" />
+                                <ObjectNumber number="{dashboard>candidateCount}" />
+                                <ObjectNumber number="{dashboard>demandCount}" />
+                                <ObjectStatus
+                                    text="{dashboard>ratio}"
+                                    state="{= ${dashboard>ratio} >= 1 ? 'Success' : 'Warning' }" />
+                            </cells>
+                        </ColumnListItem>
+                    </items>
+                </Table>
+            </content>
+        </Panel>
+
+        <!-- AI Insights Panel -->
+        <Panel
+            headerText="{i18n>aiInsights}"
+            expandable="true"
+            expanded="true"
+            class="sapUiMediumMarginBottom">
+            <headerToolbar>
+                <Toolbar>
+                    <Title text="{i18n>aiInsights}" />
+                    <ToolbarSpacer />
+                    <Button
+                        icon="sap-icon://refresh"
+                        tooltip="{i18n>refresh}"
+                        press=".onRefreshAIInsights" />
+                    <Button
+                        text="{i18n>askJoule}"
+                        icon="sap-icon://da-2"
+                        type="Emphasized"
+                        press=".onAskJoule" />
+                </Toolbar>
+            </headerToolbar>
+            <content>
+                <VBox class="sapUiSmallMargin">
+                    <!-- Loading Indicator -->
+                    <BusyIndicator
+                        visible="{dashboard>/aiData/isLoading}" />
+
+                    <!-- AI Recommendations List -->
+                    <List
+                        items="{dashboard>/aiData/recommendations}"
+                        noDataText="{i18n>noRecommendations}"
+                        visible="{= !${dashboard>/aiData/isLoading} }">
+                        <items>
+                            <StandardListItem
+                                title="{dashboard>title}"
+                                description="{dashboard>description}"
+                                icon="{= ${dashboard>type} === 'skill_gap' ? 'sap-icon://quality-issue' :
+                                       ${dashboard>type} === 'pipeline' ? 'sap-icon://pipeline-analysis' :
+                                       ${dashboard>type} === 'candidate' ? 'sap-icon://customer' :
+                                       ${dashboard>type} === 'urgent' ? 'sap-icon://warning' :
+                                       'sap-icon://hint' }"
+                                info="{dashboard>priority}"
+                                infoState="{= ${dashboard>priority} === 'High' ? 'Error' :
+                                            ${dashboard>priority} === 'Medium' ? 'Warning' : 'None' }"
+                                type="Active"
+                                press=".onAIRecommendationPress" />
+                        </items>
+                    </List>
+
+                    <!-- Empty State -->
+                    <IllustratedMessage
+                        illustrationType="sapIllus-EmptyList"
+                        title="{i18n>aiRecommendations}"
+                        description="{i18n>generateSuggestions}"
+                        visible="{= !${dashboard>/aiData/isLoading} &amp;&amp; ${dashboard>/aiData/recommendations}.length === 0 }">
+                        <additionalContent>
+                            <Button
+                                text="{i18n>generateSuggestions}"
+                                type="Emphasized"
+                                press=".onGenerateAIInsights" />
+                        </additionalContent>
+                    </IllustratedMessage>
+                </VBox>
+            </content>
+        </Panel>
+    </VBox>
+
+</core:FragmentDefinition>

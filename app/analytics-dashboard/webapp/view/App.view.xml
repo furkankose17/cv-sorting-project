@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<mvc:View
-    xmlns:mvc="sap.ui.core.mvc"
-    xmlns="sap.m"
-    displayBlock="true"
-    controllerName="cv.sorting.analytics.controller.App">
-    <App id="app" class="{= ${device>/support/touch} ? '' : 'sapUiSizeCompact' }">
-    </App>
-</mvc:View>

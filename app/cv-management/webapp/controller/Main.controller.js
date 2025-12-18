@@ -49,6 +49,45 @@ sap.ui.define([
             });
             this.setModel(oUploadViewModel, "uploadView");
 
+            // Initialize dashboard model for analytics
+            const oDashboardModel = new JSONModel({
+                isLoading: true,
+                pipelineData: {
+                    totalCandidates: 0,
+                    avgTimeToHire: 0,
+                    byStatus: [],
+                    bySource: []
+                },
+                skillsData: {
+                    topSkills: []
+                },
+                jobsData: {
+                    activeJobs: 0,
+                    totalJobs: 0
+                },
+                matchingData: {
+                    avgScore: 0,
+                    totalMatches: 0
+                },
+                interviewData: {
+                    totalScheduled: 0,
+                    completed: 0,
+                    upcomingCount: 0,
+                    completionRate: 0,
+                    avgOverallRating: 0
+                },
+                aiData: {
+                    isLoading: false,
+                    recommendations: [],
+                    lastUpdated: null
+                },
+                dateFilter: {
+                    fromDate: null,
+                    toDate: null
+                }
+            });
+            this.setModel(oDashboardModel, "dashboard");
+
             // Attach to route matched
             const oRouter = this.getRouter();
             oRouter.getRoute("main").attachPatternMatched(this._onRouteMatched, this);
@@ -83,7 +122,7 @@ sap.ui.define([
                 { id: "uploadTab", fragmentName: "cvmanagement.fragment.UploadSection" },
                 { id: "candidatesTab", fragmentName: "cvmanagement.fragment.CandidatesSection" },
                 { id: "documentsTab", fragmentName: "cvmanagement.fragment.DocumentsSection" },
-                { id: "queueTab", fragmentName: "cvmanagement.fragment.QueueSection" }
+                { id: "analyticsTab", fragmentName: "cvmanagement.fragment.AnalyticsSection" }
             ];
 
             aFragments.forEach(oFragmentConfig => {
@@ -114,8 +153,8 @@ sap.ui.define([
         _initKeyboardShortcuts: function () {
             const that = this;
 
-            // Add keyboard event listener to document
-            document.addEventListener("keydown", function (oEvent) {
+            // Store reference for cleanup
+            this._keydownHandler = function (oEvent) {
                 // Check if Ctrl (or Cmd on Mac) is pressed
                 const bCtrlKey = oEvent.ctrlKey || oEvent.metaKey;
 
@@ -153,7 +192,21 @@ sap.ui.define([
                     // Close any open dialog
                     that.closeDialog();
                 }
-            });
+            };
+
+            // Add keyboard event listener to document
+            document.addEventListener("keydown", this._keydownHandler);
+        },
+
+        /**
+         * Cleanup on exit to prevent memory leaks
+         */
+        onExit: function () {
+            // Remove keyboard event listener
+            if (this._keydownHandler) {
+                document.removeEventListener("keydown", this._keydownHandler);
+                this._keydownHandler = null;
+            }
         },
 
         /**
@@ -179,9 +232,9 @@ sap.ui.define([
             const sKey = oEvent.getParameter("key");
             this.getModel("viewModel").setProperty("/selectedTab", sKey);
 
-            // Handle dashboard iframe loading
-            if (sKey === "dashboard") {
-                this._initializeDashboardIframe();
+            // Load analytics data when analytics tab is selected
+            if (sKey === "analytics") {
+                this._loadAnalyticsDashboardData();
             }
 
             // Update URL hash with selected tab
@@ -214,7 +267,7 @@ sap.ui.define([
 
             // Refresh the OData model
             const oModel = this.getModel();
-            oModel.refresh(true);
+            oModel.refresh();
 
             this.showSuccess("Refreshed " + sSelectedTab);
         },
@@ -518,10 +571,11 @@ sap.ui.define([
                 oFileUploader.clear();
             }
 
-            // Refresh documents table
+            // Refresh documents table (OData V4 refresh doesn't take parameters)
             const oModel = this.getModel();
             if (oModel) {
-                oModel.refresh(true);
+                // Refresh all bindings
+                oModel.refresh();
             }
         },
 
@@ -848,7 +902,7 @@ sap.ui.define([
             this.setBusy(true);
             try {
                 // Call the updateStatus action
-                await this.callAction("/Candidates(" + sCandidateId + ")/CandidateService.updateStatus", {
+                await this.callAction("/Candidates(ID=" + sCandidateId + ",IsActiveEntity=true)/CandidateService.updateStatus", {
                     newStatus: sNewStatus,
                     notes: sNotes || "",
                     notifyCandidate: bNotify || false
@@ -892,7 +946,7 @@ sap.ui.define([
             this.setBusy(true);
             try {
                 // Call the addSkill action
-                await this.callAction("/Candidates(" + sCandidateId + ")/CandidateService.addSkill", {
+                await this.callAction("/Candidates(ID=" + sCandidateId + ",IsActiveEntity=true)/CandidateService.addSkill", {
                     skillId: sSkillId,
                     proficiencyLevel: sProficiency,
                     yearsOfExperience: nYears || 0
@@ -924,7 +978,7 @@ sap.ui.define([
             try {
                 // Delete the candidate
                 const oModel = this.getModel();
-                const sPath = "/Candidates(" + sCandidateId + ")";
+                const sPath = "/Candidates(ID=" + sCandidateId + ",IsActiveEntity=true)";
                 oModel.delete(sPath);
                 await oModel.submitBatch("candidateGroup");
 
@@ -1140,7 +1194,7 @@ sap.ui.define([
             try {
                 // Call scheduleInterview action
                 const oModel = this.getModel();
-                const oContext = oModel.bindContext("/Candidates(" + sCandidateId + ")/CandidateService.scheduleInterview");
+                const oContext = oModel.bindContext("/Candidates(ID=" + sCandidateId + ",IsActiveEntity=true)/CandidateService.scheduleInterview");
 
                 oContext.setParameter("interviewType", oDialogModel.getProperty("/interviewType"));
                 oContext.setParameter("scheduledDate", oDialogModel.getProperty("/scheduledDate"));
@@ -1474,39 +1528,6 @@ sap.ui.define([
         // ==================== Dashboard Section Handlers ====================
 
         /**
-         * Initialize dashboard iframe on first load
-         * @private
-         */
-        _initializeDashboardIframe: function () {
-            const oViewModel = this.getModel("viewModel");
-
-            // Only initialize once
-            if (this._dashboardIframeInitialized) {
-                return;
-            }
-
-            // Set loading state
-            oViewModel.setProperty("/dashboardLoading", true);
-
-            // Wait for iframe to load
-            setTimeout(() => {
-                const oIframe = document.getElementById("dashboardFrame");
-                if (oIframe) {
-                    oIframe.onload = () => {
-                        oViewModel.setProperty("/dashboardLoading", false);
-                        this._dashboardIframeInitialized = true;
-                    };
-
-                    // Hide loading after timeout even if load event doesn't fire
-                    setTimeout(() => {
-                        oViewModel.setProperty("/dashboardLoading", false);
-                        this._dashboardIframeInitialized = true;
-                    }, 3000);
-                }
-            }, 100);
-        },
-
-        /**
          * Load dashboard statistics
          * @private
          */
@@ -1612,32 +1633,6 @@ sap.ui.define([
         },
 
         /**
-         * Handle open analytics dashboard button press
-         */
-        onOpenAnalyticsDashboard: function () {
-            // Check if running in Fiori Launchpad
-            if (sap.ushell && sap.ushell.Container) {
-                try {
-                    // Use cross-app navigation if in Launchpad
-                    const oCrossAppNavigator = sap.ushell.Container.getService("CrossApplicationNavigation");
-                    oCrossAppNavigator.toExternal({
-                        target: {
-                            semanticObject: "Analytics",
-                            action: "display"
-                        }
-                    });
-                    return;
-                } catch (error) {
-                    console.warn("Cross-app navigation failed, using direct navigation:", error);
-                }
-            }
-
-            // Direct URL navigation (standalone mode)
-            const sAnalyticsUrl = window.location.origin + "/cv-sorting-analytics-dashboard/index.html";
-            window.open(sAnalyticsUrl, "_blank");
-        },
-
-        /**
          * Handle run bulk matching button press
          */
         onRunBulkMatching: function () {
@@ -1656,6 +1651,14 @@ sap.ui.define([
         // ============================================================
         // DOCUMENT HANDLERS
         // ============================================================
+
+        /**
+         * Handle document row press (navigate to review)
+         * @param {object} oEvent Press event
+         */
+        onDocumentPress: function (oEvent) {
+            this.onReviewDocument(oEvent);
+        },
 
         /**
          * Navigate to CV review page
@@ -1698,7 +1701,7 @@ sap.ui.define([
             const sFileName = oContext.getProperty("fileName");
 
             // Trigger download
-            const sUrl = `${this.getModel().sServiceUrl}/CVDocuments('${sDocumentId}')/fileContent`;
+            const sUrl = `${this.getModel().sServiceUrl}/CVDocuments(ID=${sDocumentId},IsActiveEntity=true)/fileContent`;
             const a = document.createElement("a");
             a.href = sUrl;
             a.download = sFileName;
@@ -1732,7 +1735,7 @@ sap.ui.define([
                                     oContext.delete().then(resolve).catch(reject);
                                 });
                                 this.showSuccess("Document deleted successfully");
-                                this.getModel().refresh(true);
+                                this.getModel().refresh();
                             } catch (error) {
                                 console.error("Failed to delete document:", error);
                                 this.showError("Failed to delete document: " + error.message);
@@ -1741,6 +1744,562 @@ sap.ui.define([
                     }
                 }
             );
+        },
+
+        // ============================================================
+        // ANALYTICS DASHBOARD HANDLERS
+        // ============================================================
+
+        /**
+         * Load all analytics dashboard data
+         * @private
+         */
+        _loadAnalyticsDashboardData: function () {
+            const oDashboardModel = this.getModel("dashboard");
+            const oDateFilter = oDashboardModel.getProperty("/dateFilter");
+
+            oDashboardModel.setProperty("/isLoading", true);
+
+            // Build function parameters
+            const sFromDate = oDateFilter.fromDate ? oDateFilter.fromDate.toISOString().split("T")[0] : null;
+            const sToDate = oDateFilter.toDate ? oDateFilter.toDate.toISOString().split("T")[0] : null;
+
+            // Load pipeline overview
+            this._callAnalyticsFunction("getPipelineOverview", {
+                fromDate: sFromDate,
+                toDate: sToDate
+            }).then((oData) => {
+                this._processPipelineData(oData);
+            }).catch((oError) => {
+                console.warn("Failed to load pipeline data, using fallback:", oError);
+                this._loadFallbackPipelineData();
+            });
+
+            // Load skills analytics
+            this._callAnalyticsFunction("getSkillAnalytics", {
+                topN: 10
+            }).then((oData) => {
+                this._processSkillsData(oData);
+            }).catch((oError) => {
+                console.warn("Failed to load skills data, using fallback:", oError);
+                this._loadFallbackSkillsData();
+            });
+
+            // Load matching data
+            this._loadAnalyticsMatchingData();
+
+            // Load interview analytics
+            this._loadAnalyticsInterviewData();
+
+            // Load jobs data
+            this._loadAnalyticsJobsData();
+
+            // Load AI insights
+            this._loadAIInsights();
+
+            oDashboardModel.setProperty("/isLoading", false);
+        },
+
+        /**
+         * Call analytics service function
+         * @param {string} sFunctionName Function name
+         * @param {object} oParams Parameters
+         * @returns {Promise} Promise
+         * @private
+         */
+        _callAnalyticsFunction: function (sFunctionName, oParams) {
+            const that = this;
+            return new Promise((resolve, reject) => {
+                const oModel = this.getModel();
+                if (!oModel) {
+                    reject(new Error("Model not available"));
+                    return;
+                }
+
+                // Build parameter string
+                const aParams = [];
+                Object.keys(oParams || {}).forEach((sKey) => {
+                    const vValue = oParams[sKey];
+                    if (vValue !== null && vValue !== undefined) {
+                        if (typeof vValue === "string") {
+                            aParams.push(sKey + "='" + vValue + "'");
+                        } else {
+                            aParams.push(sKey + "=" + vValue);
+                        }
+                    }
+                });
+
+                const sPath = "/" + sFunctionName + "(" + aParams.join(",") + ")";
+
+                const oContextBinding = oModel.bindContext(sPath);
+                oContextBinding.requestObject().then((oResult) => {
+                    resolve(oResult);
+                }).catch((oError) => {
+                    reject(oError);
+                });
+            });
+        },
+
+        /**
+         * Process pipeline data from service
+         * @param {object} oData Pipeline data
+         * @private
+         */
+        _processPipelineData: function (oData) {
+            const oDashboardModel = this.getModel("dashboard");
+
+            // Process byStatus array with state mapping
+            const aByStatus = (oData.byStatus || []).map((oStatus) => {
+                let sState = "None";
+                const sStatusLower = (oStatus.status || "").toLowerCase();
+                if (sStatusLower === "new") sState = "Information";
+                else if (sStatusLower === "screening") sState = "Warning";
+                else if (["hired", "shortlisted", "offered"].includes(sStatusLower)) sState = "Success";
+                else if (["rejected", "withdrawn"].includes(sStatusLower)) sState = "Error";
+
+                return {
+                    status: oStatus.status,
+                    count: oStatus.count || 0,
+                    percentage: Math.round((oStatus.count / (oData.totalCandidates || 1)) * 100),
+                    state: sState
+                };
+            });
+
+            oDashboardModel.setProperty("/pipelineData", {
+                totalCandidates: oData.totalCandidates || 0,
+                avgTimeToHire: oData.avgTimeToHire || 0,
+                byStatus: aByStatus,
+                bySource: oData.bySource || []
+            });
+        },
+
+        /**
+         * Process skills data from service
+         * @param {object} oData Skills data
+         * @private
+         */
+        _processSkillsData: function (oData) {
+            const oDashboardModel = this.getModel("dashboard");
+
+            const aTopSkills = (oData.topSkills || []).map((oSkill) => {
+                return {
+                    skillName: oSkill.skillName || "Unknown",
+                    candidateCount: oSkill.candidateCount || 0,
+                    demandCount: oSkill.demandCount || 0,
+                    ratio: (oSkill.supplyDemandRatio || 0).toFixed(2)
+                };
+            });
+
+            oDashboardModel.setProperty("/skillsData", {
+                topSkills: aTopSkills,
+                emergingSkills: oData.emergingSkills || [],
+                skillGaps: oData.skillGaps || []
+            });
+        },
+
+        /**
+         * Load interview analytics data
+         * @private
+         */
+        _loadAnalyticsInterviewData: function () {
+            const oDashboardModel = this.getModel("dashboard");
+
+            this._callAnalyticsFunction("getInterviewAnalytics", {
+                fromDate: null,
+                toDate: null
+            }).then((oData) => {
+                oDashboardModel.setProperty("/interviewData", {
+                    totalScheduled: oData.totalScheduled || 0,
+                    completed: oData.completed || 0,
+                    upcomingCount: oData.upcomingCount || 0,
+                    completionRate: oData.completionRate || 0,
+                    avgOverallRating: oData.avgOverallRating || 0
+                });
+            }).catch((oError) => {
+                console.warn("Failed to load interview data:", oError);
+                oDashboardModel.setProperty("/interviewData", {
+                    totalScheduled: 0,
+                    completed: 0,
+                    upcomingCount: 0,
+                    completionRate: 0,
+                    avgOverallRating: 0
+                });
+            });
+        },
+
+        /**
+         * Load matching data for analytics
+         * @private
+         */
+        _loadAnalyticsMatchingData: function () {
+            const oDashboardModel = this.getModel("dashboard");
+            const oModel = this.getModel();
+
+            if (!oModel) {
+                oDashboardModel.setProperty("/matchingData", {
+                    avgScore: 0,
+                    totalMatches: 0
+                });
+                return;
+            }
+
+            // Get match statistics
+            const oListBinding = oModel.bindList("/MatchResults");
+            oListBinding.requestContexts(0, 1000).then((aContexts) => {
+                const nTotal = aContexts.length;
+                let nTotalScore = 0;
+
+                aContexts.forEach((oContext) => {
+                    nTotalScore += oContext.getProperty("overallScore") || 0;
+                });
+
+                oDashboardModel.setProperty("/matchingData", {
+                    avgScore: nTotal > 0 ? Math.round(nTotalScore / nTotal) : 0,
+                    totalMatches: nTotal
+                });
+            }).catch(() => {
+                oDashboardModel.setProperty("/matchingData", {
+                    avgScore: 0,
+                    totalMatches: 0
+                });
+            });
+        },
+
+        /**
+         * Load jobs data for analytics
+         * @private
+         */
+        _loadAnalyticsJobsData: function () {
+            const oDashboardModel = this.getModel("dashboard");
+            const oModel = this.getModel();
+
+            if (!oModel) {
+                oDashboardModel.setProperty("/jobsData", {
+                    activeJobs: 0,
+                    totalJobs: 0
+                });
+                return;
+            }
+
+            // Count from JobPostings entity
+            const oListBinding = oModel.bindList("/JobPostings");
+            oListBinding.requestContexts(0, 1000).then((aContexts) => {
+                const nTotal = aContexts.length;
+                const nActive = aContexts.filter((oCtx) => {
+                    const sStatus = oCtx.getProperty("status");
+                    return sStatus === "published" || sStatus === "active";
+                }).length;
+
+                oDashboardModel.setProperty("/jobsData", {
+                    activeJobs: nActive,
+                    totalJobs: nTotal
+                });
+            }).catch(() => {
+                oDashboardModel.setProperty("/jobsData", {
+                    activeJobs: 0,
+                    totalJobs: 0
+                });
+            });
+        },
+
+        /**
+         * Fallback pipeline data
+         * @private
+         */
+        _loadFallbackPipelineData: function () {
+            const oDashboardModel = this.getModel("dashboard");
+            const oModel = this.getModel();
+
+            // Try to get real counts from Candidates entity
+            if (oModel) {
+                const oListBinding = oModel.bindList("/Candidates");
+                oListBinding.requestContexts(0, 1000).then((aContexts) => {
+                    const nTotal = aContexts.length;
+
+                    // Group by status
+                    const mStatusCounts = {};
+                    aContexts.forEach((oCtx) => {
+                        const sStatus = oCtx.getProperty("status_code") || oCtx.getProperty("status/code") || "new";
+                        mStatusCounts[sStatus] = (mStatusCounts[sStatus] || 0) + 1;
+                    });
+
+                    const aByStatus = Object.keys(mStatusCounts).map((sStatus) => {
+                        let sState = "None";
+                        const sStatusLower = sStatus.toLowerCase();
+                        if (sStatusLower === "new") sState = "Information";
+                        else if (sStatusLower === "screening") sState = "Warning";
+                        else if (["hired", "shortlisted", "offered"].includes(sStatusLower)) sState = "Success";
+                        else if (["rejected", "withdrawn"].includes(sStatusLower)) sState = "Error";
+
+                        return {
+                            status: sStatus.charAt(0).toUpperCase() + sStatus.slice(1),
+                            count: mStatusCounts[sStatus],
+                            percentage: Math.round((mStatusCounts[sStatus] / nTotal) * 100),
+                            state: sState
+                        };
+                    });
+
+                    oDashboardModel.setProperty("/pipelineData", {
+                        totalCandidates: nTotal,
+                        avgTimeToHire: 0,
+                        byStatus: aByStatus,
+                        bySource: []
+                    });
+                }).catch(() => {
+                    this._setEmptyPipelineData();
+                });
+            } else {
+                this._setEmptyPipelineData();
+            }
+        },
+
+        /**
+         * Set empty pipeline data
+         * @private
+         */
+        _setEmptyPipelineData: function () {
+            const oDashboardModel = this.getModel("dashboard");
+            oDashboardModel.setProperty("/pipelineData", {
+                totalCandidates: 0,
+                avgTimeToHire: 0,
+                byStatus: [
+                    { status: "New", count: 0, percentage: 0, state: "Information" },
+                    { status: "Screening", count: 0, percentage: 0, state: "Warning" },
+                    { status: "Interviewing", count: 0, percentage: 0, state: "None" },
+                    { status: "Shortlisted", count: 0, percentage: 0, state: "Success" },
+                    { status: "Hired", count: 0, percentage: 0, state: "Success" },
+                    { status: "Rejected", count: 0, percentage: 0, state: "Error" }
+                ],
+                bySource: []
+            });
+        },
+
+        /**
+         * Fallback skills data
+         * @private
+         */
+        _loadFallbackSkillsData: function () {
+            const oDashboardModel = this.getModel("dashboard");
+            oDashboardModel.setProperty("/skillsData", {
+                topSkills: [],
+                emergingSkills: [],
+                skillGaps: []
+            });
+        },
+
+        /**
+         * Load AI insights
+         * @private
+         */
+        _loadAIInsights: function () {
+            const oDashboardModel = this.getModel("dashboard");
+            oDashboardModel.setProperty("/aiData/isLoading", true);
+
+            // Generate insights based on current data
+            this._generateSampleInsights();
+        },
+
+        /**
+         * Generate sample AI insights based on current data
+         * @private
+         */
+        _generateSampleInsights: function () {
+            const oDashboardModel = this.getModel("dashboard");
+            const oPipelineData = oDashboardModel.getProperty("/pipelineData") || {};
+            const oSkillsData = oDashboardModel.getProperty("/skillsData") || {};
+
+            const aRecommendations = [];
+
+            // Generate insights based on current data
+            if (oPipelineData.totalCandidates > 0) {
+                const aByStatus = oPipelineData.byStatus || [];
+                const oScreening = aByStatus.find((s) => s.status.toLowerCase() === "screening");
+                const oNew = aByStatus.find((s) => s.status.toLowerCase() === "new");
+
+                if (oNew && oNew.count > 5) {
+                    aRecommendations.push({
+                        type: "pipeline",
+                        title: "High volume of new candidates",
+                        description: oNew.count + " candidates are awaiting initial screening. Consider prioritizing screening reviews.",
+                        priority: "Medium"
+                    });
+                }
+
+                if (oScreening && oScreening.count > 10) {
+                    aRecommendations.push({
+                        type: "urgent",
+                        title: "Screening backlog detected",
+                        description: oScreening.count + " candidates in screening stage. Schedule batch review sessions.",
+                        priority: "High"
+                    });
+                }
+            }
+
+            // Skills-based recommendations
+            if (oSkillsData.topSkills && oSkillsData.topSkills.length > 0) {
+                const aHighDemand = oSkillsData.topSkills.filter((s) => {
+                    return s.ratio && parseFloat(s.ratio) < 1;
+                });
+
+                if (aHighDemand.length > 0) {
+                    aRecommendations.push({
+                        type: "skill_gap",
+                        title: "Skill gaps identified",
+                        description: aHighDemand.length + " skills have more demand than supply: " +
+                            aHighDemand.slice(0, 3).map((s) => s.skillName).join(", "),
+                        priority: "Medium"
+                    });
+                }
+            }
+
+            // Interview recommendations
+            const oInterviewData = oDashboardModel.getProperty("/interviewData") || {};
+            if (oInterviewData.upcomingCount > 5) {
+                aRecommendations.push({
+                    type: "candidate",
+                    title: "Busy interview week ahead",
+                    description: oInterviewData.upcomingCount + " interviews scheduled. Ensure interviewers are prepared.",
+                    priority: "Low"
+                });
+            }
+
+            // Default if no insights
+            if (aRecommendations.length === 0) {
+                aRecommendations.push({
+                    type: "pipeline",
+                    title: "Pipeline health looks good",
+                    description: "No immediate action items identified. Continue monitoring metrics.",
+                    priority: "Low"
+                });
+            }
+
+            oDashboardModel.setProperty("/aiData/recommendations", aRecommendations);
+            oDashboardModel.setProperty("/aiData/lastUpdated", new Date());
+            oDashboardModel.setProperty("/aiData/isLoading", false);
+        },
+
+        /**
+         * Handle refresh analytics button
+         */
+        onRefreshAnalytics: function () {
+            this.showSuccess("Refreshing analytics...");
+            this._loadAnalyticsDashboardData();
+        },
+
+        /**
+         * Handle analytics date range change
+         * @param {sap.ui.base.Event} oEvent Change event
+         */
+        onAnalyticsDateRangeChange: function (oEvent) {
+            const oDateRange = oEvent.getSource();
+            const oFrom = oDateRange.getDateValue();
+            const oTo = oDateRange.getSecondDateValue();
+
+            const oDashboardModel = this.getModel("dashboard");
+            oDashboardModel.setProperty("/dateFilter/fromDate", oFrom);
+            oDashboardModel.setProperty("/dateFilter/toDate", oTo);
+
+            if ((oFrom && oTo) || (!oFrom && !oTo)) {
+                this._loadAnalyticsDashboardData();
+            }
+        },
+
+        /**
+         * Handle export analytics report
+         */
+        onExportAnalyticsReport: function () {
+            const oDashboardModel = this.getModel("dashboard");
+            const oPipelineData = oDashboardModel.getProperty("/pipelineData");
+            const oSkillsData = oDashboardModel.getProperty("/skillsData");
+
+            // Build CSV content
+            const aLines = [];
+            aLines.push("CV Sorting Analytics Report");
+            aLines.push("Generated: " + new Date().toISOString());
+            aLines.push("");
+
+            // Pipeline summary
+            aLines.push("PIPELINE SUMMARY");
+            aLines.push("Total Candidates," + oPipelineData.totalCandidates);
+            aLines.push("Average Time to Hire (days)," + oPipelineData.avgTimeToHire);
+            aLines.push("");
+
+            // Status breakdown
+            aLines.push("STATUS BREAKDOWN");
+            aLines.push("Status,Count,Percentage");
+            (oPipelineData.byStatus || []).forEach((oStatus) => {
+                aLines.push(oStatus.status + "," + oStatus.count + "," + oStatus.percentage + "%");
+            });
+            aLines.push("");
+
+            // Top skills
+            aLines.push("TOP SKILLS");
+            aLines.push("Skill,Candidates,Demand,Supply/Demand Ratio");
+            (oSkillsData.topSkills || []).forEach((oSkill) => {
+                aLines.push(oSkill.skillName + "," + oSkill.candidateCount + "," + oSkill.demandCount + "," + oSkill.ratio);
+            });
+
+            // Create and download file
+            const sContent = aLines.join("\n");
+            const oBlob = new Blob([sContent], { type: "text/csv;charset=utf-8" });
+            const sFilename = "analytics_report_" + new Date().toISOString().split("T")[0] + ".csv";
+
+            const oLink = document.createElement("a");
+            oLink.href = URL.createObjectURL(oBlob);
+            oLink.download = sFilename;
+            oLink.click();
+
+            this.showSuccess("Report exported: " + sFilename);
+        },
+
+        /**
+         * Handle refresh AI insights
+         */
+        onRefreshAIInsights: function () {
+            this._loadAIInsights();
+        },
+
+        /**
+         * Handle Ask Joule button
+         */
+        onAskJoule: function () {
+            sap.m.MessageBox.information(
+                "Joule AI assistant is ready to help with recruitment insights.\n\n" +
+                "Try asking questions like:\n" +
+                "• 'What skills are most in demand?'\n" +
+                "• 'Show me candidates for the Senior Developer role'\n" +
+                "• 'What's causing delays in our hiring pipeline?'",
+                {
+                    title: "Ask Joule"
+                }
+            );
+        },
+
+        /**
+         * Handle generate AI insights
+         */
+        onGenerateAIInsights: function () {
+            this.showSuccess("Generating insights...");
+            this._loadAIInsights();
+        },
+
+        /**
+         * Handle AI recommendation press
+         * @param {sap.ui.base.Event} oEvent Press event
+         */
+        onAIRecommendationPress: function (oEvent) {
+            const oSource = oEvent.getSource();
+            const oBindingContext = oSource.getBindingContext("dashboard");
+            const oRecommendation = oBindingContext ? oBindingContext.getObject() : null;
+
+            if (!oRecommendation) {
+                return;
+            }
+
+            // Show details
+            sap.m.MessageBox.information(oRecommendation.description, {
+                title: oRecommendation.title
+            });
         }
 
     });

@@ -56,12 +56,12 @@
                         key="documents">
                     </IconTabFilter>
 
-                    <!-- Queue Tab -->
+                    <!-- Analytics Tab -->
                     <IconTabFilter
-                        id="queueTab"
-                        icon="sap-icon://process"
-                        text="Processing Queue"
-                        key="queue">
+                        id="analyticsTab"
+                        icon="sap-icon://business-objects-experience"
+                        text="Analytics"
+                        key="analytics">
                     </IconTabFilter>
                 </items>
             </IconTabBar>
