@@ -4014,6 +4014,81 @@ sap.ui.define([
                     console.error("Failed to load settings:", oError);
                 }
             });
+        },
+
+        /**
+         * Handle setting change event
+         * Marks settings as dirty when any setting is modified
+         */
+        onSettingChange: function () {
+            // Mark settings as dirty
+            const oEmailModel = this.getModel("email");
+            oEmailModel.setProperty("/settingsDirty", true);
+        },
+
+        /**
+         * Test webhook connection
+         * Calls testWebhookConnection action and updates health status
+         */
+        onTestWebhookConnection: function () {
+            const oModel = this.getModel();
+            const oEmailModel = this.getModel("email");
+
+            sap.m.MessageToast.show("Testing connection...");
+
+            oModel.callFunction("/testWebhookConnection", {
+                method: "POST",
+                success: (oData) => {
+                    oEmailModel.setProperty("/health/n8nConnected", oData.connected);
+                    if (oData.connected) {
+                        sap.m.MessageToast.show("Connected! Response time: " + oData.responseTime + "ms");
+                    } else {
+                        sap.m.MessageBox.error("Connection failed: " + oData.message);
+                    }
+                },
+                error: (oError) => {
+                    oEmailModel.setProperty("/health/n8nConnected", false);
+                    sap.m.MessageBox.error("Connection test failed: " + oError.message);
+                }
+            });
+        },
+
+        /**
+         * Save email settings
+         * Collects all settings from email model, maps to settingKey/settingValue pairs,
+         * and calls updateNotificationSettings action
+         */
+        onSaveEmailSettings: function () {
+            const oModel = this.getModel();
+            const oEmailModel = this.getModel("email");
+            const oSettings = oEmailModel.getProperty("/settings");
+
+            // Map model properties back to setting keys
+            const settingsToSave = [
+                { settingKey: 'webhooks_enabled', settingValue: String(oSettings.webhooksEnabled) },
+                { settingKey: 'webhook_url', settingValue: oSettings.webhookUrl },
+                { settingKey: 'notification_cooldown_hours', settingValue: String(oSettings.cooldownHours) },
+                { settingKey: 'reminder_window_hours', settingValue: String(oSettings.reminderWindowHours) },
+                { settingKey: 'rate_limit_per_minute', settingValue: String(oSettings.rateLimitPerMinute) },
+                { settingKey: 'type_cv_received', settingValue: String(oSettings.typeCvReceived) },
+                { settingKey: 'type_status_changed', settingValue: String(oSettings.typeStatusChanged) },
+                { settingKey: 'type_interview_invitation', settingValue: String(oSettings.typeInterviewInvitation) },
+                { settingKey: 'type_interview_reminder', settingValue: String(oSettings.typeInterviewReminder) },
+                { settingKey: 'type_offer_extended', settingValue: String(oSettings.typeOfferExtended) },
+                { settingKey: 'type_application_rejected', settingValue: String(oSettings.typeApplicationRejected) }
+            ];
+
+            oModel.callFunction("/updateNotificationSettings", {
+                method: "POST",
+                urlParameters: { settings: JSON.stringify(settingsToSave) },
+                success: () => {
+                    oEmailModel.setProperty("/settingsDirty", false);
+                    sap.m.MessageToast.show(this.getResourceBundle().getText("settingsSaved"));
+                },
+                error: (oError) => {
+                    sap.m.MessageBox.error(this.getResourceBundle().getText("settingsSaveFailed") + ": " + oError.message);
+                }
+            });
         }
 
     });
