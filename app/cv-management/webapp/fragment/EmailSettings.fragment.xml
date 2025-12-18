@@ -1,0 +1,171 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.f"
+    xmlns:card="sap.f.cards"
+    xmlns:layout="sap.ui.layout"
+    xmlns:form="sap.ui.layout.form">
+
+    <VBox class="sapUiSmallMargin">
+        <!-- Webhook Settings Panel -->
+        <f:Card class="sapUiMediumMarginBottom">
+            <f:header>
+                <card:Header
+                    title="{i18n>webhookSettings}"
+                    icon="sap-icon://connected" />
+            </f:header>
+            <f:content>
+                <VBox class="sapUiSmallMargin">
+                    <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                        <Label text="{i18n>enableWebhooks}" class="sapUiSmallMarginEnd" width="200px" />
+                        <Switch
+                            id="webhooksEnabledSwitch"
+                            state="{email>/settings/webhooksEnabled}"
+                            change=".onSettingChange" />
+                    </HBox>
+                    <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                        <Label text="{i18n>n8nWebhookUrl}" class="sapUiSmallMarginEnd" width="200px" />
+                        <Input
+                            id="webhookUrlInput"
+                            value="{email>/settings/webhookUrl}"
+                            width="400px"
+                            placeholder="http://localhost:5678/webhook"
+                            change=".onSettingChange" />
+                    </HBox>
+                    <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                        <Label text="{i18n>connectionStatus}" class="sapUiSmallMarginEnd" width="200px" />
+                        <ObjectStatus
+                            text="{= ${email>/health/n8nConnected} ? ${i18n>connected} : ${i18n>disconnected} }"
+                            state="{= ${email>/health/n8nConnected} ? 'Success' : 'Error' }" />
+                        <Button
+                            text="{i18n>testConnection}"
+                            icon="sap-icon://connected"
+                            press=".onTestWebhookConnection"
+                            class="sapUiSmallMarginBegin" />
+                    </HBox>
+                </VBox>
+            </f:content>
+        </f:Card>
+
+        <!-- Notification Types Panel -->
+        <f:Card class="sapUiMediumMarginBottom">
+            <f:header>
+                <card:Header
+                    title="{i18n>notificationTypes}"
+                    icon="sap-icon://email" />
+            </f:header>
+            <f:content>
+                <VBox class="sapUiSmallMargin">
+                    <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                        <Label text="{i18n>cvReceivedNotification}" class="sapUiSmallMarginEnd" width="250px" />
+                        <Switch
+                            id="typeCvReceivedSwitch"
+                            state="{email>/settings/typeCvReceived}"
+                            change=".onSettingChange" />
+                        <Text text="Sent when CV is uploaded" class="sapUiSmallMarginBegin sapUiTinyText" />
+                    </HBox>
+                    <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                        <Label text="{i18n>statusChangedNotification}" class="sapUiSmallMarginEnd" width="250px" />
+                        <Switch
+                            id="typeStatusChangedSwitch"
+                            state="{email>/settings/typeStatusChanged}"
+                            change=".onSettingChange" />
+                        <Text text="Sent on candidate status change" class="sapUiSmallMarginBegin sapUiTinyText" />
+                    </HBox>
+                    <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                        <Label text="{i18n>interviewInvitationNotification}" class="sapUiSmallMarginEnd" width="250px" />
+                        <Switch
+                            id="typeInterviewInvitationSwitch"
+                            state="{email>/settings/typeInterviewInvitation}"
+                            change=".onSettingChange" />
+                        <Text text="Sent when interview is scheduled" class="sapUiSmallMarginBegin sapUiTinyText" />
+                    </HBox>
+                    <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                        <Label text="{i18n>interviewReminderNotification}" class="sapUiSmallMarginEnd" width="250px" />
+                        <Switch
+                            id="typeInterviewReminderSwitch"
+                            state="{email>/settings/typeInterviewReminder}"
+                            change=".onSettingChange" />
+                        <Text text="Sent 24h before interview" class="sapUiSmallMarginBegin sapUiTinyText" />
+                    </HBox>
+                    <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                        <Label text="{i18n>offerExtendedNotification}" class="sapUiSmallMarginEnd" width="250px" />
+                        <Switch
+                            id="typeOfferExtendedSwitch"
+                            state="{email>/settings/typeOfferExtended}"
+                            change=".onSettingChange" />
+                        <Text text="Sent with job offer" class="sapUiSmallMarginBegin sapUiTinyText" />
+                    </HBox>
+                    <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                        <Label text="{i18n>applicationRejectedNotification}" class="sapUiSmallMarginEnd" width="250px" />
+                        <Switch
+                            id="typeApplicationRejectedSwitch"
+                            state="{email>/settings/typeApplicationRejected}"
+                            change=".onSettingChange" />
+                        <Text text="Sent on rejection" class="sapUiSmallMarginBegin sapUiTinyText" />
+                    </HBox>
+                </VBox>
+            </f:content>
+        </f:Card>
+
+        <!-- Timing & Limits Panel -->
+        <f:Card class="sapUiMediumMarginBottom">
+            <f:header>
+                <card:Header
+                    title="{i18n>timingAndLimits}"
+                    icon="sap-icon://time-entry-request" />
+            </f:header>
+            <f:content>
+                <VBox class="sapUiSmallMargin">
+                    <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                        <Label text="{i18n>notificationCooldown}" class="sapUiSmallMarginEnd" width="300px" />
+                        <StepInput
+                            id="cooldownInput"
+                            value="{email>/settings/cooldownHours}"
+                            min="1"
+                            max="168"
+                            step="1"
+                            width="120px"
+                            change=".onSettingChange" />
+                        <Text text="hours" class="sapUiSmallMarginBegin" />
+                    </HBox>
+                    <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                        <Label text="{i18n>reminderWindow}" class="sapUiSmallMarginEnd" width="300px" />
+                        <StepInput
+                            id="reminderWindowInput"
+                            value="{email>/settings/reminderWindowHours}"
+                            min="1"
+                            max="72"
+                            step="1"
+                            width="120px"
+                            change=".onSettingChange" />
+                        <Text text="hours" class="sapUiSmallMarginBegin" />
+                    </HBox>
+                    <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                        <Label text="{i18n>rateLimit}" class="sapUiSmallMarginEnd" width="300px" />
+                        <StepInput
+                            id="rateLimitInput"
+                            value="{email>/settings/rateLimitPerMinute}"
+                            min="1"
+                            max="100"
+                            step="5"
+                            width="120px"
+                            change=".onSettingChange" />
+                        <Text text="per minute" class="sapUiSmallMarginBegin" />
+                    </HBox>
+                </VBox>
+            </f:content>
+        </f:Card>
+
+        <!-- Save Button -->
+        <Toolbar>
+            <ToolbarSpacer />
+            <Button
+                text="{i18n>saveSettings}"
+                type="Emphasized"
+                icon="sap-icon://save"
+                press=".onSaveEmailSettings" />
+        </Toolbar>
+    </VBox>
+
+</core:FragmentDefinition>
