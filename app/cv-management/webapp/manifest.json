@@ -23,6 +23,9 @@
           "odataVersion": "4.0"
         }
       }
+    },
+    "config": {
+      "n8nWebhookUrl": ""
     }
   },
   "sap.ui": {

@@ -125,7 +125,7 @@ sap.ui.define([
                 recentActivity: [],
                 settings: {
                     webhooksEnabled: true,
-                    webhookUrl: 'http://localhost:5678/webhook',
+                    webhookUrl: '',
                     cooldownHours: 24,
                     reminderWindowHours: 24,
                     rateLimitPerMinute: 50,
