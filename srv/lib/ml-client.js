@@ -8,7 +8,15 @@ const LOG = cds.log('ml-client');
 
 class MLClient {
     constructor(baseUrl) {
-        this.baseUrl = baseUrl || process.env.ML_SERVICE_URL || 'http://localhost:8000';
+        this.baseUrl = baseUrl || process.env.ML_SERVICE_URL;
+        if (!this.baseUrl) {
+            if (process.env.NODE_ENV === 'production') {
+                LOG.error('ML_SERVICE_URL not configured in production');
+            } else {
+                this.baseUrl = 'http://localhost:8000';
+                LOG.warn('ML_SERVICE_URL not configured - using localhost for development');
+            }
+        }
         this.timeout = parseInt(process.env.ML_SERVICE_TIMEOUT) || 300000; // 5 minutes for PDF OCR
     }
 

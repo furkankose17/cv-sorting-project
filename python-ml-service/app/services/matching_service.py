@@ -377,7 +377,10 @@ class SemanticMatchingService:
         """
         import httpx
 
-        cap_url = os.getenv('CAP_SERVICE_URL', 'http://localhost:4004')
+        cap_url = os.getenv('CAP_SERVICE_URL')
+        if not cap_url:
+            cap_url = 'http://localhost:4004'
+            logger.info('CAP_SERVICE_URL not configured - using localhost')
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:

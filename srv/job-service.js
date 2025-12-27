@@ -21,7 +21,10 @@ module.exports = class JobService extends cds.ApplicationService {
         LOG.info('ML Client initialized for job service');
 
         // Configuration for notifications
-        this.n8nWebhookUrl = process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/match-notification';
+        this.n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
+        if (!this.n8nWebhookUrl) {
+            LOG.warn('N8N_WEBHOOK_URL not configured - webhook notifications disabled');
+        }
         this.cooldownHours = parseInt(process.env.NOTIFICATION_COOLDOWN_HOURS) || 24;
 
         // In-memory storage for notifications (would be PostgreSQL in production)
@@ -1512,6 +1515,11 @@ module.exports = class JobService extends cds.ApplicationService {
     }
 
     async _triggerN8nWebhook(payload) {
+        if (!this.n8nWebhookUrl) {
+            LOG.warn('Cannot trigger webhook - N8N_WEBHOOK_URL not configured');
+            throw new Error('Webhook URL not configured');
+        }
+
         LOG.info(`Triggering n8n webhook: ${this.n8nWebhookUrl}`);
 
         const controller = new AbortController();
