@@ -2187,9 +2187,42 @@ sap.ui.define([
         /**
          * Handle view interviews button press
          */
-        onViewInterviews: function () {
-            this.showInfo("Interviews view coming soon - will show all scheduled interviews");
-            // TODO: Implement interviews overview
+        onViewInterviews: async function () {
+            try {
+                this.setBusy(true);
+
+                const oModel = this.getModel();
+
+                // Get match results with interview status
+                const oBinding = oModel.bindList("/MatchResults", null, null,
+                    new Filter("status_code", FilterOperator.EQ, "interview"));
+                const aContexts = await oBinding.requestContexts(0, 50);
+
+                if (aContexts.length === 0) {
+                    this.showInfo("No interviews scheduled");
+                    return;
+                }
+
+                // Create interviews model
+                const aInterviews = aContexts.map(ctx => ({
+                    candidateName: ctx.getProperty("candidate/firstName") + " " + ctx.getProperty("candidate/lastName"),
+                    jobTitle: ctx.getProperty("jobPosting/title"),
+                    matchScore: ctx.getProperty("overallScore"),
+                    status: ctx.getProperty("status_code"),
+                    matchedAt: ctx.getProperty("matchedAt")
+                }));
+
+                const oInterviewsModel = new JSONModel({ interviews: aInterviews });
+                this.setModel(oInterviewsModel, "interviewsView");
+
+                // Show in message toast for now (dialog can be added later)
+                this.showSuccess(`Found ${aInterviews.length} scheduled interviews`);
+
+            } catch (oError) {
+                this.handleError(oError);
+            } finally {
+                this.setBusy(false);
+            }
         },
 
         // ============================================================
