@@ -1071,23 +1071,43 @@ sap.ui.define([
                 this.setBusy(true);
 
                 const oModel = this.getModel();
-                const oBinding = oModel.bindList("/ScoringRules");
 
-                oBinding.create({
-                    jobPosting_ID: sJobId,
-                    name: oRuleData.name,
-                    field: oRuleData.field,
-                    operator: oRuleData.operator,
-                    value: oRuleData.value,
-                    weight: oRuleData.weight,
-                    description: oRuleData.description,
-                    isActive: true
-                });
+                if (oRuleData.isEdit && oRuleData.ruleId) {
+                    // Update existing rule
+                    const oContext = oModel.bindContext(`/ScoringRules(${oRuleData.ruleId})`);
+                    await oContext.requestObject();
 
-                await oModel.submitBatch("updateGroup");
+                    oContext.setProperty("name", oRuleData.name);
+                    oContext.setProperty("field", oRuleData.field);
+                    oContext.setProperty("operator", oRuleData.operator);
+                    oContext.setProperty("value", oRuleData.value);
+                    oContext.setProperty("weight", oRuleData.weight);
+                    oContext.setProperty("description", oRuleData.description);
 
-                this._oRuleBuilderDialog.close();
-                this.showSuccess("Rule created successfully");
+                    await oModel.submitBatch("updateGroup");
+
+                    this._oRuleBuilderDialog.close();
+                    this.showSuccess("Rule updated successfully");
+                } else {
+                    // Create new rule
+                    const oBinding = oModel.bindList("/ScoringRules");
+
+                    oBinding.create({
+                        jobPosting_ID: sJobId,
+                        name: oRuleData.name,
+                        field: oRuleData.field,
+                        operator: oRuleData.operator,
+                        value: oRuleData.value,
+                        weight: oRuleData.weight,
+                        description: oRuleData.description,
+                        isActive: true
+                    });
+
+                    await oModel.submitBatch("updateGroup");
+
+                    this._oRuleBuilderDialog.close();
+                    this.showSuccess("Rule created successfully");
+                }
 
                 // Refresh rules table
                 const oTable = this.byId("scoringRulesTable");
@@ -1216,8 +1236,28 @@ sap.ui.define([
          * Handle edit rule
          */
         onEditRule: function (oEvent) {
-            this.showInfo("Rule editor coming soon");
-            // TODO: Open RuleBuilderDialog with rule data
+            const oContext = oEvent.getSource().getBindingContext();
+            if (!oContext) {
+                this.showError("No rule selected");
+                return;
+            }
+
+            const oRuleData = oContext.getObject();
+
+            // Create rule builder model with existing data
+            const oRuleModel = new sap.ui.model.json.JSONModel({
+                isEdit: true,
+                ruleId: oRuleData.ID,
+                name: oRuleData.name,
+                field: oRuleData.field,
+                operator: oRuleData.operator,
+                value: oRuleData.value,
+                weight: oRuleData.weight,
+                description: oRuleData.description
+            });
+            this.setModel(oRuleModel, "ruleBuilder");
+
+            this._openRuleBuilderDialog();
         },
 
         /**

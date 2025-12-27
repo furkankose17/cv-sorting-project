@@ -3356,8 +3356,11 @@ sap.ui.define([
          * Handle view all jobs button
          */
         onViewAllJobs: function () {
-            // Navigate to jobs management - for now show info
-            this.showInfo("Jobs management page coming soon");
+            // Navigate to Jobs tab instead of a separate page
+            const oIconTabBar = this.byId("mainIconTabBar");
+            if (oIconTabBar) {
+                oIconTabBar.setSelectedKey("jobs");
+            }
         },
 
         // ============================================================
@@ -3837,10 +3840,23 @@ sap.ui.define([
         },
 
         /**
-         * Send test email - show coming soon message
+         * Send test email
          */
-        onSendTestEmail: function () {
-            sap.m.MessageBox.information("Test email functionality coming soon");
+        onSendTestEmail: async function () {
+            try {
+                this.setBusy(true);
+
+                const oModel = this.getModel();
+                const oAction = oModel.bindContext("/sendTestEmail(...)");
+
+                await oAction.execute();
+
+                this.showSuccess("Test email sent successfully. Check your configured email inbox.");
+            } catch (oError) {
+                this.showError("Failed to send test email: " + (oError.message || "Unknown error"));
+            } finally {
+                this.setBusy(false);
+            }
         },
 
         /**
