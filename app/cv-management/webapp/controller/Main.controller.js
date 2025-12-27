@@ -2136,9 +2136,52 @@ sap.ui.define([
         /**
          * Handle run bulk matching button press
          */
-        onRunBulkMatching: function () {
-            this.showInfo("Bulk matching functionality will run matching for all published jobs");
-            // TODO: Implement bulk matching across all jobs
+        onRunBulkMatching: async function () {
+            try {
+                this.setBusy(true);
+
+                const oModel = this.getModel();
+
+                // Get all published jobs
+                const oJobsBinding = oModel.bindList("/JobPostings", null, null,
+                    new Filter("status_code", FilterOperator.EQ, "published"));
+                const aJobContexts = await oJobsBinding.requestContexts();
+
+                if (aJobContexts.length === 0) {
+                    this.showInfo("No published jobs to match");
+                    return;
+                }
+
+                let successCount = 0;
+                let failCount = 0;
+
+                // Run matching for each job
+                for (const oJobContext of aJobContexts) {
+                    const sJobId = oJobContext.getProperty("ID");
+                    try {
+                        const oAction = oModel.bindContext("/runMatching(...)");
+                        oAction.setParameter("jobPostingId", sJobId);
+                        await oAction.execute();
+                        successCount++;
+                    } catch (error) {
+                        console.error(`Matching failed for job ${sJobId}:`, error);
+                        failCount++;
+                    }
+                }
+
+                if (failCount === 0) {
+                    this.showSuccess(`Bulk matching completed for ${successCount} jobs`);
+                } else {
+                    this.showWarning(`Matching completed: ${successCount} succeeded, ${failCount} failed`);
+                }
+
+                // Refresh dashboard
+                this._loadDashboardData();
+            } catch (oError) {
+                this.handleError(oError);
+            } finally {
+                this.setBusy(false);
+            }
         },
 
         /**
