@@ -1,0 +1,91 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:form="sap.ui.layout.form">
+
+    <Dialog
+        id="ruleBuilderDialog"
+        title="{= ${ruleBuilder>/isEdit} ? ${i18n>editRule} : ${i18n>addRule}}"
+        contentWidth="500px">
+
+        <content>
+            <form:SimpleForm
+                editable="true"
+                layout="ResponsiveGridLayout"
+                labelSpanL="4"
+                labelSpanM="4"
+                labelSpanS="12">
+
+                <form:content>
+                    <Label text="{i18n>ruleName}" required="true" />
+                    <Input
+                        id="ruleName"
+                        value="{ruleBuilder>/name}"
+                        placeholder="{i18n>enterRuleName}"
+                        maxLength="100" />
+
+                    <Label text="{i18n>ruleField}" required="true" />
+                    <Select
+                        id="ruleField"
+                        selectedKey="{ruleBuilder>/field}"
+                        change=".onRuleFieldChange">
+                        <items>
+                            <core:Item key="skills" text="{i18n>skills}" />
+                            <core:Item key="experience" text="{i18n>yearsExperience}" />
+                            <core:Item key="education" text="{i18n>education}" />
+                            <core:Item key="location" text="{i18n>location}" />
+                            <core:Item key="languages" text="{i18n>languages}" />
+                        </items>
+                    </Select>
+
+                    <Label text="{i18n>operator}" required="true" />
+                    <Select
+                        id="ruleOperator"
+                        selectedKey="{ruleBuilder>/operator}">
+                        <items>
+                            <core:Item key="contains" text="{i18n>contains}" />
+                            <core:Item key="equals" text="{i18n>equals}" />
+                            <core:Item key="greaterThan" text="{i18n>greaterThan}" />
+                            <core:Item key="lessThan" text="{i18n>lessThan}" />
+                            <core:Item key="between" text="{i18n>between}" />
+                        </items>
+                    </Select>
+
+                    <Label text="{i18n>value}" required="true" />
+                    <Input
+                        id="ruleValue"
+                        value="{ruleBuilder>/value}"
+                        placeholder="{i18n>enterValue}" />
+
+                    <Label text="{i18n>weight}" />
+                    <Slider
+                        id="ruleWeight"
+                        value="{ruleBuilder>/weight}"
+                        min="0"
+                        max="100"
+                        enableTickmarks="true"
+                        showAdvancedTooltip="true" />
+
+                    <Label text="{i18n>description}" />
+                    <TextArea
+                        id="ruleDescription"
+                        value="{ruleBuilder>/description}"
+                        rows="3"
+                        width="100%" />
+                </form:content>
+            </form:SimpleForm>
+        </content>
+
+        <beginButton>
+            <Button
+                text="{i18n>save}"
+                type="Emphasized"
+                press=".onSaveRule" />
+        </beginButton>
+        <endButton>
+            <Button
+                text="{i18n>cancel}"
+                press=".onCancelRule" />
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>
