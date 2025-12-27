@@ -2259,8 +2259,25 @@ sap.ui.define([
          * @param {object} oEvent Press event
          */
         onViewDocument: function (oEvent) {
-            this.showInfo("Document preview coming soon");
-            // TODO: Implement document preview in dialog
+            const oContext = oEvent.getSource().getBindingContext();
+            if (!oContext) {
+                this.showError("Cannot determine document");
+                return;
+            }
+
+            const sDocumentId = oContext.getProperty("ID");
+            const sFileName = oContext.getProperty("fileName");
+            const sMediaType = oContext.getProperty("mediaType");
+
+            // For PDF files, open in new tab with preview
+            if (sMediaType === "application/pdf") {
+                const sServiceUrl = this.getModel().sServiceUrl;
+                const sUrl = `${sServiceUrl}/CVDocuments(${sDocumentId})/fileContent`;
+                window.open(sUrl, "_blank");
+            } else {
+                // For other files, trigger download
+                this.onDownloadDocument(oEvent);
+            }
         },
 
         /**
