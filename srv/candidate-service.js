@@ -131,11 +131,36 @@ module.exports = class CandidateService extends cds.ApplicationService {
     }
 
     /**
-     * Send status notification (placeholder)
+     * Send status notification via event emission
      */
     async _sendStatusNotification(candidate, newStatus) {
-        // Would integrate with notification service or email service
-        console.log(`Notification sent to ${candidate.email} about status: ${newStatus}`);
+        const LOG = cds.log('candidate-service');
+
+        if (!candidate.email) {
+            LOG.warn('Cannot send notification - candidate has no email', { candidateId: candidate.ID });
+            return;
+        }
+
+        try {
+            // Emit event for email service to handle
+            await this.emit('statusNotification', {
+                candidateId: candidate.ID,
+                email: candidate.email,
+                candidateName: `${candidate.firstName} ${candidate.lastName}`,
+                newStatus: newStatus,
+                timestamp: new Date().toISOString()
+            });
+
+            LOG.info('Status notification event emitted', {
+                candidateId: candidate.ID,
+                status: newStatus
+            });
+        } catch (error) {
+            LOG.error('Failed to emit status notification', {
+                candidateId: candidate.ID,
+                error: error.message
+            });
+        }
     }
 
     /**
