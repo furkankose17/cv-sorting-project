@@ -853,6 +853,16 @@ module.exports = class CVSortingService extends cds.ApplicationService {
             }
         });
 
+        // Compute virtual fullName field
+        this.after('READ', 'Candidates', (data) => {
+            const items = Array.isArray(data) ? data : [data];
+            for (const item of items) {
+                if (item && !item.fullName) {
+                    item.fullName = [item.firstName, item.lastName].filter(Boolean).join(' ');
+                }
+            }
+        });
+
         LOG.info('Candidate domain handlers registered');
     }
 
