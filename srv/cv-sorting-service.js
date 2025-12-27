@@ -62,7 +62,10 @@ module.exports = class CVSortingService extends cds.ApplicationService {
         LOG.info('Rule Engine initialized');
 
         // Initialize n8n webhook config (from JobService)
-        this.n8nWebhookUrl = process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/match-notification';
+        this.n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
+        if (!this.n8nWebhookUrl) {
+            LOG.warn('N8N_WEBHOOK_URL not configured - webhook notifications disabled');
+        }
         this.cooldownHours = parseInt(process.env.NOTIFICATION_COOLDOWN_HOURS) || 24;
         this.thresholds = new Map();
         this.notificationHistory = [];
