@@ -4,6 +4,7 @@ Combines vector similarity with criteria-based scoring.
 """
 
 import logging
+import os
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 import numpy as np
@@ -372,25 +373,79 @@ class SemanticMatchingService:
 
     async def _get_candidate_data(self, candidate_id: str) -> Optional[Dict[str, Any]]:
         """
-        Get candidate data for criteria scoring.
-        This would ideally call CAP service or have a local cache.
+        Get candidate data from CAP service for criteria scoring.
         """
-        # TODO: Implement CAP service integration
-        # For now, return placeholder based on embeddings metadata
-        # In production, this should call the CAP CandidateService API
+        import httpx
 
-        # Example: could store basic candidate data in PostgreSQL
-        # or call CAP service: GET /api/candidates/Candidates('{candidate_id}')?$expand=skills,languages,certifications
+        cap_url = os.getenv('CAP_SERVICE_URL', 'http://localhost:4004')
 
-        logger.debug(f"Getting candidate data for {candidate_id}")
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    f"{cap_url}/api/Candidates({candidate_id})",
+                    params={"$expand": "skills,workHistory,education"},
+                    headers={"Accept": "application/json"}
+                )
 
-        # Placeholder - in real implementation, call CAP API
+                if response.status_code == 404:
+                    logger.warning(f"Candidate {candidate_id} not found in CAP service")
+                    return None
+
+                response.raise_for_status()
+                data = response.json()
+
+                # Transform CAP response to expected format
+                return self._transform_candidate_response(data)
+
+        except httpx.TimeoutException:
+            logger.error(f"Timeout getting candidate data for {candidate_id}")
+            return None
+        except httpx.HTTPError as e:
+            logger.error(f"HTTP error getting candidate data: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get candidate data for {candidate_id}: {e}")
+            return None
+
+    def _transform_candidate_response(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Transform CAP candidate response to matching service format."""
+        skills = data.get('skills', [])
+        work_history = data.get('workHistory', [])
+        education = data.get('education', [])
+
+        # Calculate total experience years
+        total_years = 0
+        for job in work_history:
+            if job.get('startDate') and job.get('endDate'):
+                try:
+                    from datetime import datetime
+                    start = datetime.fromisoformat(job['startDate'].replace('Z', '+00:00'))
+                    end_str = job['endDate']
+                    if end_str.lower() == 'present':
+                        end = datetime.now()
+                    else:
+                        end = datetime.fromisoformat(end_str.replace('Z', '+00:00'))
+                    total_years += (end - start).days / 365
+                except:
+                    pass
+
+        # Determine education level
+        education_levels = {'phd': 5, 'doctorate': 5, 'master': 4, 'mba': 4, 'bachelor': 3, 'associate': 2}
+        highest_level = ''
+        highest_rank = 0
+        for edu in education:
+            degree = (edu.get('degree') or '').lower()
+            for level, rank in education_levels.items():
+                if level in degree and rank > highest_rank:
+                    highest_rank = rank
+                    highest_level = level.title()
+
         return {
-            'skills': [],
-            'languages': {},
-            'certifications': [],
-            'totalExperienceYears': 0,
-            'educationLevel': ''
+            'skills': [s.get('name', s) if isinstance(s, dict) else s for s in skills],
+            'languages': data.get('languages', {}),
+            'certifications': data.get('certifications', []),
+            'totalExperienceYears': round(total_years, 1),
+            'educationLevel': highest_level
         }
 
     async def store_match_result(self, result: MatchResult) -> bool:
