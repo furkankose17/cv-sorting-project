@@ -171,7 +171,79 @@ sap.ui.define([
          * Handle edit job button press
          */
         onEditJob: function () {
-            this.showInfo("Edit job functionality coming soon");
+            const oContext = this.getView().getBindingContext();
+            if (!oContext) {
+                this.showError("Job not loaded");
+                return;
+            }
+
+            const oJobData = oContext.getObject();
+
+            // Create edit model with job data
+            const oEditModel = new sap.ui.model.json.JSONModel({
+                ID: oJobData.ID,
+                title: oJobData.title,
+                department: oJobData.department,
+                location: oJobData.location,
+                employmentType: oJobData.employmentType,
+                status_code: oJobData.status_code,
+                description: oJobData.description,
+                requirements: oJobData.requirements
+            });
+            this.setModel(oEditModel, "editJob");
+
+            // Open dialog (reuse from Main controller)
+            if (!this._oEditJobDialog) {
+                sap.ui.core.Fragment.load({
+                    id: this.getView().getId(),
+                    name: "cvmanagement.fragment.EditJobDialog",
+                    controller: this
+                }).then(function (oDialog) {
+                    this._oEditJobDialog = oDialog;
+                    this.getView().addDependent(oDialog);
+                    oDialog.open();
+                }.bind(this));
+            } else {
+                this._oEditJobDialog.open();
+            }
+        },
+
+        onSaveEditJob: async function () {
+            const oEditModel = this.getModel("editJob");
+            const oJobData = oEditModel.getData();
+
+            try {
+                this.setBusy(true);
+
+                const oContext = this.getView().getBindingContext();
+
+                // Update properties
+                oContext.setProperty("title", oJobData.title);
+                oContext.setProperty("department", oJobData.department);
+                oContext.setProperty("location", oJobData.location);
+                oContext.setProperty("employmentType", oJobData.employmentType);
+                oContext.setProperty("status_code", oJobData.status_code);
+                oContext.setProperty("description", oJobData.description);
+                oContext.setProperty("requirements", oJobData.requirements);
+
+                await this.getModel().submitBatch("updateGroup");
+
+                this._oEditJobDialog.close();
+                this.showSuccess("Job updated successfully");
+            } catch (oError) {
+                this.handleError(oError);
+            } finally {
+                this.setBusy(false);
+            }
+        },
+
+        onCancelEditJob: function () {
+            this._oEditJobDialog.close();
+        },
+
+        onEditJobDialogEscape: function (oPromise) {
+            oPromise.resolve();
+            this._oEditJobDialog.close();
         },
 
         // ==================== Matching Actions ====================
