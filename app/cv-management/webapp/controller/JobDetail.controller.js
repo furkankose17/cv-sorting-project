@@ -1026,8 +1026,83 @@ sap.ui.define([
          * Handle add scoring rule
          */
         onAddScoringRule: function () {
-            this.showInfo("Scoring rule builder coming soon");
-            // TODO: Open RuleBuilderDialog
+            // Create rule builder model
+            const oRuleModel = new sap.ui.model.json.JSONModel({
+                isEdit: false,
+                name: "",
+                field: "skills",
+                operator: "contains",
+                value: "",
+                weight: 50,
+                description: ""
+            });
+            this.setModel(oRuleModel, "ruleBuilder");
+
+            this._openRuleBuilderDialog();
+        },
+
+        _openRuleBuilderDialog: function () {
+            if (!this._oRuleBuilderDialog) {
+                sap.ui.core.Fragment.load({
+                    id: this.getView().getId(),
+                    name: "cvmanagement.fragment.RuleBuilderDialog",
+                    controller: this
+                }).then(function (oDialog) {
+                    this._oRuleBuilderDialog = oDialog;
+                    this.getView().addDependent(oDialog);
+                    oDialog.open();
+                }.bind(this));
+            } else {
+                this._oRuleBuilderDialog.open();
+            }
+        },
+
+        onSaveRule: async function () {
+            const oRuleModel = this.getModel("ruleBuilder");
+            const oRuleData = oRuleModel.getData();
+            const sJobId = this.getView().getBindingContext().getProperty("ID");
+
+            if (!oRuleData.name || !oRuleData.value) {
+                this.showError("Please fill in required fields");
+                return;
+            }
+
+            try {
+                this.setBusy(true);
+
+                const oModel = this.getModel();
+                const oBinding = oModel.bindList("/ScoringRules");
+
+                oBinding.create({
+                    jobPosting_ID: sJobId,
+                    name: oRuleData.name,
+                    field: oRuleData.field,
+                    operator: oRuleData.operator,
+                    value: oRuleData.value,
+                    weight: oRuleData.weight,
+                    description: oRuleData.description,
+                    isActive: true
+                });
+
+                await oModel.submitBatch("updateGroup");
+
+                this._oRuleBuilderDialog.close();
+                this.showSuccess("Rule created successfully");
+
+                // Refresh rules table
+                const oTable = this.byId("scoringRulesTable");
+                if (oTable) {
+                    oTable.getBinding("items").refresh();
+                }
+            } catch (oError) {
+                this.handleError(oError);
+            } finally {
+                this.setBusy(false);
+            }
+        },
+
+        onCancelRule: function () {
+            this._oRuleBuilderDialog.close();
         },
 
         /**
