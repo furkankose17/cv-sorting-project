@@ -676,7 +676,7 @@ module.exports = class CVSortingService extends cds.ApplicationService {
                     ID: targetCandidateId,
                     firstName: firstName,
                     lastName: lastName,
-                    email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@cv-upload.placeholder`,
+                    email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${process.env.DEFAULT_EMAIL_DOMAIN || 'pending-verification.local'}`,
                     status_code: 'new',
                     source: 'cv-upload'
                 });
