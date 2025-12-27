@@ -1,0 +1,104 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:form="sap.ui.layout.form">
+
+    <Dialog
+        id="editJobDialog"
+        title="{i18n>editJob}"
+        contentWidth="600px"
+        escapeHandler=".onEditJobDialogEscape">
+
+        <content>
+            <form:SimpleForm
+                editable="true"
+                layout="ResponsiveGridLayout"
+                labelSpanXL="4"
+                labelSpanL="4"
+                labelSpanM="4"
+                labelSpanS="12"
+                emptySpanXL="0"
+                emptySpanL="0"
+                emptySpanM="0"
+                emptySpanS="0"
+                columnsXL="1"
+                columnsL="1"
+                columnsM="1">
+
+                <form:content>
+                    <Label text="{i18n>jobTitle}" required="true" />
+                    <Input
+                        id="editJobTitle"
+                        value="{editJob>/title}"
+                        placeholder="{i18n>enterJobTitle}"
+                        maxLength="200" />
+
+                    <Label text="{i18n>department}" />
+                    <Input
+                        id="editJobDepartment"
+                        value="{editJob>/department}"
+                        placeholder="{i18n>enterDepartment}"
+                        maxLength="100" />
+
+                    <Label text="{i18n>location}" />
+                    <Input
+                        id="editJobLocation"
+                        value="{editJob>/location}"
+                        placeholder="{i18n>enterLocation}"
+                        maxLength="200" />
+
+                    <Label text="{i18n>employmentType}" />
+                    <Select
+                        id="editJobEmploymentType"
+                        selectedKey="{editJob>/employmentType}">
+                        <items>
+                            <core:Item key="full-time" text="{i18n>fullTime}" />
+                            <core:Item key="part-time" text="{i18n>partTime}" />
+                            <core:Item key="contract" text="{i18n>contract}" />
+                            <core:Item key="internship" text="{i18n>internship}" />
+                        </items>
+                    </Select>
+
+                    <Label text="{i18n>status}" />
+                    <Select
+                        id="editJobStatus"
+                        selectedKey="{editJob>/status_code}">
+                        <items>
+                            <core:Item key="draft" text="{i18n>draft}" />
+                            <core:Item key="published" text="{i18n>published}" />
+                            <core:Item key="closed" text="{i18n>closed}" />
+                        </items>
+                    </Select>
+
+                    <Label text="{i18n>description}" />
+                    <TextArea
+                        id="editJobDescription"
+                        value="{editJob>/description}"
+                        rows="5"
+                        width="100%"
+                        placeholder="{i18n>enterDescription}" />
+
+                    <Label text="{i18n>requirements}" />
+                    <TextArea
+                        id="editJobRequirements"
+                        value="{editJob>/requirements}"
+                        rows="4"
+                        width="100%"
+                        placeholder="{i18n>enterRequirements}" />
+                </form:content>
+            </form:SimpleForm>
+        </content>
+
+        <beginButton>
+            <Button
+                text="{i18n>save}"
+                type="Emphasized"
+                press=".onSaveEditJob" />
+        </beginButton>
+        <endButton>
+            <Button
+                text="{i18n>cancel}"
+                press=".onCancelEditJob" />
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>
