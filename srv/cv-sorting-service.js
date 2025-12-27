@@ -2748,8 +2748,10 @@ module.exports = class CVSortingService extends cds.ApplicationService {
                 }
 
                 default:
-                    LOG.warn(`Job handler ${handlerName} not implemented`);
-                    return null;
+                    const error = new Error(`Job handler '${handlerName}' not implemented`);
+                    error.code = 'NOT_IMPLEMENTED';
+                    LOG.error(error.message);
+                    throw error;
             }
         } catch (error) {
             LOG.error(`Error in ${handlerName}:`, error);
