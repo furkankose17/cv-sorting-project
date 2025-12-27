@@ -1318,15 +1318,98 @@ sap.ui.define([
         /**
          * Handle export rules
          */
-        onExportRules: function () {
-            this.showInfo("Export functionality coming soon");
+        onExportRules: async function () {
+            try {
+                const sJobId = this.getView().getBindingContext().getProperty("ID");
+                const oModel = this.getModel();
+
+                // Get all rules for this job
+                const oBinding = oModel.bindList("/ScoringRules", null, null,
+                    new sap.ui.model.Filter("jobPosting_ID", sap.ui.model.FilterOperator.EQ, sJobId));
+                const aContexts = await oBinding.requestContexts();
+
+                const aRules = aContexts.map(ctx => ({
+                    name: ctx.getProperty("name"),
+                    field: ctx.getProperty("field"),
+                    operator: ctx.getProperty("operator"),
+                    value: ctx.getProperty("value"),
+                    weight: ctx.getProperty("weight"),
+                    description: ctx.getProperty("description"),
+                    isActive: ctx.getProperty("isActive")
+                }));
+
+                // Create and download JSON file
+                const sContent = JSON.stringify({ rules: aRules, exportedAt: new Date().toISOString() }, null, 2);
+                const oBlob = new Blob([sContent], { type: "application/json" });
+                const sUrl = URL.createObjectURL(oBlob);
+
+                const oLink = document.createElement("a");
+                oLink.href = sUrl;
+                oLink.download = `scoring-rules-${sJobId}.json`;
+                oLink.click();
+
+                URL.revokeObjectURL(sUrl);
+                this.showSuccess(`Exported ${aRules.length} rules`);
+            } catch (oError) {
+                this.handleError(oError);
+            }
         },
 
         /**
          * Handle import rules
          */
         onImportRules: function () {
-            this.showInfo("Import functionality coming soon");
+            // Create file input
+            const oFileInput = document.createElement("input");
+            oFileInput.type = "file";
+            oFileInput.accept = ".json";
+
+            oFileInput.onchange = async (oEvent) => {
+                const oFile = oEvent.target.files[0];
+                if (!oFile) return;
+
+                try {
+                    const sContent = await oFile.text();
+                    const oData = JSON.parse(sContent);
+
+                    if (!oData.rules || !Array.isArray(oData.rules)) {
+                        this.showError("Invalid rules file format");
+                        return;
+                    }
+
+                    const sJobId = this.getView().getBindingContext().getProperty("ID");
+                    const oModel = this.getModel();
+                    const oBinding = oModel.bindList("/ScoringRules");
+
+                    let importCount = 0;
+                    for (const oRule of oData.rules) {
+                        oBinding.create({
+                            jobPosting_ID: sJobId,
+                            name: oRule.name,
+                            field: oRule.field,
+                            operator: oRule.operator,
+                            value: oRule.value,
+                            weight: oRule.weight || 50,
+                            description: oRule.description || "",
+                            isActive: oRule.isActive !== false
+                        });
+                        importCount++;
+                    }
+
+                    await oModel.submitBatch("updateGroup");
+                    this.showSuccess(`Imported ${importCount} rules`);
+
+                    // Refresh rules table
+                    const oTable = this.byId("scoringRulesTable");
+                    if (oTable) {
+                        oTable.getBinding("items").refresh();
+                    }
+                } catch (oError) {
+                    this.showError("Failed to import rules: " + oError.message);
+                }
+            };
+
+            oFileInput.click();
         },
 
         /**
