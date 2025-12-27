@@ -1842,7 +1842,97 @@ sap.ui.define([
          * @param {sap.ui.base.Event} oEvent The press event
          */
         onEditJob: function (oEvent) {
-            this.showInfo("Edit job functionality coming soon");
+            const oSource = oEvent.getSource();
+            const oContext = oSource.getBindingContext();
+
+            if (!oContext) {
+                this.showError("No job selected");
+                return;
+            }
+
+            const oJobData = oContext.getObject();
+
+            // Create edit model with job data
+            const oEditModel = new JSONModel({
+                ID: oJobData.ID,
+                title: oJobData.title,
+                department: oJobData.department,
+                location: oJobData.location,
+                employmentType: oJobData.employmentType,
+                status_code: oJobData.status_code,
+                description: oJobData.description,
+                requirements: oJobData.requirements
+            });
+            this.setModel(oEditModel, "editJob");
+
+            // Open dialog
+            if (!this._oEditJobDialog) {
+                Fragment.load({
+                    id: this.getView().getId(),
+                    name: "cvmanagement.fragment.EditJobDialog",
+                    controller: this
+                }).then(function (oDialog) {
+                    this._oEditJobDialog = oDialog;
+                    this.getView().addDependent(oDialog);
+                    oDialog.open();
+                }.bind(this));
+            } else {
+                this._oEditJobDialog.open();
+            }
+        },
+
+        /**
+         * Save edited job
+         */
+        onSaveEditJob: async function () {
+            const oEditModel = this.getModel("editJob");
+            const oJobData = oEditModel.getData();
+            const sJobId = oJobData.ID;
+
+            try {
+                this.setBusy(true);
+
+                const oModel = this.getModel();
+                const oContext = oModel.bindContext(`/JobPostings(${sJobId})`);
+                await oContext.requestObject();
+
+                // Update properties
+                oContext.setProperty("title", oJobData.title);
+                oContext.setProperty("department", oJobData.department);
+                oContext.setProperty("location", oJobData.location);
+                oContext.setProperty("employmentType", oJobData.employmentType);
+                oContext.setProperty("status_code", oJobData.status_code);
+                oContext.setProperty("description", oJobData.description);
+                oContext.setProperty("requirements", oJobData.requirements);
+
+                await oModel.submitBatch("updateGroup");
+
+                this._oEditJobDialog.close();
+                this.showSuccess("Job updated successfully");
+
+                // Refresh jobs table
+                this.onRefreshJobs();
+            } catch (oError) {
+                this.handleError(oError);
+            } finally {
+                this.setBusy(false);
+            }
+        },
+
+        /**
+         * Cancel edit job dialog
+         */
+        onCancelEditJob: function () {
+            this._oEditJobDialog.close();
+        },
+
+        /**
+         * Handle escape key in edit job dialog
+         * @param {object} oPromise Promise to resolve
+         */
+        onEditJobDialogEscape: function (oPromise) {
+            oPromise.resolve();
+            this._oEditJobDialog.close();
         },
 
         /**
