@@ -545,8 +545,8 @@ class OCRService {
         // Pattern for job entries
         const jobPattern = /(?:^|\n)(.+?)\s*(?:at|@|-|,)\s*(.+?)(?:\s*\(|\s*[-–]\s*)(\d{4}|\w+\s+\d{4})(?:\s*[-–]\s*)(present|\d{4}|\w+\s+\d{4})?/gi;
 
-        let match;
-        while ((match = jobPattern.exec(experienceSection)) !== null) {
+        const matches = experienceSection.matchAll(jobPattern);
+        for (const match of matches) {
             experiences.push({
                 title: match[1]?.trim(),
                 company: match[2]?.trim(),
@@ -568,8 +568,8 @@ class OCRService {
         // Pattern for education entries
         const eduPattern = /(?:^|\n)(Bachelor|Master|PhD|B\.?S\.?|M\.?S\.?|B\.?A\.?|M\.?A\.?|MBA|Doctor).+?(?:in|of)?\s*(.+?)(?:\s*[-–,]\s*)(.+?)(?:\s*\(|\s*[-–]\s*)(\d{4})/gi;
 
-        let match;
-        while ((match = eduPattern.exec(educationSection)) !== null) {
+        const matches = educationSection.matchAll(eduPattern);
+        for (const match of matches) {
             education.push({
                 degree: match[1]?.trim(),
                 field: match[2]?.trim(),
@@ -716,8 +716,8 @@ class OCRService {
         ];
 
         for (const { regex, langGroup, profGroup } of patterns) {
-            let match;
-            while ((match = regex.exec(textToSearch)) !== null) {
+            const matches = textToSearch.matchAll(regex);
+            for (const match of matches) {
                 const langKey = match[langGroup].toLowerCase();
                 const proficiencyRaw = match[profGroup]?.toLowerCase();
 
@@ -841,8 +841,8 @@ class OCRService {
         const foundCerts = new Map();
 
         for (const { pattern, issuer: defaultIssuer } of certPatterns) {
-            let match;
-            while ((match = pattern.exec(textToSearch)) !== null) {
+            const matches = textToSearch.matchAll(pattern);
+            for (const match of matches) {
                 const fullMatch = match[0].trim();
                 const certName = this._normalizeCertName(fullMatch);
 
